@@ -1,0 +1,95 @@
+# LLM TaskBench Task Definition Template
+#
+# This template shows all available fields for defining custom evaluation tasks.
+# Copy this file and fill in your specific values.
+
+# Required: Unique name for this task (use snake_case)
+name: "your_task_name"
+
+# Required: Human-readable description of what the task does
+description: "Describe what you want the LLM to do with the input"
+
+# Required: Type of input data
+# Options: "transcript", "text", "csv", "json"
+input_type: "text"
+
+# Required: Expected output format
+# Options: "csv", "json", "markdown"
+output_format: "json"
+
+# Required: List of criteria for evaluating model outputs
+# These will be used by the LLM-as-judge to score outputs
+evaluation_criteria:
+  - "Accuracy: Did it correctly identify key information?"
+  - "Completeness: Are all required elements present?"
+  - "Format compliance: Does output match the specified format?"
+  - "Quality: Is the output clear and well-structured?"
+
+# Optional: Task-specific constraints
+# Use this to specify rules, limits, or requirements
+constraints:
+  # Example numeric constraints
+  min_items: 5
+  max_items: 20
+
+  # Example string constraints
+  required_fields: ["field1", "field2", "field3"]
+
+  # Example format constraints
+  date_format: "YYYY-MM-DD"
+
+  # Add your own constraints as key-value pairs
+  custom_constraint: "your_value"
+
+# Optional: Examples of good inputs and outputs
+# Provide 2-3 examples showing what you expect
+examples:
+  - input: "Example input text here..."
+    expected_output: '{"result": "example output"}'
+    quality_score: 95
+    notes: "Perfect example: all criteria met"
+
+  - input: "Another example..."
+    expected_output: '{"result": "another output"}'
+    quality_score: 70
+    notes: "Acceptable but could be better: missing some details"
+
+# Required: Detailed instructions for the LLM-as-judge
+# This is used to automatically evaluate model outputs
+# Be specific about scoring criteria and what counts as violations
+judge_instructions: |
+  Evaluate the model's output using these criteria:
+
+  1. ACCURACY (X points):
+     - Specific criterion 1
+     - Specific criterion 2
+     - Deduct Y points for each error
+
+  2. FORMAT (X points):
+     - Valid JSON/CSV/markdown?
+     - Required fields present?
+     - Proper structure?
+
+  3. COMPLIANCE (X points):
+     - Meets all constraints?
+     - Follows specified rules?
+
+  Count violations:
+  - Type 1 violation: [describe]
+  - Type 2 violation: [describe]
+  - Type 3 violation: [describe]
+
+  Provide:
+  - Accuracy score (0-100)
+  - Format score (0-100)
+  - Compliance score (0-100)
+  - Overall score (0-100, weighted average)
+  - List of all violations found
+  - Detailed reasoning for scores
+
+# Tips for effective task definitions:
+# 1. Be specific: Vague criteria lead to inconsistent evaluations
+# 2. Use examples: Show what good/bad outputs look like
+# 3. Quantify when possible: "20-24 items" not "many items"
+# 4. Test iteratively: Run on a few models, refine criteria
+# 5. Balance strictness: Too strict may penalize all models unfairly

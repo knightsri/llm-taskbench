@@ -1,0 +1,49 @@
+name: "lecture_concept_extraction"
+description: "Extract teaching concepts from lecture transcripts with precise timestamps"
+
+input_type: "transcript"
+output_format: "csv"
+
+evaluation_criteria:
+  - "Concept count (target: 20-24 for 3-hour lecture)"
+  - "Timestamp accuracy (within ±5 seconds)"
+  - "Duration compliance (2-7 minutes per segment)"
+  - "Concept names are descriptive and clear"
+  - "No overlapping time ranges"
+
+constraints:
+  min_duration_minutes: 2
+  max_duration_minutes: 7
+  target_duration_minutes: "3-6"
+  required_csv_columns: ["concept", "start_time", "end_time"]
+  timestamp_format: "HH:MM:SS"
+
+examples:
+  - input: "Sample transcript snippet..."
+    expected_output: "01_Teaching_Concept,00:20:06,00:23:15"
+    quality_score: 95
+    notes: "Perfect: 3.15 minute segment, descriptive name, clean timestamps"
+
+judge_instructions: |
+  Evaluate the model's output against these specific criteria:
+
+  1. ACCURACY (40 points):
+     - Did it identify all major teaching concepts?
+     - Are concepts semantically distinct?
+     - Are timestamps accurate?
+
+  2. FORMAT (30 points):
+     - Valid CSV with required columns?
+     - Timestamps in HH:MM:SS format?
+     - Concept names follow naming convention?
+
+  3. COMPLIANCE (30 points):
+     - All segments 2-7 minutes? (violations: -5 points each)
+     - No overlapping timestamps?
+     - Concepts in chronological order?
+
+  Count violations:
+  - Under 2 minutes: VIOLATION
+  - Over 7 minutes: VIOLATION
+  - Overlapping timestamps: VIOLATION
+  - Invalid format: VIOLATION
