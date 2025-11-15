@@ -1,0 +1,29 @@
+name: "test_lecture_analysis"
+description: "Test task for lecture concept extraction"
+input_type: "transcript"
+output_format: "csv"
+
+evaluation_criteria:
+  - "Concept count (target: 20-24 for 3-hour lecture)"
+  - "Timestamp accuracy (within ±5 seconds)"
+  - "Duration compliance (2-7 minutes per segment)"
+  - "Concept names are descriptive and clear"
+  - "No overlapping time ranges"
+
+constraints:
+  min_duration_minutes: 2
+  max_duration_minutes: 7
+  required_csv_columns: ["concept", "start_time", "end_time"]
+  timestamp_format: "HH:MM:SS"
+
+examples:
+  - input: "Sample transcript snippet about Python programming..."
+    expected_output: "01_Introduction_to_Python,00:00:00,00:05:30"
+    quality_score: 95
+    notes: "Good example with clear concept and proper duration"
+
+judge_instructions: |
+  Evaluate the model's output based on:
+  1. Accuracy: Are concepts correctly identified?
+  2. Format: Is the CSV properly formatted?
+  3. Compliance: Do segments meet duration constraints?

@@ -1,0 +1,6 @@
+name: "invalid_task"
+description: "Task with missing required fields"
+input_type: "invalid_type"
+output_format: "csv"
+# Missing evaluation_criteria
+# Missing judge_instructions
