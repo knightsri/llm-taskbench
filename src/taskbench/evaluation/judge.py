@@ -262,7 +262,7 @@ class LLMJudge:
         counts = self.count_violations_by_type(all_violations)
 
         summary_parts = [
-            f"  {models_with_violations}/{len(scores)} models had violations. Total: {total_violations}",
+            f"Â  {models_with_violations}/{len(scores)} models had violations. Total: {total_violations}",
             ""
         ]
 

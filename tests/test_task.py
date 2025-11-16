@@ -158,7 +158,7 @@ class TestTaskParser:
         assert loaded_task.output_format == sample_task.output_format
 
     def test_round_trip_preservation(self, parser, valid_task_path, tmp_path):
-        """Test that load ’ save ’ load preserves data."""
+        """Test that load â€™ save â€™ load preserves data."""
         # Load original task
         original_task = parser.load_from_yaml(valid_task_path)
 

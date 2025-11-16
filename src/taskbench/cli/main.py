@@ -170,17 +170,17 @@ async def _evaluate_async(
                     console.print(table)
 
                     # Show recommendations
-                    console.print("\n[bold cyan]=Ê RECOMMENDATIONS[/bold cyan]\n")
+                    console.print("\n[bold cyan]=ÃŠ RECOMMENDATIONS[/bold cyan]\n")
 
                     best_model = ModelComparison.identify_best(comparison)
                     best_value = ModelComparison.identify_best_value(comparison)
 
-                    console.print(f"<Æ [bold green]Best Overall[/bold green]: {best_model}")
+                    console.print(f"<Ã† [bold green]Best Overall[/bold green]: {best_model}")
                     best_item = next(c for c in comparison if c["model"] == best_model)
                     console.print(f"   Score: {best_item['overall_score']}/100, Cost: ${best_item['cost_usd']:.4f}")
 
                     if best_value != best_model:
-                        console.print(f"\n=Ž [bold yellow]Best Value[/bold yellow]: {best_value}")
+                        console.print(f"\n=Å½ [bold yellow]Best Value[/bold yellow]: {best_value}")
                         value_item = next(c for c in comparison if c["model"] == best_value)
                         console.print(f"   Score: {value_item['overall_score']}/100, Cost: ${value_item['cost_usd']:.4f}")
 

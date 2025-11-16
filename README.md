@@ -43,15 +43,19 @@ Traditional LLM benchmarks don't tell you which model is best for **your** task.
 git clone https://github.com/knightsri/llm-taskbench.git
 cd llm-taskbench
 
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
-# Install the package
+# Install dependencies
 pip install -e .
 
-# Set up your API key
+# Set up API key
 cp .env.example .env
-# Edit .env and add your OPENROUTER_API_KEY
+# Edit .env and add: OPENROUTER_API_KEY=sk-or-v1-your-key-here
 ```
 
 ### Run Your First Evaluation
