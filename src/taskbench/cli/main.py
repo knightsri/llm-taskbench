@@ -19,9 +19,11 @@ from rich.panel import Panel
 from rich import box
 
 from taskbench.core.task import TaskParser
-from taskbench.core.models import EvaluationResult, TaskDefinition
+from taskbench.core.models import EvaluationResult, TaskDefinition, JudgeScore
 from taskbench.evaluation.executor import ModelExecutor
 from taskbench.evaluation.cost import CostTracker
+from taskbench.evaluation.comparison import ModelComparison
+from taskbench.evaluation.recommender import RecommendationEngine
 from taskbench.utils.logging import setup_logging
 
 # Create Typer app
@@ -454,6 +456,141 @@ def results(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def recommend(
+    results_file: str = typer.Option(
+        "results.json",
+        "--results-file", "-r",
+        help="Path to evaluation results JSON file"
+    ),
+    scores_file: str = typer.Option(
+        "scores.json",
+        "--scores-file", "-s",
+        help="Path to judge scores JSON file"
+    ),
+    budget: Optional[float] = typer.Option(
+        None,
+        "--budget", "-b",
+        help="Maximum budget per request in USD (e.g., 0.10)"
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output", "-o",
+        help="Save recommendations to JSON file"
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose", "-v",
+        help="Enable verbose logging"
+    )
+) -> None:
+    """
+    Generate model recommendations from evaluation results.
+
+    This command analyzes evaluation results and judge scores to provide
+    intelligent recommendations about which models to use based on:
+    - Overall performance (accuracy, format, compliance)
+    - Cost efficiency (best value for money)
+    - Budget constraints
+    - Different use cases (production, development, etc.)
+
+    Example:
+
+        # Generate recommendations from results
+        taskbench recommend --results-file results.json --scores-file scores.json
+
+        # Filter by budget (max 10 cents per request)
+        taskbench recommend --budget 0.10
+
+        # Save recommendations to JSON
+        taskbench recommend --output recommendations.json
+    """
+    setup_cli_logging(verbose)
+
+    try:
+        # Load evaluation results
+        results_path = Path(results_file)
+        if not results_path.exists():
+            console.print(f"[red]Error: Results file not found: {results_file}[/red]")
+            console.print("[yellow]Tip: Run 'taskbench evaluate' first to generate results[/yellow]")
+            raise typer.Exit(code=1)
+
+        console.print(f"\n[cyan]Loading evaluation results from {results_file}...[/cyan]")
+        results = load_results(results_file)
+        console.print(f"[green]✓[/green] Loaded {len(results)} evaluation result(s)")
+
+        # Load judge scores
+        scores_path = Path(scores_file)
+        if not scores_path.exists():
+            console.print(f"\n[yellow]Warning: Scores file not found: {scores_file}[/yellow]")
+            console.print("[yellow]Recommendations will be limited without judge scores[/yellow]")
+            console.print("[yellow]Tip: Use the judge functionality to generate scores[/yellow]")
+            scores = []
+        else:
+            console.print(f"\n[cyan]Loading judge scores from {scores_file}...[/cyan]")
+            scores = load_scores(scores_file)
+            console.print(f"[green]✓[/green] Loaded {len(scores)} judge score(s)")
+
+        # Filter by budget if specified
+        if budget is not None:
+            console.print(f"\n[cyan]Filtering models by budget: ${budget:.4f} per request[/cyan]")
+            original_count = len(results)
+            results = [r for r in results if r.cost_usd <= budget]
+            filtered_count = original_count - len(results)
+
+            if filtered_count > 0:
+                console.print(f"[yellow]→[/yellow] Filtered out {filtered_count} model(s) exceeding budget")
+
+            if not results:
+                console.print(f"\n[red]Error: No models found within budget of ${budget:.4f}[/red]")
+                console.print("[yellow]Try increasing the budget or running more evaluations[/yellow]")
+                raise typer.Exit(code=1)
+
+        if not results:
+            console.print("\n[red]Error: No evaluation results available[/red]")
+            raise typer.Exit(code=1)
+
+        # Create comparison data
+        console.print("\n[cyan]Analyzing results and generating comparison...[/cyan]")
+        comparison = ModelComparison()
+        comparison_data = comparison.compare_results(results, scores)
+        console.print(f"[green]✓[/green] Comparison complete: {comparison_data['successful_models']} successful, {comparison_data['failed_models']} failed")
+
+        # Display comparison table
+        console.print()
+        comparison_table = comparison.generate_comparison_table(comparison_data)
+        console.print(comparison_table)
+
+        # Generate recommendations
+        console.print("\n[cyan]Generating intelligent recommendations...[/cyan]")
+        engine = RecommendationEngine()
+        recommendations = engine.generate_recommendations(comparison_data)
+        console.print(f"[green]✓[/green] Recommendations generated")
+
+        # Display formatted recommendations
+        console.print()
+        formatted_recs = engine.format_recommendations(recommendations)
+        console.print(formatted_recs)
+
+        # Save to JSON if requested
+        if output:
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            export_data = engine.export_recommendations_json(recommendations)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=2, default=str)
+
+            console.print(f"\n[green]✓[/green] Recommendations saved to {output}")
+
+    except Exception as e:
+        logger.error(f"Failed to generate recommendations: {e}", exc_info=verbose)
+        console.print(f"\n[red]Error: {e}[/red]")
+        if verbose:
+            console.print_exception()
+        raise typer.Exit(code=1)
+
+
 # Helper functions
 
 def display_results_table(results: List[EvaluationResult]) -> None:
@@ -535,6 +672,24 @@ def load_results(results_path: str) -> List[EvaluationResult]:
     results = [EvaluationResult(**data) for data in results_data]
     logger.info(f"Loaded {len(results)} results from {results_path}")
     return results
+
+
+def load_scores(scores_path: str) -> List[JudgeScore]:
+    """
+    Load judge scores from a JSON file.
+
+    Args:
+        scores_path: Path to the JSON file
+
+    Returns:
+        List of JudgeScore objects
+    """
+    with open(scores_path, 'r', encoding='utf-8') as f:
+        scores_data = json.load(f)
+
+    scores = [JudgeScore(**data) for data in scores_data]
+    logger.info(f"Loaded {len(scores)} scores from {scores_path}")
+    return scores
 
 
 def format_results_json(results: List[EvaluationResult]) -> str:
