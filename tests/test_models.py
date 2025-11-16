@@ -1,7 +1,11 @@
 """
 Tests for Pydantic data models.
+
+This module tests all data models for proper instantiation, validation,
+and serialization.
 """
 
+import json
 from datetime import datetime
 
 import pytest
@@ -20,21 +24,22 @@ class TestTaskDefinition:
     """Tests for TaskDefinition model."""
 
     def test_valid_task_definition(self):
-        """Test creating a valid task definition."""
+        """Test creating a valid TaskDefinition."""
         task = TaskDefinition(
             name="test_task",
             description="A test task",
             input_type="transcript",
             output_format="csv",
             evaluation_criteria=["Accuracy", "Format"],
-            constraints={"min_duration": 2},
+            constraints={"min_duration": 2, "max_duration": 7},
             examples=[{"input": "test", "output": "result"}],
-            judge_instructions="Evaluate based on criteria"
+            judge_instructions="Evaluate carefully"
         )
         assert task.name == "test_task"
         assert task.input_type == "transcript"
         assert task.output_format == "csv"
         assert len(task.evaluation_criteria) == 2
+        assert task.constraints["min_duration"] == 2
 
     def test_invalid_input_type(self):
         """Test that invalid input_type raises ValidationError."""
@@ -45,7 +50,7 @@ class TestTaskDefinition:
                 input_type="invalid_type",
                 output_format="csv",
                 evaluation_criteria=["Accuracy"],
-                judge_instructions="Test"
+                judge_instructions="Evaluate carefully"
             )
         assert "input_type must be one of" in str(exc_info.value)
 
@@ -55,171 +60,237 @@ class TestTaskDefinition:
             TaskDefinition(
                 name="test_task",
                 description="A test task",
-                input_type="transcript",
+                input_type="text",
                 output_format="invalid_format",
                 evaluation_criteria=["Accuracy"],
-                judge_instructions="Test"
+                judge_instructions="Evaluate carefully"
             )
         assert "output_format must be one of" in str(exc_info.value)
 
     def test_optional_fields(self):
         """Test that optional fields work correctly."""
         task = TaskDefinition(
+            name="minimal_task",
+            description="Minimal task",
+            input_type="text",
+            output_format="json",
+            evaluation_criteria=["Accuracy"],
+            judge_instructions="Evaluate"
+        )
+        assert task.constraints == {}
+        assert task.examples == []
+
+    def test_serialization_to_dict(self):
+        """Test model serialization to dict."""
+        task = TaskDefinition(
             name="test_task",
             description="A test task",
             input_type="text",
             output_format="json",
             evaluation_criteria=["Accuracy"],
-            judge_instructions="Test"
+            judge_instructions="Evaluate"
         )
-        assert task.constraints == {}
-        assert task.examples == []
+        task_dict = task.model_dump()
+        assert isinstance(task_dict, dict)
+        assert task_dict["name"] == "test_task"
 
-    def test_serialization(self):
-        """Test model serialization to dict/JSON."""
+    def test_serialization_to_json(self):
+        """Test model serialization to JSON."""
         task = TaskDefinition(
             name="test_task",
             description="A test task",
-            input_type="transcript",
-            output_format="csv",
+            input_type="text",
+            output_format="json",
             evaluation_criteria=["Accuracy"],
-            judge_instructions="Test"
+            judge_instructions="Evaluate"
         )
-        task_dict = task.model_dump()
-        assert task_dict["name"] == "test_task"
-        assert isinstance(task_dict, dict)
+        task_json = task.model_dump_json()
+        assert isinstance(task_json, str)
+        parsed = json.loads(task_json)
+        assert parsed["name"] == "test_task"
 
 
 class TestCompletionResponse:
     """Tests for CompletionResponse model."""
 
     def test_valid_completion_response(self):
-        """Test creating a valid completion response."""
+        """Test creating a valid CompletionResponse."""
         response = CompletionResponse(
             content="Test response",
-            model="anthropic/claude-sonnet-4.5",
+            model="test-model",
             input_tokens=100,
             output_tokens=50,
             total_tokens=150,
-            latency_ms=1500.5
+            latency_ms=1234.56
         )
         assert response.content == "Test response"
-        assert response.model == "anthropic/claude-sonnet-4.5"
+        assert response.model == "test-model"
         assert response.total_tokens == 150
+        assert response.latency_ms == 1234.56
         assert isinstance(response.timestamp, datetime)
 
-    def test_default_timestamp(self):
+    def test_timestamp_defaults_to_now(self):
         """Test that timestamp defaults to current time."""
+        before = datetime.now()
         response = CompletionResponse(
             content="Test",
             model="test-model",
             input_tokens=100,
             output_tokens=50,
             total_tokens=150,
-            latency_ms=1000
+            latency_ms=100.0
         )
-        assert isinstance(response.timestamp, datetime)
-        # Check it's within the last few seconds
-        assert (datetime.now() - response.timestamp).total_seconds() < 5
+        after = datetime.now()
+        assert before <= response.timestamp <= after
+
+    def test_serialization(self):
+        """Test CompletionResponse serialization."""
+        response = CompletionResponse(
+            content="Test",
+            model="test-model",
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+            latency_ms=100.0
+        )
+        response_dict = response.model_dump()
+        assert response_dict["content"] == "Test"
+        assert response_dict["total_tokens"] == 150
 
 
 class TestEvaluationResult:
     """Tests for EvaluationResult model."""
 
     def test_valid_evaluation_result(self):
-        """Test creating a valid evaluation result."""
+        """Test creating a valid EvaluationResult."""
         result = EvaluationResult(
-            model_name="anthropic/claude-sonnet-4.5",
-            task_name="lecture_analysis",
-            output="concept,start,end\nIntro,00:00:00,00:03:00",
-            input_tokens=1000,
-            output_tokens=500,
-            total_tokens=1500,
-            cost_usd=0.36,
-            latency_ms=2500
+            model_name="test-model",
+            task_name="test-task",
+            output="test output",
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+            cost_usd=0.25,
+            latency_ms=1234.56
         )
-        assert result.model_name == "anthropic/claude-sonnet-4.5"
+        assert result.model_name == "test-model"
+        assert result.task_name == "test-task"
         assert result.status == "success"
         assert result.error is None
 
-    def test_failed_evaluation_result(self):
-        """Test creating a failed evaluation result."""
+    def test_failed_status_with_error(self):
+        """Test EvaluationResult with failed status and error message."""
         result = EvaluationResult(
             model_name="test-model",
-            task_name="test_task",
+            task_name="test-task",
             output="",
             input_tokens=0,
             output_tokens=0,
             total_tokens=0,
             cost_usd=0.0,
-            latency_ms=0,
+            latency_ms=0.0,
             status="failed",
             error="API timeout"
         )
         assert result.status == "failed"
         assert result.error == "API timeout"
 
+    def test_serialization(self):
+        """Test EvaluationResult serialization."""
+        result = EvaluationResult(
+            model_name="test-model",
+            task_name="test-task",
+            output="output",
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+            cost_usd=0.25,
+            latency_ms=1234.56
+        )
+        result_dict = result.model_dump()
+        assert result_dict["model_name"] == "test-model"
+        assert result_dict["cost_usd"] == 0.25
+
 
 class TestJudgeScore:
     """Tests for JudgeScore model."""
 
     def test_valid_judge_score(self):
-        """Test creating a valid judge score."""
-        score = JudgeScore(
-            model_evaluated="anthropic/claude-sonnet-4.5",
-            accuracy_score=95,
-            format_score=100,
-            compliance_score=98,
-            overall_score=97,
-            violations=[],
-            reasoning="Excellent performance"
-        )
-        assert score.overall_score == 97
-        assert len(score.violations) == 0
-
-    def test_judge_score_with_violations(self):
-        """Test judge score with violations."""
+        """Test creating a valid JudgeScore."""
         score = JudgeScore(
             model_evaluated="test-model",
-            accuracy_score=85,
-            format_score=90,
-            compliance_score=70,
-            overall_score=80,
-            violations=["Segment under 2 minutes", "Overlapping timestamps"],
-            reasoning="Some issues found"
+            accuracy_score=95,
+            format_score=100,
+            compliance_score=90,
+            overall_score=95,
+            violations=["Minor issue"],
+            reasoning="Good performance overall"
         )
-        assert len(score.violations) == 2
+        assert score.model_evaluated == "test-model"
+        assert score.accuracy_score == 95
+        assert score.overall_score == 95
+        assert len(score.violations) == 1
 
-    def test_score_range_validation(self):
-        """Test that scores must be 0-100."""
-        with pytest.raises(ValidationError):
+    def test_score_validation_upper_bound(self):
+        """Test that scores above 100 raise ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             JudgeScore(
                 model_evaluated="test-model",
-                accuracy_score=150,  # Invalid
+                accuracy_score=101,
                 format_score=100,
                 compliance_score=100,
                 overall_score=100,
                 violations=[],
                 reasoning="Test"
             )
+        assert "Score must be between 0 and 100" in str(exc_info.value)
 
-        with pytest.raises(ValidationError):
+    def test_score_validation_lower_bound(self):
+        """Test that scores below 0 raise ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             JudgeScore(
                 model_evaluated="test-model",
-                accuracy_score=95,
-                format_score=-10,  # Invalid
-                compliance_score=100,
-                overall_score=95,
+                accuracy_score=50,
+                format_score=-1,
+                compliance_score=50,
+                overall_score=50,
                 violations=[],
                 reasoning="Test"
             )
+        assert "Score must be between 0 and 100" in str(exc_info.value)
+
+    def test_empty_violations(self):
+        """Test JudgeScore with no violations."""
+        score = JudgeScore(
+            model_evaluated="test-model",
+            accuracy_score=100,
+            format_score=100,
+            compliance_score=100,
+            overall_score=100,
+            reasoning="Perfect score"
+        )
+        assert score.violations == []
+
+    def test_serialization(self):
+        """Test JudgeScore serialization."""
+        score = JudgeScore(
+            model_evaluated="test-model",
+            accuracy_score=95,
+            format_score=100,
+            compliance_score=90,
+            overall_score=95,
+            violations=[],
+            reasoning="Good"
+        )
+        score_dict = score.model_dump()
+        assert score_dict["overall_score"] == 95
 
 
 class TestModelConfig:
     """Tests for ModelConfig model."""
 
     def test_valid_model_config(self):
-        """Test creating a valid model config."""
+        """Test creating a valid ModelConfig."""
         config = ModelConfig(
             model_id="anthropic/claude-sonnet-4.5",
             display_name="Claude Sonnet 4.5",
@@ -229,37 +300,22 @@ class TestModelConfig:
             provider="Anthropic"
         )
         assert config.model_id == "anthropic/claude-sonnet-4.5"
+        assert config.display_name == "Claude Sonnet 4.5"
+        assert config.input_price_per_1m == 3.00
+        assert config.output_price_per_1m == 15.00
+        assert config.context_window == 200000
         assert config.provider == "Anthropic"
 
-    def test_calculate_cost(self):
-        """Test cost calculation method."""
+    def test_serialization(self):
+        """Test ModelConfig serialization."""
         config = ModelConfig(
-            model_id="anthropic/claude-sonnet-4.5",
-            display_name="Claude Sonnet 4.5",
-            input_price_per_1m=3.00,
-            output_price_per_1m=15.00,
-            context_window=200000,
-            provider="Anthropic"
-        )
-
-        # Test with 100K input + 10K output tokens
-        cost = config.calculate_cost(100_000, 10_000)
-        expected = (100_000 / 1_000_000) * 3.00 + (10_000 / 1_000_000) * 15.00
-        assert cost == round(expected, 2)
-        assert cost == 0.45
-
-    def test_calculate_cost_rounding(self):
-        """Test that cost is rounded to $0.01 precision."""
-        config = ModelConfig(
-            model_id="test-model",
+            model_id="test/model",
             display_name="Test Model",
-            input_price_per_1m=2.50,
-            output_price_per_1m=10.00,
+            input_price_per_1m=1.00,
+            output_price_per_1m=2.00,
             context_window=100000,
             provider="Test"
         )
-
-        # Test with odd numbers that might have rounding issues
-        cost = config.calculate_cost(12_345, 6_789)
-        assert isinstance(cost, float)
-        assert len(str(cost).split('.')[-1]) <= 2  # Max 2 decimal places
+        config_dict = config.model_dump()
+        assert config_dict["model_id"] == "test/model"
+        assert config_dict["input_price_per_1m"] == 1.00

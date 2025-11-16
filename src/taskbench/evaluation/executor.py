@@ -1,184 +1,179 @@
 """
-Model executor for LLM TaskBench.
+Model executor for running evaluations.
 
-This module provides the ModelExecutor class that handles executing tasks
-on multiple LLM models, building prompts, tracking costs, and collecting results.
+This module handles executing tasks on LLM models, building prompts,
+and collecting results.
 """
 
-import asyncio
 import logging
-from typing import List, Optional
+from typing import List
 
+from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
-from taskbench.api.client import OpenRouterClient, OpenRouterAPIError
-from taskbench.core.models import TaskDefinition, EvaluationResult, CompletionResponse
+from taskbench.api.client import OpenRouterClient
+from taskbench.core.models import EvaluationResult, TaskDefinition
 from taskbench.evaluation.cost import CostTracker
 
 logger = logging.getLogger(__name__)
+console = Console()
 
 
 class ModelExecutor:
     """
-    Execute evaluation tasks on multiple LLM models.
+    Execute tasks on LLM models and collect results.
 
-    This class handles:
-    - Building comprehensive prompts from task definitions
-    - Executing tasks on one or more models via OpenRouter API
-    - Tracking token usage and costs
-    - Handling errors gracefully
-    - Displaying progress with Rich progress bars
+    Handles prompt building, API calls, error handling, and result collection
+    for single and multiple model evaluations.
 
     Example:
-        >>> executor = ModelExecutor()
-        >>> task = TaskDefinition(...)
-        >>> input_data = "lecture transcript..."
-        >>>
-        >>> # Execute on a single model
-        >>> result = await executor.execute("anthropic/claude-sonnet-4.5", task, input_data)
-        >>> print(f"Cost: ${result.cost_usd:.4f}")
-        >>>
-        >>> # Execute on multiple models
-        >>> models = ["anthropic/claude-sonnet-4.5", "openai/gpt-4o"]
-        >>> results = await executor.evaluate_multiple(models, task, input_data)
-        >>> for result in results:
-        ...     print(f"{result.model_name}: {result.status}")
+        ```python
+        executor = ModelExecutor(api_client, cost_tracker)
+
+        result = await executor.execute(
+            model_id="anthropic/claude-sonnet-4.5",
+            task=task_definition,
+            input_data=transcript
+        )
+
+        results = await executor.evaluate_multiple(
+            model_ids=["claude-sonnet-4.5", "gpt-4o"],
+            task=task_definition,
+            input_data=transcript
+        )
+        ```
     """
 
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        cost_tracker: Optional[CostTracker] = None,
-        timeout: float = 120.0
-    ):
+    def __init__(self, api_client: OpenRouterClient, cost_tracker: CostTracker):
         """
         Initialize the model executor.
 
         Args:
-            api_key: OpenRouter API key (optional, reads from env if not provided)
-            cost_tracker: CostTracker instance for cost calculation (creates new if not provided)
-            timeout: Request timeout in seconds (default: 120)
+            api_client: OpenRouterClient for making API calls
+            cost_tracker: CostTracker for calculating costs
         """
-        self.api_key = api_key
-        self.timeout = timeout
-        self.cost_tracker = cost_tracker or CostTracker()
-        logger.info("ModelExecutor initialized")
+        self.api_client = api_client
+        self.cost_tracker = cost_tracker
 
     def build_prompt(self, task: TaskDefinition, input_data: str) -> str:
         """
         Build a comprehensive prompt from task definition and input data.
 
-        This method creates a detailed prompt that includes:
-        - Task description and objectives
-        - Input data
-        - Expected output format with examples
-        - Constraints (emphasized for clarity)
-        - Any example inputs/outputs
-
         Args:
-            task: TaskDefinition containing task specifications
-            input_data: The input data to process (e.g., transcript text)
+            task: TaskDefinition describing the task
+            input_data: Input data to process
 
         Returns:
-            Formatted prompt string ready to send to the model
+            Complete prompt string to send to the model
 
         Example:
-            >>> executor = ModelExecutor()
-            >>> task = TaskDefinition(name="concept_extraction", ...)
-            >>> input_data = "Lecture transcript content..."
-            >>> prompt = executor.build_prompt(task, input_data)
+            The prompt includes:
+            - Task description
+            - Output format requirements
+            - Constraints (EMPHASIZED)
+            - Examples
+            - Input data
         """
-        prompt_parts = []
+        # Start with task description
+        prompt_parts = [
+            f"# Task: {task.name}",
+            "",
+            task.description,
+            "",
+            "## Output Format",
+            f"You MUST provide output in {task.output_format.upper()} format.",
+            ""
+        ]
 
-        # Task description
-        prompt_parts.append(f"# Task: {task.name}")
-        prompt_parts.append("")
-        prompt_parts.append(task.description)
-        prompt_parts.append("")
-
-        # Output format instructions
-        prompt_parts.append(f"## Output Format")
-        prompt_parts.append(f"You MUST return your response in **{task.output_format.upper()}** format.")
-        prompt_parts.append("")
-
-        # Constraints - make them VERY clear
+        # Add constraints with emphasis
         if task.constraints:
-            prompt_parts.append("## IMPORTANT CONSTRAINTS - YOU MUST FOLLOW THESE:")
-            prompt_parts.append("")
+            prompt_parts.extend([
+                "## CRITICAL CONSTRAINTS",
+                "You MUST follow these constraints strictly:",
+                ""
+            ])
+
             for key, value in task.constraints.items():
-                # Format constraint keys to be more readable
-                readable_key = key.replace("_", " ").title()
-                prompt_parts.append(f"- **{readable_key}**: {value}")
-            prompt_parts.append("")
-            prompt_parts.append("**CRITICAL**: Violating these constraints will result in a failed evaluation.")
+                constraint_line = f"- **{key}**: {value}"
+                prompt_parts.append(constraint_line)
+
             prompt_parts.append("")
 
-        # Examples (if provided)
+        # Add examples if available
         if task.examples:
-            prompt_parts.append("## Examples")
-            prompt_parts.append("")
-            for i, example in enumerate(task.examples, 1):
+            prompt_parts.extend([
+                "## Examples",
+                "Here are examples of good output:",
+                ""
+            ])
+
+            for i, example in enumerate(task.examples[:3], 1):  # Limit to 3 examples
                 prompt_parts.append(f"### Example {i}")
                 if "input" in example:
-                    prompt_parts.append(f"Input: {example['input']}")
+                    prompt_parts.append(f"Input: {example['input'][:200]}...")
                 if "expected_output" in example:
-                    prompt_parts.append(f"Expected Output: {example['expected_output']}")
+                    prompt_parts.append(f"Expected output: {example['expected_output']}")
                 if "notes" in example:
                     prompt_parts.append(f"Notes: {example['notes']}")
                 prompt_parts.append("")
 
-        # Input data
-        prompt_parts.append("## Input Data")
-        prompt_parts.append("")
-        prompt_parts.append(input_data)
-        prompt_parts.append("")
+        # Add evaluation criteria
+        if task.evaluation_criteria:
+            prompt_parts.extend([
+                "## Evaluation Criteria",
+                "Your output will be evaluated on:",
+                ""
+            ])
 
-        # Final instructions
-        prompt_parts.append("## Instructions")
-        prompt_parts.append(f"Process the input data according to the task description above.")
-        prompt_parts.append(f"Return ONLY the {task.output_format.upper()} output - no explanations or additional text.")
-        prompt_parts.append("Ensure all constraints are strictly followed.")
+            for criterion in task.evaluation_criteria:
+                prompt_parts.append(f"- {criterion}")
 
-        prompt = "\n".join(prompt_parts)
+            prompt_parts.append("")
 
-        logger.debug(f"Built prompt for task '{task.name}' ({len(prompt)} characters)")
-        return prompt
+        # Add input data
+        prompt_parts.extend([
+            "## Input Data",
+            "",
+            input_data,
+            "",
+            "## Your Task",
+            f"Process the above input and provide output in {task.output_format.upper()} format.",
+            "Ensure you follow ALL constraints listed above.",
+            "Provide ONLY the output, no explanations."
+        ])
+
+        return "\n".join(prompt_parts)
 
     async def execute(
         self,
         model_id: str,
         task: TaskDefinition,
-        input_data: str
+        input_data: str,
+        max_tokens: int = 2000,
+        temperature: float = 0.7
     ) -> EvaluationResult:
         """
         Execute a task on a single model.
 
-        This method:
-        1. Builds the prompt from task and input data
-        2. Calls the OpenRouter API with the specified model
-        3. Parses the response
-        4. Calculates cost using the cost tracker
-        5. Returns an EvaluationResult
-
-        If an error occurs, the result status is set to "failed" and the error
-        message is included.
-
         Args:
             model_id: Model identifier (e.g., "anthropic/claude-sonnet-4.5")
-            task: TaskDefinition to execute
-            input_data: Input data for the task
+            task: TaskDefinition describing the task
+            input_data: Input data to process
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
 
         Returns:
-            EvaluationResult containing output, tokens, cost, and status
+            EvaluationResult with model output and metadata
 
         Example:
-            >>> executor = ModelExecutor()
-            >>> task = TaskDefinition(...)
-            >>> result = await executor.execute("anthropic/claude-sonnet-4.5", task, "input")
-            >>> if result.status == "success":
-            ...     print(f"Output: {result.output}")
-            ... else:
-            ...     print(f"Error: {result.error}")
+            ```python
+            result = await executor.execute(
+                model_id="anthropic/claude-sonnet-4.5",
+                task=lecture_task,
+                input_data=transcript_text
+            )
+            print(f"Cost: ${result.cost_usd:.4f}")
+            ```
         """
         logger.info(f"Executing task '{task.name}' on model '{model_id}'")
 
@@ -186,24 +181,20 @@ class ModelExecutor:
             # Build prompt
             prompt = self.build_prompt(task, input_data)
 
-            # Create API client and execute
-            async with OpenRouterClient(api_key=self.api_key, timeout=self.timeout) as client:
-                response: CompletionResponse = await client.complete(
-                    model=model_id,
-                    prompt=prompt,
-                    temperature=0.3  # Lower temperature for more consistent outputs
-                )
+            # Make API call
+            response = await self.api_client.complete(
+                model=model_id,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
 
             # Calculate cost
-            try:
-                cost = self.cost_tracker.calculate_cost(
-                    model_id,
-                    response.input_tokens,
-                    response.output_tokens
-                )
-            except ValueError as e:
-                logger.warning(f"Could not calculate cost for {model_id}: {e}")
-                cost = 0.0
+            cost = self.cost_tracker.calculate_cost(
+                model_id,
+                response.input_tokens,
+                response.output_tokens
+            )
 
             # Create evaluation result
             result = EvaluationResult(
@@ -215,22 +206,25 @@ class ModelExecutor:
                 total_tokens=response.total_tokens,
                 cost_usd=cost,
                 latency_ms=response.latency_ms,
-                status="success",
-                error=None
+                timestamp=response.timestamp,
+                status="success"
             )
 
+            # Track the evaluation
+            self.cost_tracker.track_evaluation(result)
+
             logger.info(
-                f"Task '{task.name}' completed on '{model_id}': "
-                f"{result.total_tokens} tokens, ${result.cost_usd:.4f}, "
-                f"{result.latency_ms:.0f}ms"
+                f"Successfully executed on {model_id}: "
+                f"{result.total_tokens} tokens, ${result.cost_usd:.4f}"
             )
 
             return result
 
-        except OpenRouterAPIError as e:
-            # API-specific error
-            logger.error(f"API error executing task '{task.name}' on '{model_id}': {e}")
-            return EvaluationResult(
+        except Exception as e:
+            logger.error(f"Failed to execute on {model_id}: {type(e).__name__}: {str(e)}")
+
+            # Create failed result
+            result = EvaluationResult(
                 model_name=model_id,
                 task_name=task.name,
                 output="",
@@ -240,161 +234,101 @@ class ModelExecutor:
                 cost_usd=0.0,
                 latency_ms=0.0,
                 status="failed",
-                error=str(e)
+                error=f"{type(e).__name__}: {str(e)}"
             )
 
-        except Exception as e:
-            # Unexpected error
-            logger.error(
-                f"Unexpected error executing task '{task.name}' on '{model_id}': {e}",
-                exc_info=True
-            )
-            return EvaluationResult(
-                model_name=model_id,
-                task_name=task.name,
-                output="",
-                input_tokens=0,
-                output_tokens=0,
-                total_tokens=0,
-                cost_usd=0.0,
-                latency_ms=0.0,
-                status="failed",
-                error=f"Unexpected error: {str(e)}"
-            )
+            return result
 
     async def evaluate_multiple(
         self,
         model_ids: List[str],
         task: TaskDefinition,
         input_data: str,
-        show_progress: bool = True
+        max_tokens: int = 2000,
+        temperature: float = 0.7
     ) -> List[EvaluationResult]:
         """
-        Execute a task on multiple models sequentially.
-
-        This method runs the same task on multiple models and collects all results,
-        even if some models fail. Progress is displayed using Rich progress bars.
+        Execute a task on multiple models with progress tracking.
 
         Args:
-            model_ids: List of model identifiers to evaluate
-            task: TaskDefinition to execute
-            input_data: Input data for the task
-            show_progress: Whether to show progress bar (default: True)
+            model_ids: List of model identifiers
+            task: TaskDefinition describing the task
+            input_data: Input data to process
+            max_tokens: Maximum tokens to generate per model
+            temperature: Sampling temperature
 
         Returns:
-            List of EvaluationResult objects, one per model
+            List of EvaluationResults, one per model
 
         Example:
-            >>> executor = ModelExecutor()
-            >>> models = [
-            ...     "anthropic/claude-sonnet-4.5",
-            ...     "openai/gpt-4o",
-            ...     "google/gemini-2.0-flash-exp"
-            ... ]
-            >>> task = TaskDefinition(...)
-            >>> results = await executor.evaluate_multiple(models, task, "input data")
-            >>>
-            >>> # Check results
-            >>> for result in results:
-            ...     if result.status == "success":
-            ...         print(f"{result.model_name}: ${result.cost_usd:.4f}")
-            ...     else:
-            ...         print(f"{result.model_name}: FAILED - {result.error}")
+            ```python
+            results = await executor.evaluate_multiple(
+                model_ids=["claude-sonnet-4.5", "gpt-4o", "qwen-2.5-72b"],
+                task=lecture_task,
+                input_data=transcript_text
+            )
+
+            for result in results:
+                if result.status == "success":
+                    print(f"{result.model_name}: ${result.cost_usd:.4f}")
+            ```
         """
-        logger.info(
-            f"Starting evaluation of task '{task.name}' on {len(model_ids)} models"
-        )
+        console.print(f"\n[bold blue]Evaluating {len(model_ids)} models on task '{task.name}'[/bold blue]\n")
 
-        results: List[EvaluationResult] = []
+        results = []
 
-        if show_progress:
-            # Create Rich progress bar
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                TextColumn("[cyan]{task.fields[status]}"),
-            ) as progress:
-                progress_task = progress.add_task(
-                    "[cyan]Evaluating models...",
-                    total=len(model_ids),
-                    status=""
-                )
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console
+        ) as progress:
+            eval_task = progress.add_task(
+                f"[cyan]Evaluating models...",
+                total=len(model_ids)
+            )
 
-                for i, model_id in enumerate(model_ids, 1):
-                    # Update progress bar
-                    progress.update(
-                        progress_task,
-                        description=f"[cyan]Evaluating {i}/{len(model_ids)}: {model_id}",
-                        status="Running..."
-                    )
-
-                    # Execute task
-                    result = await self.execute(model_id, task, input_data)
-                    results.append(result)
-
-                    # Track cost
-                    if result.status == "success":
-                        self.cost_tracker.track_evaluation(result)
-
-                    # Update progress status
-                    status_emoji = "" if result.status == "success" else ""
-                    status_text = (
-                        f"{status_emoji} {result.total_tokens} tokens, ${result.cost_usd:.4f}"
-                        if result.status == "success"
-                        else f"{status_emoji} FAILED"
-                    )
-                    progress.update(progress_task, advance=1, status=status_text)
-
-                progress.update(
-                    progress_task,
-                    description=f"[green]Completed {len(model_ids)} evaluations",
-                    status=f"Total: ${self.cost_tracker.get_total_cost():.4f}"
-                )
-        else:
-            # No progress bar - just execute sequentially
             for model_id in model_ids:
-                result = await self.execute(model_id, task, input_data)
+                progress.update(
+                    eval_task,
+                    description=f"[cyan]Evaluating {model_id}..."
+                )
+
+                result = await self.execute(
+                    model_id=model_id,
+                    task=task,
+                    input_data=input_data,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+
                 results.append(result)
 
+                # Show result status
                 if result.status == "success":
-                    self.cost_tracker.track_evaluation(result)
+                    console.print(
+                        f" [green]{model_id}[/green]: "
+                        f"{result.total_tokens:,} tokens, "
+                        f"${result.cost_usd:.4f}, "
+                        f"{result.latency_ms:.0f}ms"
+                    )
+                else:
+                    console.print(
+                        f" [red]{model_id}[/red]: "
+                        f"{result.error}"
+                    )
 
-        # Log summary
+                progress.advance(eval_task)
+
+        # Summary
         successful = sum(1 for r in results if r.status == "success")
-        failed = len(results) - successful
-        total_cost = self.cost_tracker.get_total_cost()
+        total_cost = sum(r.cost_usd for r in results)
 
-        logger.info(
-            f"Evaluation complete: {successful} successful, {failed} failed, "
-            f"total cost: ${total_cost:.4f}"
+        console.print(
+            f"\n[bold green]Evaluation complete![/bold green] "
+            f"{successful}/{len(model_ids)} successful, "
+            f"Total cost: ${total_cost:.4f}\n"
         )
 
         return results
-
-    def get_cost_summary(self) -> str:
-        """
-        Get a formatted cost summary.
-
-        Returns:
-            Formatted string with cost statistics
-
-        Example:
-            >>> executor = ModelExecutor()
-            >>> # ... run some evaluations ...
-            >>> print(executor.get_cost_summary())
-        """
-        return self.cost_tracker.export_summary()
-
-    def reset_tracker(self) -> None:
-        """
-        Reset the cost tracker statistics.
-
-        Example:
-            >>> executor = ModelExecutor()
-            >>> # ... run some evaluations ...
-            >>> executor.reset_tracker()  # Clear stats for next run
-        """
-        self.cost_tracker.reset()
-        logger.info("Cost tracker reset")

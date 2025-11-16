@@ -1,11 +1,16 @@
 """
-Tests for Task Parser.
+Tests for task definition parser and validator.
+
+This module tests the TaskParser class for loading, validating,
+and saving task definitions.
 """
 
 import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
+from pydantic import ValidationError
 
 from taskbench.core.models import TaskDefinition
 from taskbench.core.task import TaskParser
@@ -14,174 +19,168 @@ from taskbench.core.task import TaskParser
 class TestTaskParser:
     """Tests for TaskParser class."""
 
-    def test_load_valid_yaml(self):
-        """Test loading a valid YAML file."""
-        parser = TaskParser()
-        fixture_path = Path(__file__).parent / "fixtures" / "valid_task.yaml"
-        task = parser.load_from_yaml(str(fixture_path))
+    @pytest.fixture
+    def parser(self):
+        """Create a TaskParser instance."""
+        return TaskParser()
 
+    @pytest.fixture
+    def valid_task_path(self):
+        """Path to valid task fixture."""
+        return "tests/fixtures/valid_task.yaml"
+
+    @pytest.fixture
+    def invalid_task_path(self):
+        """Path to invalid task fixture."""
+        return "tests/fixtures/invalid_task.yaml"
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample TaskDefinition."""
+        return TaskDefinition(
+            name="sample_task",
+            description="A sample task for testing",
+            input_type="text",
+            output_format="json",
+            evaluation_criteria=["Accuracy", "Completeness"],
+            constraints={"min_length": 10, "max_length": 100},
+            examples=[],
+            judge_instructions="Evaluate carefully"
+        )
+
+    def test_load_valid_yaml(self, parser, valid_task_path):
+        """Test loading a valid YAML file."""
+        task = parser.load_from_yaml(valid_task_path)
         assert isinstance(task, TaskDefinition)
         assert task.name == "test_lecture_analysis"
         assert task.input_type == "transcript"
         assert task.output_format == "csv"
         assert len(task.evaluation_criteria) > 0
+        assert task.constraints["min_duration_minutes"] == 2
+        assert task.constraints["max_duration_minutes"] == 7
 
-    def test_load_nonexistent_file(self):
-        """Test that loading a non-existent file raises FileNotFoundError."""
-        parser = TaskParser()
-        with pytest.raises(FileNotFoundError):
-            parser.load_from_yaml("nonexistent_file.yaml")
+    def test_load_nonexistent_file(self, parser):
+        """Test loading a file that doesn't exist."""
+        with pytest.raises(FileNotFoundError) as exc_info:
+            parser.load_from_yaml("nonexistent/file.yaml")
+        assert "not found" in str(exc_info.value)
 
-    def test_load_invalid_yaml(self):
-        """Test that loading invalid YAML raises ValueError."""
-        parser = TaskParser()
+    def test_load_invalid_yaml_syntax(self, parser, tmp_path):
+        """Test loading a file with invalid YAML syntax."""
+        invalid_yaml = tmp_path / "invalid.yaml"
+        invalid_yaml.write_text("name: [invalid yaml\nno closing bracket")
 
-        # Create a temporary file with invalid YAML
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            f.write("invalid: yaml: content:\n  - malformed")
-            temp_path = f.name
+        with pytest.raises(yaml.YAMLError):
+            parser.load_from_yaml(str(invalid_yaml))
 
-        try:
-            with pytest.raises(ValueError) as exc_info:
-                parser.load_from_yaml(temp_path)
-            assert "Failed to parse YAML" in str(exc_info.value) or "Failed to create TaskDefinition" in str(exc_info.value)
-        finally:
-            Path(temp_path).unlink()
+    def test_load_invalid_task_structure(self, parser, invalid_task_path):
+        """Test loading a YAML file with invalid task structure."""
+        with pytest.raises(ValidationError):
+            parser.load_from_yaml(invalid_task_path)
 
-    def test_load_empty_yaml(self):
-        """Test that loading an empty YAML file raises ValueError."""
-        parser = TaskParser()
-
-        # Create a temporary empty file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            f.write("")
-            temp_path = f.name
-
-        try:
-            with pytest.raises(ValueError) as exc_info:
-                parser.load_from_yaml(temp_path)
-            assert "empty" in str(exc_info.value).lower()
-        finally:
-            Path(temp_path).unlink()
-
-    def test_validate_valid_task(self):
-        """Test validation of a valid task."""
-        task = TaskDefinition(
-            name="test_task",
-            description="A test task",
-            input_type="transcript",
-            output_format="csv",
-            evaluation_criteria=["Accuracy", "Format"],
-            constraints={"min_duration_minutes": 2, "max_duration_minutes": 7},
-            judge_instructions="Evaluate based on criteria"
-        )
-
-        is_valid, errors = TaskParser.validate_task(task)
+    def test_validate_valid_task(self, parser, sample_task):
+        """Test validating a valid task."""
+        is_valid, errors = parser.validate_task(sample_task)
         assert is_valid is True
         assert len(errors) == 0
 
-    def test_validate_missing_fields(self):
-        """Test validation catches missing fields."""
+    def test_validate_empty_criteria(self, parser):
+        """Test validation catches empty evaluation_criteria."""
         task = TaskDefinition(
-            name="",  # Empty name
-            description="A test task",
-            input_type="transcript",
-            output_format="csv",
-            evaluation_criteria=[],  # Empty criteria
-            judge_instructions=""  # Empty instructions
-        )
-
-        is_valid, errors = TaskParser.validate_task(task)
-        assert is_valid is False
-        assert len(errors) > 0
-        assert any("name" in error.lower() for error in errors)
-        assert any("criterion" in error.lower() for error in errors)  # Changed to match actual error message
-
-    def test_validate_invalid_constraints(self):
-        """Test validation catches invalid constraints."""
-        task = TaskDefinition(
-            name="test_task",
-            description="A test task",
-            input_type="transcript",
-            output_format="csv",
-            evaluation_criteria=["Accuracy"],
-            constraints={
-                "min_duration_minutes": 10,
-                "max_duration_minutes": 5  # Max < Min, should fail
-            },
+            name="test",
+            description="Test",
+            input_type="text",
+            output_format="json",
+            evaluation_criteria=[],  # Empty!
             judge_instructions="Test"
         )
-
-        is_valid, errors = TaskParser.validate_task(task)
+        is_valid, errors = parser.validate_task(task)
         assert is_valid is False
-        assert len(errors) > 0
-        assert any("min" in error.lower() and "max" in error.lower() for error in errors)
+        assert any("evaluation_criteria" in err for err in errors)
 
-    def test_save_and_load_round_trip(self):
-        """Test that saving and loading preserves data."""
-        original_task = TaskDefinition(
-            name="test_task",
-            description="A test task",
-            input_type="transcript",
-            output_format="csv",
-            evaluation_criteria=["Accuracy", "Format"],
-            constraints={"min_duration_minutes": 2, "max_duration_minutes": 7},
-            examples=[{"input": "test", "output": "result"}],
-            judge_instructions="Evaluate based on criteria"
-        )
-
-        # Save to temporary file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir) / "test_task.yaml"
-            TaskParser.save_to_yaml(original_task, str(temp_path))
-
-            # Load it back
-            loaded_task = TaskParser.load_from_yaml(str(temp_path))
-
-            # Verify all fields match
-            assert loaded_task.name == original_task.name
-            assert loaded_task.description == original_task.description
-            assert loaded_task.input_type == original_task.input_type
-            assert loaded_task.output_format == original_task.output_format
-            assert loaded_task.evaluation_criteria == original_task.evaluation_criteria
-            assert loaded_task.constraints == original_task.constraints
-            assert loaded_task.judge_instructions == original_task.judge_instructions
-
-    def test_save_creates_directories(self):
-        """Test that save_to_yaml creates parent directories."""
+    def test_validate_empty_judge_instructions(self, parser):
+        """Test validation catches empty judge_instructions."""
         task = TaskDefinition(
-            name="test_task",
-            description="A test task",
+            name="test",
+            description="Test",
             input_type="text",
             output_format="json",
             evaluation_criteria=["Accuracy"],
+            judge_instructions=""  # Empty!
+        )
+        is_valid, errors = parser.validate_task(task)
+        assert is_valid is False
+        assert any("judge_instructions" in err for err in errors)
+
+    def test_validate_min_max_constraints(self, parser):
+        """Test validation catches invalid min/max constraints."""
+        task = TaskDefinition(
+            name="test",
+            description="Test",
+            input_type="text",
+            output_format="json",
+            evaluation_criteria=["Accuracy"],
+            constraints={"min_duration_minutes": 10, "max_duration_minutes": 5},  # min > max!
             judge_instructions="Test"
         )
+        is_valid, errors = parser.validate_task(task)
+        assert is_valid is False
+        assert any("min_duration_minutes" in err and "max_duration_minutes" in err for err in errors)
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Path with non-existent subdirectories
-            temp_path = Path(temp_dir) / "subdir1" / "subdir2" / "test_task.yaml"
+    def test_validate_csv_columns_constraint(self, parser):
+        """Test validation of required_csv_columns for CSV output."""
+        task = TaskDefinition(
+            name="test",
+            description="Test",
+            input_type="text",
+            output_format="csv",
+            evaluation_criteria=["Accuracy"],
+            constraints={"required_csv_columns": []},  # Empty list!
+            judge_instructions="Test"
+        )
+        is_valid, errors = parser.validate_task(task)
+        assert is_valid is False
+        assert any("required_csv_columns" in err for err in errors)
 
-            TaskParser.save_to_yaml(task, str(temp_path))
+    def test_save_to_yaml(self, parser, sample_task, tmp_path):
+        """Test saving a task to YAML."""
+        output_path = tmp_path / "output" / "saved_task.yaml"
+        parser.save_to_yaml(sample_task, str(output_path))
 
-            # Verify file was created
-            assert temp_path.exists()
-            assert temp_path.is_file()
+        # Verify file was created
+        assert output_path.exists()
 
-    def test_load_all_from_directory(self):
-        """Test loading all tasks from a directory."""
-        # Use the fixtures directory
-        fixtures_dir = Path(__file__).parent / "fixtures"
+        # Verify content can be loaded back
+        loaded_task = parser.load_from_yaml(str(output_path))
+        assert loaded_task.name == sample_task.name
+        assert loaded_task.description == sample_task.description
+        assert loaded_task.input_type == sample_task.input_type
+        assert loaded_task.output_format == sample_task.output_format
 
-        parser = TaskParser()
-        tasks = parser.load_all_from_directory(str(fixtures_dir))
+    def test_round_trip_preservation(self, parser, valid_task_path, tmp_path):
+        """Test that load ’ save ’ load preserves data."""
+        # Load original task
+        original_task = parser.load_from_yaml(valid_task_path)
 
-        # Should load at least the valid_task.yaml
-        assert len(tasks) >= 1
-        assert any(task.name == "test_lecture_analysis" for task in tasks)
+        # Save to temporary file
+        temp_path = tmp_path / "round_trip.yaml"
+        parser.save_to_yaml(original_task, str(temp_path))
 
-    def test_load_all_from_nonexistent_directory(self):
-        """Test that loading from non-existent directory raises FileNotFoundError."""
-        parser = TaskParser()
-        with pytest.raises(FileNotFoundError):
-            parser.load_all_from_directory("/nonexistent/directory")
+        # Load again
+        reloaded_task = parser.load_from_yaml(str(temp_path))
+
+        # Compare
+        assert reloaded_task.name == original_task.name
+        assert reloaded_task.description == original_task.description
+        assert reloaded_task.input_type == original_task.input_type
+        assert reloaded_task.output_format == original_task.output_format
+        assert reloaded_task.evaluation_criteria == original_task.evaluation_criteria
+        assert reloaded_task.constraints == original_task.constraints
+
+    def test_save_creates_parent_directories(self, parser, sample_task, tmp_path):
+        """Test that save_to_yaml creates parent directories if needed."""
+        output_path = tmp_path / "nested" / "deep" / "path" / "task.yaml"
+        parser.save_to_yaml(sample_task, str(output_path))
+
+        assert output_path.exists()
+        assert output_path.parent.exists()

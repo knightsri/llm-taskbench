@@ -1,105 +1,68 @@
 # LLM TaskBench API Reference
 
-Complete API reference for all public classes and methods in LLM TaskBench.
-
 ## Table of Contents
 
 - [Core Models](#core-models)
-  - [TaskDefinition](#taskdefinition)
-  - [CompletionResponse](#completionresponse)
-  - [EvaluationResult](#evaluationresult)
-  - [JudgeScore](#judgescore)
-  - [ModelConfig](#modelconfig)
-- [Task Management](#task-management)
-  - [TaskParser](#taskparser)
+- [Task Parser](#task-parser)
 - [API Client](#api-client)
-  - [OpenRouterClient](#openrouterclient)
-  - [OpenRouterAPIError](#openrouterapierror)
 - [Retry Logic](#retry-logic)
-  - [retry_with_backoff](#retry_with_backoff)
-  - [RateLimiter](#ratelimiter)
-- [Evaluation Engine](#evaluation-engine)
-  - [ModelExecutor](#modelexecutor)
-  - [LLMJudge](#llmjudge)
-  - [CostTracker](#costtracker)
-  - [LLMOrchestrator](#llmorchestrator)
-- [Analysis and Reporting](#analysis-and-reporting)
-  - [ModelComparison](#modelcomparison)
-  - [RecommendationEngine](#recommendationengine)
+- [Model Executor](#model-executor)
+- [LLM Judge](#llm-judge)
+- [Model Comparison](#model-comparison)
+- [Cost Tracker](#cost-tracker)
+- [Error Handling](#error-handling)
 
 ---
 
 ## Core Models
 
-Located in `taskbench.core.models`
+Location: `taskbench.core.models`
+
+All core models are Pydantic BaseModel subclasses with automatic validation.
 
 ### TaskDefinition
 
-Represents a user-defined evaluation task with validation.
+Represents a user-defined evaluation task.
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `str` | Yes | Unique identifier for the task |
+| `description` | `str` | Yes | Human-readable task description |
+| `input_type` | `str` | Yes | Type of input data: "transcript", "text", "csv", "json" |
+| `output_format` | `str` | Yes | Expected output format: "csv", "json", "markdown" |
+| `evaluation_criteria` | `List[str]` | Yes | List of criteria for evaluation |
+| `constraints` | `Dict[str, Any]` | No | Constraints that outputs must satisfy |
+| `examples` | `List[Dict[str, Any]]` | No | Example inputs and expected outputs |
+| `judge_instructions` | `str` | Yes | Instructions for the LLM-as-judge evaluator |
+
+**Validation:**
+- `input_type` must be one of: "transcript", "text", "csv", "json"
+- `output_format` must be one of: "csv", "json", "markdown"
+
+**Example:**
 
 ```python
 from taskbench.core.models import TaskDefinition
 
 task = TaskDefinition(
-    name="lecture_analysis",
+    name="lecture_concept_extraction",
     description="Extract teaching concepts from lecture transcripts",
     input_type="transcript",
     output_format="csv",
-    evaluation_criteria=["Accuracy", "Format compliance"],
-    constraints={"min_duration_minutes": 2, "max_duration_minutes": 7},
-    examples=[],
-    judge_instructions="Evaluate based on accuracy and format"
-)
-```
-
-#### Constructor Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | `str` | Yes | Unique name for this task |
-| `description` | `str` | Yes | Human-readable description |
-| `input_type` | `str` | Yes | Type of input: "transcript", "text", "csv", "json" |
-| `output_format` | `str` | Yes | Expected output: "csv", "json", "markdown" |
-| `evaluation_criteria` | `List[str]` | Yes | List of criteria for evaluation |
-| `constraints` | `Dict[str, Any]` | No | Task-specific constraints (default: {}) |
-| `examples` | `List[Dict[str, Any]]` | No | Example inputs/outputs (default: []) |
-| `judge_instructions` | `str` | Yes | Instructions for the LLM judge |
-
-#### Validation Rules
-
-- `input_type` must be one of: `["transcript", "text", "csv", "json"]`
-- `output_format` must be one of: `["csv", "json", "markdown"]`
-- All required fields must be non-empty
-
-#### Methods
-
-None - this is a data model.
-
-#### Example
-
-```python
-task = TaskDefinition(
-    name="sentiment_analysis",
-    description="Classify customer feedback as positive, negative, or neutral",
-    input_type="text",
-    output_format="json",
     evaluation_criteria=[
-        "Correct sentiment classification",
-        "Confidence score provided",
-        "JSON format compliance"
+        "Timestamp accuracy",
+        "Duration compliance",
+        "Concept clarity"
     ],
     constraints={
-        "required_fields": ["sentiment", "confidence"],
-        "valid_sentiments": ["positive", "negative", "neutral"]
+        "min_duration_minutes": 2,
+        "max_duration_minutes": 7,
+        "required_csv_columns": ["concept", "start_time", "end_time"]
     },
-    examples=[
-        {
-            "input": "This product is amazing!",
-            "expected_output": '{"sentiment": "positive", "confidence": 0.95}',
-            "notes": "Clear positive sentiment"
-        }
-    ],
-    judge_instructions="Check sentiment accuracy and JSON format"
+    examples=[],
+    judge_instructions="Evaluate based on accuracy, format, and compliance..."
 )
 ```
 
@@ -107,84 +70,106 @@ task = TaskDefinition(
 
 ### CompletionResponse
 
-API response from LLM completion with token tracking.
+API response from an LLM completion.
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `str` | Yes | The model's response text |
+| `model` | `str` | Yes | Model identifier (e.g., "anthropic/claude-sonnet-4.5") |
+| `input_tokens` | `int` | Yes | Number of input tokens consumed |
+| `output_tokens` | `int` | Yes | Number of output tokens generated |
+| `total_tokens` | `int` | Yes | Total tokens (input + output) |
+| `latency_ms` | `float` | Yes | Response latency in milliseconds |
+| `timestamp` | `datetime` | No | When the response was received (auto-generated) |
+
+**Example:**
 
 ```python
 from taskbench.core.models import CompletionResponse
 
 response = CompletionResponse(
-    content="The analysis results...",
+    content="concept,start_time,end_time\n01_Introduction,00:00:00,00:05:30",
     model="anthropic/claude-sonnet-4.5",
-    input_tokens=1000,
+    input_tokens=1500,
     output_tokens=500,
-    total_tokens=1500,
-    latency_ms=2500
+    total_tokens=2000,
+    latency_ms=2345.67
 )
+
+print(f"Model: {response.model}")
+print(f"Tokens: {response.total_tokens}")
+print(f"Latency: {response.latency_ms:.2f}ms")
 ```
-
-#### Constructor Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `content` | `str` | Yes | The model's generated text response |
-| `model` | `str` | Yes | Model identifier used for generation |
-| `input_tokens` | `int` | Yes | Number of input tokens consumed |
-| `output_tokens` | `int` | Yes | Number of output tokens generated |
-| `total_tokens` | `int` | Yes | Total tokens (input + output) |
-| `latency_ms` | `float` | Yes | Response latency in milliseconds |
-| `timestamp` | `datetime` | No | When response received (default: now) |
-
-#### Methods
-
-None - this is a data model.
 
 ---
 
 ### EvaluationResult
 
-Complete evaluation result for one model on one task.
+Single model evaluation result.
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model_name` | `str` | Yes | Model identifier |
+| `task_name` | `str` | Yes | Task identifier |
+| `output` | `str` | Yes | Model's output for the task |
+| `input_tokens` | `int` | Yes | Input tokens consumed |
+| `output_tokens` | `int` | Yes | Output tokens generated |
+| `total_tokens` | `int` | Yes | Total tokens used |
+| `cost_usd` | `float` | Yes | Cost in USD for this evaluation |
+| `latency_ms` | `float` | Yes | Execution latency in milliseconds |
+| `timestamp` | `datetime` | No | When the evaluation was performed (auto-generated) |
+| `status` | `str` | No | Evaluation status: "success" or "failed" (default: "success") |
+| `error` | `Optional[str]` | No | Error message if status is "failed" |
+
+**Example:**
 
 ```python
 from taskbench.core.models import EvaluationResult
 
 result = EvaluationResult(
     model_name="anthropic/claude-sonnet-4.5",
-    task_name="lecture_analysis",
-    output="concept,start_time,end_time\nIntro,00:00:00,00:03:15",
-    input_tokens=1000,
+    task_name="lecture_concept_extraction",
+    output="concept,start_time,end_time\n...",
+    input_tokens=1500,
     output_tokens=500,
-    total_tokens=1500,
+    total_tokens=2000,
     cost_usd=0.36,
-    latency_ms=2500,
+    latency_ms=2345.67,
     status="success"
 )
+
+if result.status == "success":
+    print(f"Output: {result.output[:100]}...")
+    print(f"Cost: ${result.cost_usd:.4f}")
 ```
-
-#### Constructor Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model_name` | `str` | Yes | Name/ID of the model evaluated |
-| `task_name` | `str` | Yes | Name of the task |
-| `output` | `str` | Yes | The model's generated output |
-| `input_tokens` | `int` | Yes | Number of input tokens used |
-| `output_tokens` | `int` | Yes | Number of output tokens generated |
-| `total_tokens` | `int` | Yes | Total tokens consumed |
-| `cost_usd` | `float` | Yes | Cost in USD |
-| `latency_ms` | `float` | Yes | Time taken in milliseconds |
-| `timestamp` | `datetime` | No | When evaluation performed (default: now) |
-| `status` | `str` | No | Status: "success", "failed", "timeout" (default: "success") |
-| `error` | `str` | No | Error message if failed (default: None) |
-
-#### Methods
-
-None - this is a data model.
 
 ---
 
 ### JudgeScore
 
-LLM-as-judge scoring result with detailed breakdowns.
+LLM-as-judge scoring result.
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model_evaluated` | `str` | Yes | Model that was evaluated |
+| `accuracy_score` | `int` | Yes | Accuracy score (0-100) |
+| `format_score` | `int` | Yes | Format compliance score (0-100) |
+| `compliance_score` | `int` | Yes | Constraint compliance score (0-100) |
+| `overall_score` | `int` | Yes | Overall score (0-100) |
+| `violations` | `List[str]` | No | List of constraint violations found |
+| `reasoning` | `str` | Yes | Detailed explanation of the scores |
+| `timestamp` | `datetime` | No | When the evaluation was performed (auto-generated) |
+
+**Validation:**
+- All scores must be in range 0-100
+
+**Example:**
 
 ```python
 from taskbench.core.models import JudgeScore
@@ -193,39 +178,36 @@ score = JudgeScore(
     model_evaluated="anthropic/claude-sonnet-4.5",
     accuracy_score=95,
     format_score=100,
-    compliance_score=98,
-    overall_score=97,
-    violations=[],
-    reasoning="Excellent performance with accurate concept extraction"
+    compliance_score=90,
+    overall_score=95,
+    violations=["One segment slightly over 7 minutes"],
+    reasoning="Excellent extraction with minor duration issue..."
 )
+
+print(f"Overall Score: {score.overall_score}/100")
+print(f"Violations: {len(score.violations)}")
+for violation in score.violations:
+    print(f"  - {violation}")
 ```
-
-#### Constructor Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model_evaluated` | `str` | Yes | Name of the model being judged |
-| `accuracy_score` | `int` | Yes | Accuracy score (0-100) |
-| `format_score` | `int` | Yes | Format compliance score (0-100) |
-| `compliance_score` | `int` | Yes | Constraint compliance score (0-100) |
-| `overall_score` | `int` | Yes | Overall weighted score (0-100) |
-| `violations` | `List[str]` | No | List of constraint violations (default: []) |
-| `reasoning` | `str` | Yes | Detailed reasoning for scores |
-| `timestamp` | `datetime` | No | When judging performed (default: now) |
-
-#### Validation Rules
-
-- All scores must be integers between 0 and 100 (inclusive)
-
-#### Methods
-
-None - this is a data model.
 
 ---
 
 ### ModelConfig
 
-Model pricing and configuration information.
+Model pricing and configuration.
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model_id` | `str` | Yes | Unique model identifier for API calls |
+| `display_name` | `str` | Yes | Human-readable model name |
+| `input_price_per_1m` | `float` | Yes | Input price per 1M tokens in USD |
+| `output_price_per_1m` | `float` | Yes | Output price per 1M tokens in USD |
+| `context_window` | `int` | Yes | Maximum context window size in tokens |
+| `provider` | `str` | Yes | Model provider (e.g., "Anthropic", "OpenAI") |
+
+**Example:**
 
 ```python
 from taskbench.core.models import ModelConfig
@@ -238,1082 +220,1170 @@ config = ModelConfig(
     context_window=200000,
     provider="Anthropic"
 )
-```
 
-#### Constructor Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model_id` | `str` | Yes | Unique identifier for the model |
-| `display_name` | `str` | Yes | Human-readable name |
-| `input_price_per_1m` | `float` | Yes | Price per 1M input tokens (USD) |
-| `output_price_per_1m` | `float` | Yes | Price per 1M output tokens (USD) |
-| `context_window` | `int` | Yes | Maximum context window in tokens |
-| `provider` | `str` | Yes | Model provider (e.g., "Anthropic") |
-
-#### Methods
-
-##### `calculate_cost(input_tokens: int, output_tokens: int) -> float`
-
-Calculate the cost for given token usage.
-
-**Parameters:**
-- `input_tokens` (`int`): Number of input tokens
-- `output_tokens` (`int`): Number of output tokens
-
-**Returns:**
-- `float`: Total cost in USD, rounded to 2 decimal places
-
-**Example:**
-```python
-config = ModelConfig(...)
-cost = config.calculate_cost(1000, 500)
-print(f"Cost: ${cost:.2f}")  # Cost: $0.01
+print(f"{config.display_name} ({config.provider})")
+print(f"Input: ${config.input_price_per_1m}/1M tokens")
+print(f"Output: ${config.output_price_per_1m}/1M tokens")
 ```
 
 ---
 
-## Task Management
+## Task Parser
 
-Located in `taskbench.core.task`
+Location: `taskbench.core.task`
 
 ### TaskParser
 
-Parser for task definition YAML files with validation.
+Parser and validator for task definitions.
+
+#### `load_from_yaml(yaml_path: str) -> TaskDefinition`
+
+Load a task definition from a YAML file.
+
+**Parameters:**
+- `yaml_path` (str): Path to the YAML file containing the task definition
+
+**Returns:**
+- `TaskDefinition`: Parsed task definition object
+
+**Raises:**
+- `FileNotFoundError`: If the YAML file doesn't exist
+- `yaml.YAMLError`: If the YAML is malformed
+- `ValidationError`: If the YAML doesn't match TaskDefinition schema
+
+**Example:**
+
+```python
+from taskbench.core.task import TaskParser
+
+parser = TaskParser()
+task = parser.load_from_yaml("tasks/lecture_analysis.yaml")
+
+print(f"Loaded task: {task.name}")
+print(f"Input type: {task.input_type}")
+print(f"Output format: {task.output_format}")
+```
+
+---
+
+#### `validate_task(task: TaskDefinition) -> Tuple[bool, List[str]]`
+
+Validate a task definition for logical consistency.
+
+**Parameters:**
+- `task` (TaskDefinition): Task definition to validate
+
+**Returns:**
+- `Tuple[bool, List[str]]`: (is_valid, list_of_errors)
+  - `is_valid`: True if task is valid, False otherwise
+  - `list_of_errors`: List of error messages (empty if valid)
+
+**Validation Checks:**
+- Evaluation criteria is non-empty
+- Judge instructions is non-empty
+- Min/max constraints satisfy min < max
+- CSV output has required_csv_columns constraint
+- All constraint values have correct types
+
+**Example:**
 
 ```python
 from taskbench.core.task import TaskParser
 
 parser = TaskParser()
 task = parser.load_from_yaml("tasks/my_task.yaml")
-```
 
-#### Constructor Parameters
-
-None - TaskParser uses static methods.
-
-#### Methods
-
-##### `load_from_yaml(yaml_path: str) -> TaskDefinition`
-
-Load a task definition from a YAML file.
-
-**Parameters:**
-- `yaml_path` (`str`): Path to the YAML file
-
-**Returns:**
-- `TaskDefinition`: Validated task definition object
-
-**Raises:**
-- `FileNotFoundError`: If the YAML file doesn't exist
-- `ValueError`: If the YAML is malformed or invalid
-- `yaml.YAMLError`: If the YAML cannot be parsed
-
-**Example:**
-```python
-parser = TaskParser()
-try:
-    task = parser.load_from_yaml("tasks/sentiment.yaml")
-    print(f"Loaded task: {task.name}")
-except FileNotFoundError:
-    print("Task file not found")
-except ValueError as e:
-    print(f"Invalid task: {e}")
-```
-
-##### `validate_task(task: TaskDefinition) -> Tuple[bool, List[str]]`
-
-Validate a task definition for logical consistency.
-
-**Parameters:**
-- `task` (`TaskDefinition`): Task to validate
-
-**Returns:**
-- `Tuple[bool, List[str]]`: (is_valid, list_of_errors)
-
-**Example:**
-```python
-task = TaskDefinition(...)
-is_valid, errors = TaskParser.validate_task(task)
+is_valid, errors = parser.validate_task(task)
 if not is_valid:
+    print("Validation errors:")
     for error in errors:
-        print(f"Error: {error}")
+        print(f"  - {error}")
+else:
+    print("Task is valid!")
 ```
 
-##### `save_to_yaml(task: TaskDefinition, yaml_path: str) -> None`
+---
+
+#### `save_to_yaml(task: TaskDefinition, yaml_path: str) -> None`
 
 Save a task definition to a YAML file.
 
 **Parameters:**
-- `task` (`TaskDefinition`): Task to save
-- `yaml_path` (`str`): Path where to save the YAML
+- `task` (TaskDefinition): Task definition to save
+- `yaml_path` (str): Path where the YAML file should be saved
 
 **Raises:**
 - `IOError`: If the file cannot be written
 
 **Example:**
+
 ```python
-task = TaskDefinition(...)
-TaskParser.save_to_yaml(task, "tasks/new_task.yaml")
-```
+from taskbench.core.task import TaskParser
+from taskbench.core.models import TaskDefinition
 
-##### `load_all_from_directory(directory: str) -> List[TaskDefinition]`
-
-Load all task definitions from a directory.
-
-**Parameters:**
-- `directory` (`str`): Path to directory containing YAML files
-
-**Returns:**
-- `List[TaskDefinition]`: List of loaded tasks
-
-**Example:**
-```python
 parser = TaskParser()
-tasks = parser.load_all_from_directory("tasks/")
-print(f"Loaded {len(tasks)} tasks")
+task = TaskDefinition(
+    name="custom_task",
+    description="My custom task",
+    input_type="text",
+    output_format="json",
+    evaluation_criteria=["Accuracy"],
+    judge_instructions="Evaluate the output..."
+)
+
+parser.save_to_yaml(task, "tasks/custom_task.yaml")
+print("Task saved successfully!")
 ```
 
 ---
 
 ## API Client
 
-Located in `taskbench.api.client`
+Location: `taskbench.api.client`
 
 ### OpenRouterClient
 
-Async HTTP client for OpenRouter API with error handling.
+Async HTTP client for OpenRouter API.
+
+#### `__init__(api_key: str, base_url: str = "https://openrouter.ai/api/v1", timeout: float = 120.0)`
+
+Initialize the OpenRouter client.
+
+**Parameters:**
+- `api_key` (str): OpenRouter API key
+- `base_url` (str): Base URL for OpenRouter API (default: official endpoint)
+- `timeout` (float): Request timeout in seconds (default: 120s)
+
+**Example:**
 
 ```python
 from taskbench.api.client import OpenRouterClient
 
-async with OpenRouterClient() as client:
-    response = await client.complete(
-        model="anthropic/claude-sonnet-4.5",
-        prompt="Explain quantum computing"
-    )
-    print(response.content)
+async with OpenRouterClient(api_key="your-key") as client:
+    # Use client for API calls
+    pass
 ```
 
-#### Constructor Parameters
+---
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `api_key` | `str` | No | OpenRouter API key (reads from env if not provided) |
-| `timeout` | `float` | No | Request timeout in seconds (default: 120.0) |
-| `app_name` | `str` | No | App name for headers (default: "LLM-TaskBench") |
-| `site_url` | `str` | No | Site URL for headers |
+#### `complete(model: str, prompt: str, max_tokens: int = 1000, temperature: float = 0.7, **kwargs) -> CompletionResponse`
 
-#### Methods
-
-##### `async complete(model: str, prompt: str, temperature: float = 0.7, max_tokens: int = None, **kwargs) -> CompletionResponse`
-
-Send a completion request to OpenRouter API.
+Send a completion request to OpenRouter.
 
 **Parameters:**
-- `model` (`str`): Model identifier (e.g., "anthropic/claude-sonnet-4.5")
-- `prompt` (`str`): The prompt text
-- `temperature` (`float`, optional): Sampling temperature 0.0-2.0 (default: 0.7)
-- `max_tokens` (`int`, optional): Maximum tokens to generate
-- `**kwargs`: Additional parameters for the API
+- `model` (str): Model identifier (e.g., "anthropic/claude-sonnet-4.5")
+- `prompt` (str): The prompt to send to the model
+- `max_tokens` (int): Maximum tokens to generate (default: 1000)
+- `temperature` (float): Sampling temperature 0-1 (default: 0.7)
+- `**kwargs`: Additional parameters to pass to the API
 
 **Returns:**
-- `CompletionResponse`: Model response with metadata
+- `CompletionResponse`: Response with model output and metadata
 
 **Raises:**
-- `OpenRouterAPIError`: If the API request fails
+- `AuthenticationError`: If API key is invalid
+- `RateLimitError`: If rate limit is exceeded
+- `BadRequestError`: If request is malformed
+- `OpenRouterError`: For other API errors
 
 **Example:**
+
 ```python
-async with OpenRouterClient() as client:
+from taskbench.api.client import OpenRouterClient
+
+async with OpenRouterClient(api_key="your-key") as client:
     response = await client.complete(
         model="anthropic/claude-sonnet-4.5",
-        prompt="What is Python?",
-        temperature=0.5,
-        max_tokens=500
+        prompt="Explain Python lists in 2 sentences",
+        max_tokens=100,
+        temperature=0.7
     )
+
     print(f"Response: {response.content}")
     print(f"Tokens: {response.total_tokens}")
-    print(f"Latency: {response.latency_ms}ms")
+    print(f"Latency: {response.latency_ms:.2f}ms")
 ```
 
-##### `async complete_with_json(model: str, prompt: str, temperature: float = 0.7, max_tokens: int = None, **kwargs) -> CompletionResponse`
+---
 
-Send a completion request with JSON mode enabled.
+#### `complete_with_json(model: str, prompt: str, max_tokens: int = 1000, temperature: float = 0.7, **kwargs) -> CompletionResponse`
+
+Request a completion in JSON mode.
+
+Adds JSON formatting instructions to the prompt and validates that the response is valid JSON.
 
 **Parameters:**
 - Same as `complete()`
 
 **Returns:**
-- `CompletionResponse`: Model response (content should be valid JSON)
+- `CompletionResponse`: Response with JSON content (cleaned of markdown blocks)
 
 **Raises:**
-- `OpenRouterAPIError`: If the API request fails
-
-**Note:** Not all models support JSON mode.
+- `OpenRouterError`: If response is not valid JSON
+- Other exceptions same as `complete()`
 
 **Example:**
+
 ```python
-async with OpenRouterClient() as client:
+from taskbench.api.client import OpenRouterClient
+import json
+
+async with OpenRouterClient(api_key="your-key") as client:
     response = await client.complete_with_json(
-        model="openai/gpt-4o",
-        prompt="Return a JSON object with name and age fields"
+        model="anthropic/claude-sonnet-4.5",
+        prompt="List 3 programming languages with their year of creation",
+        max_tokens=500,
+        temperature=0.5
     )
-    import json
+
     data = json.loads(response.content)
+    print(json.dumps(data, indent=2))
 ```
 
-##### `async close() -> None`
+---
+
+#### `close() -> None`
 
 Close the HTTP client and cleanup resources.
 
 **Example:**
+
 ```python
-client = OpenRouterClient()
-# ... use client ...
+from taskbench.api.client import OpenRouterClient
+
+client = OpenRouterClient(api_key="your-key")
+# Use client...
 await client.close()
 ```
 
 ---
 
-### OpenRouterAPIError
+### Exception Classes
 
-Exception class for OpenRouter API errors.
+#### `OpenRouterError`
 
-```python
-from taskbench.api.client import OpenRouterAPIError
+Base exception for OpenRouter API errors.
 
-try:
-    response = await client.complete(...)
-except OpenRouterAPIError as e:
-    print(f"API error: {e}")
-    print(f"Status code: {e.status_code}")
-    print(f"Response: {e.response_body}")
-```
+#### `RateLimitError`
 
-#### Constructor Parameters
+Raised when API rate limit is exceeded (HTTP 429).
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `message` | `str` | Yes | Error message |
-| `status_code` | `int` | No | HTTP status code |
-| `response_body` | `str` | No | API response body |
+#### `AuthenticationError`
 
-#### Attributes
+Raised when API authentication fails (HTTP 401).
 
-- `status_code` (`int | None`): HTTP status code if available
-- `response_body` (`str | None`): Response body if available
+#### `BadRequestError`
+
+Raised when the request is malformed (HTTP 400).
 
 ---
 
 ## Retry Logic
 
-Located in `taskbench.api.retry`
-
-### retry_with_backoff
-
-Decorator that adds exponential backoff retry logic to async functions.
-
-```python
-from taskbench.api.retry import retry_with_backoff
-
-@retry_with_backoff(max_retries=5, initial_delay=2.0)
-async def call_api():
-    return await client.complete(model="...", prompt="...")
-
-result = await call_api()  # Will retry on transient errors
-```
-
-#### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `max_retries` | `int` | 3 | Maximum number of retry attempts |
-| `initial_delay` | `float` | 1.0 | Initial delay before first retry (seconds) |
-| `max_delay` | `float` | 60.0 | Maximum delay between retries (seconds) |
-| `exponential_base` | `float` | 2.0 | Base for exponential backoff |
-| `retryable_status_codes` | `Set[int]` | {429, 500, 502, 503, 504} | HTTP codes to retry |
-
-#### Retry Behavior
-
-- Only retries on transient errors (rate limits, server errors)
-- Does NOT retry on client errors (401, 403, 400)
-- Uses exponential backoff: `delay = min(initial_delay * (base ^ attempt), max_delay)`
-- Logs all retry attempts
-
-#### Example
-
-```python
-from taskbench.api.retry import retry_with_backoff
-
-@retry_with_backoff(max_retries=5, initial_delay=2.0, max_delay=30.0)
-async def fetch_data():
-    async with OpenRouterClient() as client:
-        return await client.complete(
-            model="anthropic/claude-sonnet-4.5",
-            prompt="Process this data..."
-        )
-
-# Will automatically retry on 429, 500, 502, 503, 504 errors
-result = await fetch_data()
-```
-
----
+Location: `taskbench.api.retry`
 
 ### RateLimiter
 
-Token bucket rate limiter for controlling API request rates.
+Token bucket rate limiter for API requests.
+
+#### `__init__(max_requests_per_minute: int = 60)`
+
+Initialize the rate limiter.
+
+**Parameters:**
+- `max_requests_per_minute` (int): Maximum requests allowed per minute
+
+**Example:**
 
 ```python
 from taskbench.api.retry import RateLimiter
 
-limiter = RateLimiter(requests_per_minute=60)
-
-async def make_requests():
-    for i in range(100):
-        await limiter.acquire()  # Wait if necessary
-        result = await api_call()
+limiter = RateLimiter(max_requests_per_minute=60)
 ```
-
-#### Constructor Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `requests_per_minute` | `int` | 60 | Maximum requests allowed per minute |
-| `burst_size` | `int` | None | Max burst size (default: same as requests_per_minute) |
-
-#### Methods
-
-##### `async acquire(tokens: int = 1) -> None`
-
-Acquire tokens from the bucket, waiting if necessary.
-
-**Parameters:**
-- `tokens` (`int`): Number of tokens to acquire (default: 1)
-
-**Blocks until:**
-- Requested tokens are available
-
-**Example:**
-```python
-limiter = RateLimiter(requests_per_minute=60)
-await limiter.acquire()  # Wait for 1 token
-# Make API call
-```
-
-##### `async try_acquire(tokens: int = 1) -> bool`
-
-Try to acquire tokens without waiting.
-
-**Parameters:**
-- `tokens` (`int`): Number of tokens to acquire (default: 1)
-
-**Returns:**
-- `bool`: True if tokens acquired, False otherwise
-
-**Example:**
-```python
-limiter = RateLimiter(requests_per_minute=60)
-if await limiter.try_acquire():
-    # Make API call
-else:
-    # Handle rate limit
-    print("Rate limited")
-```
-
-##### `get_available_tokens() -> float`
-
-Get the current number of available tokens.
-
-**Returns:**
-- `float`: Number of tokens currently available
-
-##### `reset() -> None`
-
-Reset the rate limiter to full capacity.
 
 ---
 
-## Evaluation Engine
+#### `acquire() -> None`
 
-Located in `taskbench.evaluation`
+Acquire permission to make a request.
+
+Sleeps if making a request now would exceed the rate limit.
+
+**Example:**
+
+```python
+from taskbench.api.retry import RateLimiter
+
+limiter = RateLimiter(max_requests_per_minute=60)
+
+async def make_api_call():
+    await limiter.acquire()  # Wait if rate limit would be exceeded
+    # Make API request
+    pass
+```
+
+---
+
+### retry_with_backoff
+
+Decorator for retrying async functions with exponential backoff.
+
+#### `retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 60.0, retryable_exceptions: Optional[Set[Type[Exception]]] = None, non_retryable_exceptions: Optional[Set[Type[Exception]]] = None)`
+
+**Parameters:**
+- `max_retries` (int): Maximum number of retry attempts (default: 3)
+- `base_delay` (float): Initial delay in seconds (default: 1.0)
+- `max_delay` (float): Maximum delay in seconds (default: 60.0)
+- `retryable_exceptions` (Set[Type[Exception]]): Exceptions to retry (default: RateLimitError, OpenRouterError, TimeoutError, ConnectionError)
+- `non_retryable_exceptions` (Set[Type[Exception]]): Exceptions to never retry (default: AuthenticationError, BadRequestError, ValueError, TypeError)
+
+**Returns:**
+- Decorated function with retry logic
+
+**Retry Strategy:**
+- Exponential backoff: delay = min(base_delay * (2 ** attempt), max_delay)
+- Retries transient errors (rate limits, timeouts, server errors)
+- Immediately raises non-retryable errors (auth, bad requests)
+
+**Example:**
+
+```python
+from taskbench.api.retry import retry_with_backoff
+from taskbench.api.client import OpenRouterClient
+
+@retry_with_backoff(max_retries=3, base_delay=2.0)
+async def make_api_call(client: OpenRouterClient):
+    return await client.complete(
+        model="anthropic/claude-sonnet-4.5",
+        prompt="Hello, world!"
+    )
+
+# If the call fails with a retryable error, it will retry up to 3 times
+# with delays of 2s, 4s, 8s
+```
+
+---
+
+### with_rate_limit
+
+Decorator to enforce rate limiting on async functions.
+
+#### `with_rate_limit(limiter: RateLimiter)`
+
+**Parameters:**
+- `limiter` (RateLimiter): RateLimiter instance to use
+
+**Returns:**
+- Decorated function with rate limiting
+
+**Example:**
+
+```python
+from taskbench.api.retry import RateLimiter, with_rate_limit
+
+limiter = RateLimiter(max_requests_per_minute=60)
+
+@with_rate_limit(limiter)
+async def make_request():
+    # This function will automatically respect the rate limit
+    pass
+```
+
+---
+
+## Model Executor
+
+Location: `taskbench.evaluation.executor`
 
 ### ModelExecutor
 
-Execute evaluation tasks on multiple LLM models.
+Execute tasks on LLM models and collect results.
+
+#### `__init__(api_client: OpenRouterClient, cost_tracker: CostTracker)`
+
+Initialize the model executor.
+
+**Parameters:**
+- `api_client` (OpenRouterClient): OpenRouter client for making API calls
+- `cost_tracker` (CostTracker): Cost tracker for calculating costs
+
+**Example:**
+
+```python
+from taskbench.api.client import OpenRouterClient
+from taskbench.evaluation.cost import CostTracker
+from taskbench.evaluation.executor import ModelExecutor
+
+async with OpenRouterClient(api_key="your-key") as client:
+    cost_tracker = CostTracker()
+    executor = ModelExecutor(client, cost_tracker)
+```
+
+---
+
+#### `build_prompt(task: TaskDefinition, input_data: str) -> str`
+
+Build a comprehensive prompt from task definition and input data.
+
+**Parameters:**
+- `task` (TaskDefinition): Task definition describing the task
+- `input_data` (str): Input data to process
+
+**Returns:**
+- `str`: Complete prompt string to send to the model
+
+**Prompt Structure:**
+1. Task name and description
+2. Output format requirements
+3. CRITICAL CONSTRAINTS section (emphasized)
+4. Examples of good outputs
+5. Evaluation criteria
+6. Input data
+7. Final instructions
+
+**Example:**
 
 ```python
 from taskbench.evaluation.executor import ModelExecutor
+from taskbench.core.task import TaskParser
 
-executor = ModelExecutor()
-result = await executor.execute("anthropic/claude-sonnet-4.5", task, input_data)
+parser = TaskParser()
+task = parser.load_from_yaml("tasks/lecture_analysis.yaml")
+input_data = "Lecture transcript content..."
+
+# Assuming executor is already initialized
+prompt = executor.build_prompt(task, input_data)
+print(prompt[:500])  # Preview first 500 chars
 ```
 
-#### Constructor Parameters
+---
 
-| Parameter | Type | Default | Description |
-|-----------|------|----------|-------------|
-| `api_key` | `str` | None | OpenRouter API key (reads from env if not provided) |
-| `cost_tracker` | `CostTracker` | None | Cost tracker instance (creates new if not provided) |
-| `timeout` | `float` | 120.0 | Request timeout in seconds |
-
-#### Methods
-
-##### `build_prompt(task: TaskDefinition, input_data: str) -> str`
-
-Build a comprehensive prompt from task and input data.
-
-**Parameters:**
-- `task` (`TaskDefinition`): Task specifications
-- `input_data` (`str`): Input data to process
-
-**Returns:**
-- `str`: Formatted prompt ready for the model
-
-**Example:**
-```python
-executor = ModelExecutor()
-prompt = executor.build_prompt(task, "Input text...")
-print(prompt)
-```
-
-##### `async execute(model_id: str, task: TaskDefinition, input_data: str) -> EvaluationResult`
+#### `execute(model_id: str, task: TaskDefinition, input_data: str, max_tokens: int = 2000, temperature: float = 0.7) -> EvaluationResult`
 
 Execute a task on a single model.
 
 **Parameters:**
-- `model_id` (`str`): Model identifier
-- `task` (`TaskDefinition`): Task to execute
-- `input_data` (`str`): Input data
+- `model_id` (str): Model identifier (e.g., "anthropic/claude-sonnet-4.5")
+- `task` (TaskDefinition): Task definition describing the task
+- `input_data` (str): Input data to process
+- `max_tokens` (int): Maximum tokens to generate (default: 2000)
+- `temperature` (float): Sampling temperature (default: 0.7)
 
 **Returns:**
-- `EvaluationResult`: Result with output, tokens, cost, status
+- `EvaluationResult`: Evaluation result with output and metadata
+
+**Error Handling:**
+- On success: Returns EvaluationResult with status="success"
+- On error: Returns EvaluationResult with status="failed" and error message
 
 **Example:**
+
 ```python
-executor = ModelExecutor()
+from taskbench.evaluation.executor import ModelExecutor
+from taskbench.core.task import TaskParser
+
+parser = TaskParser()
+task = parser.load_from_yaml("tasks/lecture_analysis.yaml")
+input_data = open("data/transcript.txt").read()
+
+# Assuming executor is already initialized
 result = await executor.execute(
-    "anthropic/claude-sonnet-4.5",
-    task,
-    "Lecture transcript..."
+    model_id="anthropic/claude-sonnet-4.5",
+    task=task,
+    input_data=input_data,
+    max_tokens=2000,
+    temperature=0.7
 )
+
 if result.status == "success":
-    print(f"Output: {result.output}")
+    print(f"Output: {result.output[:200]}...")
     print(f"Cost: ${result.cost_usd:.4f}")
+else:
+    print(f"Error: {result.error}")
 ```
-
-##### `async evaluate_multiple(model_ids: List[str], task: TaskDefinition, input_data: str, show_progress: bool = True) -> List[EvaluationResult]`
-
-Execute a task on multiple models sequentially.
-
-**Parameters:**
-- `model_ids` (`List[str]`): List of model identifiers
-- `task` (`TaskDefinition`): Task to execute
-- `input_data` (`str`): Input data
-- `show_progress` (`bool`): Show progress bar (default: True)
-
-**Returns:**
-- `List[EvaluationResult]`: Results for all models
-
-**Example:**
-```python
-executor = ModelExecutor()
-models = [
-    "anthropic/claude-sonnet-4.5",
-    "openai/gpt-4o",
-    "google/gemini-2.0-flash-exp"
-]
-results = await executor.evaluate_multiple(models, task, input_data)
-for result in results:
-    print(f"{result.model_name}: ${result.cost_usd:.4f}")
-```
-
-##### `get_cost_summary() -> str`
-
-Get a formatted cost summary.
-
-**Returns:**
-- `str`: Formatted cost statistics
-
-##### `reset_tracker() -> None`
-
-Reset the cost tracker statistics.
 
 ---
 
+#### `evaluate_multiple(model_ids: List[str], task: TaskDefinition, input_data: str, max_tokens: int = 2000, temperature: float = 0.7) -> List[EvaluationResult]`
+
+Execute a task on multiple models with progress tracking.
+
+**Parameters:**
+- `model_ids` (List[str]): List of model identifiers
+- `task` (TaskDefinition): Task definition describing the task
+- `input_data` (str): Input data to process
+- `max_tokens` (int): Maximum tokens to generate per model (default: 2000)
+- `temperature` (float): Sampling temperature (default: 0.7)
+
+**Returns:**
+- `List[EvaluationResult]`: List of evaluation results, one per model
+
+**Features:**
+- Displays progress bar with Rich
+- Shows real-time status updates
+- Prints summary after completion
+
+**Example:**
+
+```python
+from taskbench.evaluation.executor import ModelExecutor
+
+# Assuming executor is already initialized
+results = await executor.evaluate_multiple(
+    model_ids=[
+        "anthropic/claude-sonnet-4.5",
+        "openai/gpt-4o",
+        "qwen/qwen-2.5-72b-instruct"
+    ],
+    task=task,
+    input_data=input_data,
+    max_tokens=2000,
+    temperature=0.7
+)
+
+for result in results:
+    if result.status == "success":
+        print(f"{result.model_name}: ${result.cost_usd:.4f}")
+```
+
+---
+
+## LLM Judge
+
+Location: `taskbench.evaluation.judge`
+
 ### LLMJudge
 
-LLM-as-Judge evaluator for scoring model outputs.
+Use an LLM to evaluate model outputs.
+
+#### `__init__(api_client: OpenRouterClient, judge_model: str = "anthropic/claude-sonnet-4.5")`
+
+Initialize the LLM judge.
+
+**Parameters:**
+- `api_client` (OpenRouterClient): OpenRouter client for making API calls
+- `judge_model` (str): Model to use as judge (default: "anthropic/claude-sonnet-4.5")
+
+**Example:**
+
+```python
+from taskbench.api.client import OpenRouterClient
+from taskbench.evaluation.judge import LLMJudge
+
+async with OpenRouterClient(api_key="your-key") as client:
+    judge = LLMJudge(client, judge_model="anthropic/claude-sonnet-4.5")
+```
+
+---
+
+#### `build_judge_prompt(task: TaskDefinition, model_output: str, input_data: str) -> str`
+
+Build evaluation prompt for the judge model.
+
+**Parameters:**
+- `task` (TaskDefinition): Task definition with evaluation criteria
+- `model_output` (str): The output to evaluate
+- `input_data` (str): Original input data for context
+
+**Returns:**
+- `str`: Complete judge prompt
+
+**Prompt Structure:**
+1. Judge role and task description
+2. Evaluation criteria from task
+3. Constraints to check
+4. Original input data (for context)
+5. Model output to evaluate
+6. Judge instructions from task
+7. JSON response format specification
+
+**Example:**
 
 ```python
 from taskbench.evaluation.judge import LLMJudge
-from taskbench.api.client import OpenRouterClient
 
-client = OpenRouterClient()
-judge = LLMJudge(client, judge_model="anthropic/claude-sonnet-4.5")
+# Assuming judge is already initialized
+prompt = judge.build_judge_prompt(task, result.output, input_data)
 ```
 
-#### Constructor Parameters
+---
 
-| Parameter | Type | Default | Description |
-|-----------|------|----------|-------------|
-| `api_client` | `OpenRouterClient` | Required | OpenRouter client instance |
-| `judge_model` | `str` | "anthropic/claude-sonnet-4.5" | Model to use for judging |
+#### `evaluate(task: TaskDefinition, result: EvaluationResult, input_data: str) -> JudgeScore`
 
-#### Methods
-
-##### `build_judge_prompt(task: TaskDefinition, model_output: str, input_data: str) -> str`
-
-Build a detailed evaluation prompt for the judge model.
+Evaluate a model's output using LLM-as-judge.
 
 **Parameters:**
-- `task` (`TaskDefinition`): Task with evaluation criteria
-- `model_output` (`str`): Output to evaluate
-- `input_data` (`str`): Original input for context
+- `task` (TaskDefinition): Task definition with evaluation criteria
+- `result` (EvaluationResult): Evaluation result to evaluate
+- `input_data` (str): Original input data
 
 **Returns:**
-- `str`: Formatted judge prompt
-
-##### `async evaluate(task: TaskDefinition, result: EvaluationResult, input_data: str) -> JudgeScore`
-
-Evaluate a model's output using the judge model.
-
-**Parameters:**
-- `task` (`TaskDefinition`): Task with criteria
-- `result` (`EvaluationResult`): Result to evaluate
-- `input_data` (`str`): Original input
-
-**Returns:**
-- `JudgeScore`: Detailed scoring and violations
+- `JudgeScore`: Score with accuracy, format, compliance scores and violations
 
 **Raises:**
-- `OpenRouterAPIError`: If API call fails
-- `ValueError`: If response cannot be parsed
+- `Exception`: If judge fails to return valid JSON
+
+**Judge Configuration:**
+- Uses JSON mode for structured output
+- Temperature: 0.3 (for consistency)
+- Max tokens: 2000
 
 **Example:**
+
 ```python
-judge = LLMJudge(client)
-score = await judge.evaluate(task, result, input_data)
-print(f"Overall: {score.overall_score}")
-print(f"Accuracy: {score.accuracy_score}")
-print(f"Format: {score.format_score}")
-print(f"Compliance: {score.compliance_score}")
+from taskbench.evaluation.judge import LLMJudge
+
+# Assuming judge is already initialized
+score = await judge.evaluate(
+    task=task,
+    result=result,
+    input_data=input_data
+)
+
+print(f"Overall Score: {score.overall_score}/100")
+print(f"Accuracy: {score.accuracy_score}/100")
+print(f"Format: {score.format_score}/100")
+print(f"Compliance: {score.compliance_score}/100")
 print(f"Violations: {score.violations}")
+print(f"Reasoning: {score.reasoning}")
 ```
 
-##### `parse_violations(violations: List[str]) -> Dict[str, List[str]]`
+---
+
+#### `parse_violations(violations: List[str]) -> Dict[str, List[str]]`
 
 Categorize violations by type.
 
 **Parameters:**
-- `violations` (`List[str]`): List of violation strings
+- `violations` (List[str]): List of violation strings
 
 **Returns:**
-- `Dict[str, List[str]]`: Violations categorized by type
+- `Dict[str, List[str]]`: Dictionary mapping violation types to specific violations
 
 **Categories:**
-- `under_min`: Below minimum constraints
-- `over_max`: Exceeding maximum constraints
-- `format`: Format-related violations
-- `missing_field`: Missing required fields
-- `other`: Other violations
+- `under_min`: Below minimum requirements
+- `over_max`: Exceeds maximum limits
+- `format`: Format specification violations
+- `missing_field`: Required fields absent
+- `other`: Miscellaneous issues
 
-##### `count_violations_by_type(violations: List[str]) -> Dict[str, int]`
+**Example:**
 
-Count violations by category.
+```python
+from taskbench.evaluation.judge import LLMJudge
 
-**Parameters:**
-- `violations` (`List[str]`): List of violation strings
+judge = LLMJudge(client)
+violations = [
+    "Segment duration under 2 minutes",
+    "Missing required CSV column: end_time",
+    "Timestamp format invalid"
+]
 
-**Returns:**
-- `Dict[str, int]`: Count of violations per type
-
-##### `get_violation_summary(scores: List[JudgeScore]) -> str`
-
-Generate a text summary of violations across models.
-
-**Parameters:**
-- `scores` (`List[JudgeScore]`): Scores to analyze
-
-**Returns:**
-- `str`: Formatted summary
+categorized = judge.parse_violations(violations)
+print(categorized)
+# {
+#   "under_min": ["Segment duration under 2 minutes"],
+#   "missing_field": ["Missing required CSV column: end_time"],
+#   "format": ["Timestamp format invalid"],
+#   "over_max": [],
+#   "other": []
+# }
+```
 
 ---
 
+## Model Comparison
+
+Location: `taskbench.evaluation.judge`
+
+### ModelComparison
+
+Compare and rank model evaluation results.
+
+#### `compare_results(results: List[EvaluationResult], scores: List[JudgeScore]) -> List[Dict[str, Any]]`
+
+Combine results and scores into comparison data.
+
+**Parameters:**
+- `results` (List[EvaluationResult]): List of evaluation results
+- `scores` (List[JudgeScore]): List of corresponding judge scores
+
+**Returns:**
+- `List[Dict[str, Any]]`: List of dicts with combined data, sorted by overall_score descending
+
+**Raises:**
+- `ValueError`: If results and scores lists have different lengths
+
+**Comparison Data Fields:**
+- `rank`: Ranking (1 = best)
+- `model`: Model identifier
+- `overall_score`: Overall score (0-100)
+- `accuracy_score`, `format_score`, `compliance_score`: Subscores
+- `violations`: Number of violations
+- `violation_list`: List of violation strings
+- `cost_usd`: Cost in USD
+- `tokens`: Total tokens used
+- `latency_ms`: Latency in milliseconds
+- `status`: Evaluation status
+- `reasoning`: Judge's detailed reasoning
+
+**Example:**
+
+```python
+from taskbench.evaluation.judge import ModelComparison
+
+comparison = ModelComparison.compare_results(results, scores)
+
+for item in comparison:
+    print(f"Rank {item['rank']}: {item['model']}")
+    print(f"  Score: {item['overall_score']}/100")
+    print(f"  Cost: ${item['cost_usd']:.4f}")
+    print(f"  Violations: {item['violations']}")
+```
+
+---
+
+#### `identify_best(comparison: List[Dict[str, Any]]) -> str`
+
+Identify model with highest overall score.
+
+**Parameters:**
+- `comparison` (List[Dict[str, Any]]): Comparison data from compare_results()
+
+**Returns:**
+- `str`: Model identifier of the best model
+
+**Example:**
+
+```python
+from taskbench.evaluation.judge import ModelComparison
+
+comparison = ModelComparison.compare_results(results, scores)
+best_model = ModelComparison.identify_best(comparison)
+
+print(f"Best model: {best_model}")
+```
+
+---
+
+#### `identify_best_value(comparison: List[Dict[str, Any]], max_cost: float = None) -> str`
+
+Identify model with best score/cost ratio.
+
+**Parameters:**
+- `comparison` (List[Dict[str, Any]]): Comparison data from compare_results()
+- `max_cost` (float, optional): Optional maximum cost filter
+
+**Returns:**
+- `str`: Model identifier with best value
+
+**Value Calculation:**
+- If cost > 0: value_score = overall_score / cost_usd
+- If cost = 0: value_score = overall_score * 1000 (free models get bonus)
+
+**Example:**
+
+```python
+from taskbench.evaluation.judge import ModelComparison
+
+comparison = ModelComparison.compare_results(results, scores)
+
+# Best value overall
+best_value = ModelComparison.identify_best_value(comparison)
+print(f"Best value: {best_value}")
+
+# Best value under $0.50
+best_cheap = ModelComparison.identify_best_value(comparison, max_cost=0.50)
+print(f"Best value under $0.50: {best_cheap}")
+```
+
+---
+
+#### `generate_comparison_table(comparison: List[Dict[str, Any]]) -> Table`
+
+Generate Rich table for comparison display.
+
+**Parameters:**
+- `comparison` (List[Dict[str, Any]]): Comparison data from compare_results()
+
+**Returns:**
+- `rich.table.Table`: Rich Table object
+
+**Table Columns:**
+- Rank
+- Model (short name)
+- Score (color-coded: green >=90, yellow >=80, red <80)
+- Violations (color-coded: green =0, yellow <=2, red >2)
+- Cost (USD)
+- Tokens
+- Value (P/PP/PPP rating based on score/cost ratio)
+
+**Example:**
+
+```python
+from rich.console import Console
+from taskbench.evaluation.judge import ModelComparison
+
+console = Console()
+comparison = ModelComparison.compare_results(results, scores)
+table = ModelComparison.generate_comparison_table(comparison)
+
+console.print(table)
+```
+
+---
+
+## Cost Tracker
+
+Location: `taskbench.evaluation.cost`
+
 ### CostTracker
 
-Track and calculate costs for LLM API usage.
+Calculate and track costs for LLM evaluations.
+
+#### `__init__(models_config_path: str = "config/models.yaml")`
+
+Initialize the cost tracker.
+
+**Parameters:**
+- `models_config_path` (str): Path to YAML file containing model pricing (default: "config/models.yaml")
+
+**Raises:**
+- `FileNotFoundError`: If config file doesn't exist
+- `ValueError`: If config file is invalid
+
+**Example:**
+
+```python
+from taskbench.evaluation.cost import CostTracker
+
+tracker = CostTracker("config/models.yaml")
+```
+
+---
+
+#### `calculate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float`
+
+Calculate cost for a specific API call.
+
+**Parameters:**
+- `model_id` (str): Model identifier (e.g., "anthropic/claude-sonnet-4.5")
+- `input_tokens` (int): Number of input tokens consumed
+- `output_tokens` (int): Number of output tokens generated
+
+**Returns:**
+- `float`: Cost in USD, rounded to $0.01 precision
+
+**Raises:**
+- `ValueError`: If model_id is not found in pricing database
+
+**Formula:**
+```
+cost = (input_tokens / 1,000,000) * input_price_per_1m
+     + (output_tokens / 1,000,000) * output_price_per_1m
+```
+
+**Example:**
 
 ```python
 from taskbench.evaluation.cost import CostTracker
 
 tracker = CostTracker()
-cost = tracker.calculate_cost("anthropic/claude-sonnet-4.5", 1000, 500)
+
+cost = tracker.calculate_cost(
+    model_id="anthropic/claude-sonnet-4.5",
+    input_tokens=1000,
+    output_tokens=500
+)
+
+print(f"Cost: ${cost:.4f}")
+# Cost: $0.0105
+# Calculation: (1000/1M * $3.00) + (500/1M * $15.00) = $0.0030 + $0.0075 = $0.0105
 ```
 
-#### Constructor Parameters
+---
 
-| Parameter | Type | Default | Description |
-|-----------|------|----------|-------------|
-| `models_config_path` | `str` | None | Path to models.yaml (default: config/models.yaml) |
+#### `track_evaluation(result: EvaluationResult) -> None`
 
-#### Methods
-
-##### `get_model_config(model_id: str) -> ModelConfig | None`
-
-Get the configuration for a specific model.
+Track an evaluation result for cost analysis.
 
 **Parameters:**
-- `model_id` (`str`): Model identifier
-
-**Returns:**
-- `ModelConfig | None`: Config if found, None otherwise
-
-##### `calculate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float`
-
-Calculate cost for given token usage.
-
-**Parameters:**
-- `model_id` (`str`): Model identifier
-- `input_tokens` (`int`): Input tokens
-- `output_tokens` (`int`): Output tokens
-
-**Returns:**
-- `float`: Cost in USD
-
-**Raises:**
-- `ValueError`: If model not found
+- `result` (EvaluationResult): Evaluation result to track
 
 **Example:**
+
 ```python
+from taskbench.evaluation.cost import CostTracker
+
 tracker = CostTracker()
-cost = tracker.calculate_cost("anthropic/claude-sonnet-4.5", 1000, 500)
-print(f"Cost: ${cost:.2f}")
+tracker.track_evaluation(result)
 ```
 
-##### `track_evaluation(evaluation: EvaluationResult) -> None`
+---
 
-Track an evaluation and update statistics.
-
-**Parameters:**
-- `evaluation` (`EvaluationResult`): Result to track
-
-##### `get_total_cost() -> float`
+#### `get_total_cost() -> float`
 
 Get total cost of all tracked evaluations.
 
 **Returns:**
 - `float`: Total cost in USD
 
-##### `get_cost_breakdown() -> Dict[str, Dict[str, float]]`
+**Example:**
 
-Get cost breakdown by model.
-
-**Returns:**
 ```python
-{
-    "model_name": {
-        "cost": total_cost,
-        "input_tokens": total_input_tokens,
-        "output_tokens": total_output_tokens,
-        "evaluations": count
-    }
-}
+from taskbench.evaluation.cost import CostTracker
+
+tracker = CostTracker()
+# ... track some evaluations ...
+
+total = tracker.get_total_cost()
+print(f"Total cost: ${total:.2f}")
 ```
 
-##### `get_statistics() -> Dict[str, Any]`
+---
+
+#### `get_cost_breakdown() -> Dict[str, float]`
+
+Get per-model cost breakdown.
+
+**Returns:**
+- `Dict[str, float]`: Dictionary mapping model names to their total costs
+
+**Example:**
+
+```python
+from taskbench.evaluation.cost import CostTracker
+
+tracker = CostTracker()
+# ... track some evaluations ...
+
+breakdown = tracker.get_cost_breakdown()
+for model, cost in breakdown.items():
+    print(f"{model}: ${cost:.4f}")
+```
+
+---
+
+#### `get_statistics() -> Dict[str, Any]`
 
 Get comprehensive cost statistics.
 
 **Returns:**
-- Dictionary with total_cost, total_evaluations, averages, breakdown
-
-##### `reset() -> None`
-
-Reset all tracked evaluations and statistics.
-
-##### `export_summary() -> str`
-
-Export a formatted summary of cost statistics.
-
-**Returns:**
-- `str`: Formatted summary
-
----
-
-### LLMOrchestrator
-
-Intelligent model selection based on task characteristics.
-
-```python
-from taskbench.evaluation.orchestrator import LLMOrchestrator
-from taskbench.api.client import OpenRouterClient
-
-client = OpenRouterClient()
-orchestrator = LLMOrchestrator(client)
-```
-
-#### Constructor Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `api_client` | `OpenRouterClient` | Client for API calls |
-
-#### Methods
-
-##### `async create_evaluation_plan(task: TaskDefinition, budget: float = None) -> List[str]`
-
-Create an evaluation plan by suggesting appropriate models.
-
-**Parameters:**
-- `task` (`TaskDefinition`): Task specifications
-- `budget` (`float`, optional): Maximum budget per evaluation (USD)
-
-**Returns:**
-- `List[str]`: Recommended model IDs
+- `Dict[str, Any]`: Dictionary with statistics:
+  - `total_cost`: Total cost in USD
+  - `total_tokens`: Total tokens across all evaluations
+  - `total_evaluations`: Number of evaluations tracked
+  - `avg_cost_per_eval`: Average cost per evaluation
+  - `avg_tokens_per_eval`: Average tokens per evaluation
+  - `cost_by_model`: Per-model cost breakdown
 
 **Example:**
+
 ```python
-orchestrator = LLMOrchestrator(client)
-models = await orchestrator.create_evaluation_plan(task, budget=0.10)
-print(f"Recommended: {models}")
-```
+from taskbench.evaluation.cost import CostTracker
 
-##### `get_model_category(model_id: str) -> str`
+tracker = CostTracker()
+# ... track some evaluations ...
 
-Categorize a model by its characteristics.
-
-**Parameters:**
-- `model_id` (`str`): Model identifier
-
-**Returns:**
-- `str`: Category: "premium", "budget", "large_context", or "default"
-
-##### `estimate_cost_range(model_ids: List[str], estimated_input_tokens: int = 2000, estimated_output_tokens: int = 500) -> Dict[str, float]`
-
-Estimate cost range for a list of models.
-
-**Parameters:**
-- `model_ids` (`List[str]`): Model identifiers
-- `estimated_input_tokens` (`int`): Estimated input (default: 2000)
-- `estimated_output_tokens` (`int`): Estimated output (default: 500)
-
-**Returns:**
-```python
-{
-    "min": minimum_cost,
-    "max": maximum_cost,
-    "average": average_cost
-}
+stats = tracker.get_statistics()
+print(f"Total cost: ${stats['total_cost']:.2f}")
+print(f"Total tokens: {stats['total_tokens']:,}")
+print(f"Total evaluations: {stats['total_evaluations']}")
+print(f"Average cost: ${stats['avg_cost_per_eval']:.4f}")
+print(f"Average tokens: {stats['avg_tokens_per_eval']:,}")
 ```
 
 ---
 
-## Analysis and Reporting
+#### `get_model_config(model_id: str) -> Optional[ModelConfig]`
 
-Located in `taskbench.evaluation`
-
-### ModelComparison
-
-Compare and analyze evaluation results across models.
-
-```python
-from taskbench.evaluation.comparison import ModelComparison
-
-comparison = ModelComparison()
-compared = comparison.compare_results(results, scores)
-```
-
-#### Methods
-
-##### `compare_results(results: List[EvaluationResult], scores: List[JudgeScore]) -> Dict[str, Any]`
-
-Combine results with scores and calculate rankings.
+Get configuration for a specific model.
 
 **Parameters:**
-- `results` (`List[EvaluationResult]`): Evaluation results
-- `scores` (`List[JudgeScore]`): Judge scores
+- `model_id` (str): Model identifier
 
 **Returns:**
-```python
-{
-    "models": List[Dict],  # Combined data, ranked by score
-    "total_models": int,
-    "successful_models": int,
-    "failed_models": int
-}
-```
+- `Optional[ModelConfig]`: ModelConfig if found, None otherwise
 
 **Example:**
+
 ```python
-comparison = ModelComparison()
-compared = comparison.compare_results(results, scores)
-for model in compared['models']:
-    print(f"{model['name']}: {model['overall_score']}")
-```
+from taskbench.evaluation.cost import CostTracker
 
-##### `identify_best(comparison: Dict[str, Any]) -> str`
+tracker = CostTracker()
+config = tracker.get_model_config("anthropic/claude-sonnet-4.5")
 
-Identify the model with highest overall score.
-
-**Parameters:**
-- `comparison` (`Dict`): Output from compare_results()
-
-**Returns:**
-- `str`: Name of best model
-
-##### `identify_best_value(comparison: Dict[str, Any], max_cost: float = None) -> str`
-
-Identify model with best score-to-cost ratio.
-
-**Parameters:**
-- `comparison` (`Dict`): Output from compare_results()
-- `max_cost` (`float`, optional): Maximum cost filter
-
-**Returns:**
-- `str`: Name of best value model
-
-##### `generate_comparison_table(comparison: Dict[str, Any]) -> str`
-
-Generate a beautiful comparison table.
-
-**Parameters:**
-- `comparison` (`Dict`): Output from compare_results()
-
-**Returns:**
-- `str`: Formatted table
-
-##### `get_summary_statistics(comparison: Dict[str, Any]) -> Dict[str, Any]`
-
-Calculate summary statistics.
-
-**Returns:**
-```python
-{
-    "total_models": int,
-    "successful_models": int,
-    "failed_models": int,
-    "average_score": float,
-    "average_cost": float,
-    "total_cost": float,
-    "best_score": int,
-    "worst_score": int,
-    "best_value": float
-}
+if config:
+    print(f"{config.display_name}")
+    print(f"Input: ${config.input_price_per_1m}/1M tokens")
+    print(f"Output: ${config.output_price_per_1m}/1M tokens")
 ```
 
 ---
 
-### RecommendationEngine
+#### `list_models() -> List[ModelConfig]`
 
-Generate intelligent recommendations from evaluation results.
-
-```python
-from taskbench.evaluation.recommender import RecommendationEngine
-
-engine = RecommendationEngine()
-recommendations = engine.generate_recommendations(comparison_data)
-```
-
-#### Methods
-
-##### `generate_recommendations(comparison: Dict[str, Any]) -> Dict[str, Any]`
-
-Generate comprehensive recommendations.
-
-**Parameters:**
-- `comparison` (`Dict`): Output from ModelComparison.compare_results()
+Get list of all available models.
 
 **Returns:**
-```python
-{
-    "tiers": {
-        "Excellent": List[Dict],  # Models scoring 90+
-        "Good": List[Dict],       # Models scoring 80-89
-        "Acceptable": List[Dict], # Models scoring 70-79
-        "Poor": List[Dict]        # Models scoring < 70
-    },
-    "best_overall": Dict,       # Highest scoring model
-    "best_value": Dict,         # Best score/cost ratio
-    "budget_option": Dict,      # Cheapest acceptable model
-    "premium_option": Dict,     # Same as best_overall
-    "recommendations": {
-        "general": str,
-        "production": str,
-        "cost_sensitive": str,
-        "budget": str,
-        "development": str
-    }
-}
-```
+- `List[ModelConfig]`: List of all model configurations
 
 **Example:**
+
 ```python
-engine = RecommendationEngine()
-recs = engine.generate_recommendations(compared)
-print(f"Best overall: {recs['best_overall']['name']}")
-print(f"Best value: {recs['best_value']['name']}")
-print(f"Production: {recs['recommendations']['production']}")
+from taskbench.evaluation.cost import CostTracker
+
+tracker = CostTracker()
+models = tracker.list_models()
+
+for model in models:
+    print(f"{model.display_name} ({model.provider})")
+    print(f"  Input: ${model.input_price_per_1m}/1M")
+    print(f"  Output: ${model.output_price_per_1m}/1M")
 ```
-
-##### `format_recommendations(recs: Dict[str, Any]) -> str`
-
-Format recommendations into beautiful Rich display.
-
-**Parameters:**
-- `recs` (`Dict`): Output from generate_recommendations()
-
-**Returns:**
-- `str`: Formatted recommendations with Rich markup
-
-##### `export_recommendations_json(recs: Dict[str, Any]) -> Dict[str, Any]`
-
-Export recommendations in JSON-friendly format.
-
-**Parameters:**
-- `recs` (`Dict`): Output from generate_recommendations()
-
-**Returns:**
-- `Dict`: Simplified JSON-serializable dictionary
 
 ---
 
 ## Error Handling
 
-### Common Exceptions
+### Exception Hierarchy
 
-1. **OpenRouterAPIError** - API request failures
-   - Check `status_code` for HTTP error code
-   - Check `response_body` for detailed error
-
-2. **ValueError** - Validation errors
-   - Invalid task definitions
-   - Missing required fields
-   - Malformed data
-
-3. **FileNotFoundError** - Missing files
-   - Task YAML files
-   - Config files
-   - Input data files
-
-4. **yaml.YAMLError** - YAML parsing errors
-   - Invalid YAML syntax
-   - Malformed structure
+```
+Exception
+├── OpenRouterError (base for all API errors)
+│   ├── AuthenticationError (401)
+│   ├── BadRequestError (400)
+│   └── RateLimitError (429)
+├── FileNotFoundError (task/config files)
+├── yaml.YAMLError (YAML parsing)
+└── pydantic.ValidationError (data validation)
+```
 
 ### Best Practices
 
-1. **Always use async context managers for clients:**
+1. **Always use async context managers for API clients:**
 ```python
-async with OpenRouterClient() as client:
-    # Use client
+async with OpenRouterClient(api_key="key") as client:
+    # client will be properly closed even if errors occur
     pass
-# Automatically closed
 ```
 
-2. **Handle API errors gracefully:**
+2. **Check evaluation status before using results:**
 ```python
-try:
-    result = await executor.execute(...)
-except OpenRouterAPIError as e:
-    if e.status_code == 429:
-        # Rate limited, wait and retry
-        pass
-    elif e.status_code in (500, 502, 503):
-        # Server error, retry
-        pass
-    else:
-        # Client error, don't retry
-        raise
+if result.status == "success":
+    process(result.output)
+else:
+    print(f"Error: {result.error}")
 ```
 
-3. **Validate tasks before evaluation:**
+3. **Validate tasks before running evaluations:**
 ```python
-task = parser.load_from_yaml("task.yaml")
 is_valid, errors = parser.validate_task(task)
 if not is_valid:
-    print(f"Errors: {errors}")
-    exit(1)
+    for error in errors:
+        print(f"Error: {error}")
+    return
 ```
 
-4. **Track costs to avoid surprises:**
+4. **Handle missing models gracefully:**
 ```python
-executor = ModelExecutor()
-results = await executor.evaluate_multiple(...)
-print(executor.get_cost_summary())
+try:
+    cost = tracker.calculate_cost(model_id, input_tokens, output_tokens)
+except ValueError as e:
+    print(f"Model not found: {e}")
 ```
 
----
-
-## Type Hints
-
-All public APIs include comprehensive type hints for better IDE support and type checking. Use mypy for static type checking:
-
-```bash
-mypy src/taskbench
+5. **Use retry decorators for resilience:**
+```python
+@retry_with_backoff(max_retries=3)
+async def robust_api_call():
+    return await client.complete(...)
 ```
 
 ---
 
 ## Complete Example
 
-Here's a complete example using multiple APIs together:
+Here's a complete example using all major components:
 
 ```python
 import asyncio
-from taskbench.core.task import TaskParser
 from taskbench.api.client import OpenRouterClient
+from taskbench.core.task import TaskParser
+from taskbench.evaluation.cost import CostTracker
 from taskbench.evaluation.executor import ModelExecutor
-from taskbench.evaluation.judge import LLMJudge
-from taskbench.evaluation.comparison import ModelComparison
-from taskbench.evaluation.recommender import RecommendationEngine
+from taskbench.evaluation.judge import LLMJudge, ModelComparison
+from rich.console import Console
 
 async def main():
+    console = Console()
+
     # Load task
     parser = TaskParser()
-    task = parser.load_from_yaml("tasks/sentiment.yaml")
+    task = parser.load_from_yaml("tasks/lecture_analysis.yaml")
 
-    # Validate
+    # Validate task
     is_valid, errors = parser.validate_task(task)
     if not is_valid:
-        print(f"Errors: {errors}")
+        console.print("[red]Task validation failed:[/red]")
+        for error in errors:
+            console.print(f"  - {error}")
         return
 
     # Load input
-    with open("input.txt") as f:
+    with open("data/transcript.txt") as f:
         input_data = f.read()
 
-    # Execute evaluations
-    executor = ModelExecutor()
-    models = [
-        "anthropic/claude-sonnet-4.5",
-        "openai/gpt-4o"
-    ]
-    results = await executor.evaluate_multiple(models, task, input_data)
-
-    # Judge outputs
-    async with OpenRouterClient() as client:
+    # Initialize components
+    async with OpenRouterClient(api_key="your-key") as client:
+        cost_tracker = CostTracker()
+        executor = ModelExecutor(client, cost_tracker)
         judge = LLMJudge(client)
+
+        # Evaluate models
+        model_ids = [
+            "anthropic/claude-sonnet-4.5",
+            "openai/gpt-4o",
+            "qwen/qwen-2.5-72b-instruct"
+        ]
+
+        results = await executor.evaluate_multiple(
+            model_ids=model_ids,
+            task=task,
+            input_data=input_data
+        )
+
+        # Judge results
         scores = []
         for result in results:
             if result.status == "success":
                 score = await judge.evaluate(task, result, input_data)
                 scores.append(score)
+            else:
+                scores.append(None)
 
-    # Compare and recommend
-    comparison = ModelComparison()
-    compared = comparison.compare_results(results, scores)
+        # Compare results
+        valid_results = [r for r, s in zip(results, scores) if s is not None]
+        valid_scores = [s for s in scores if s is not None]
 
-    engine = RecommendationEngine()
-    recs = engine.generate_recommendations(compared)
-    print(engine.format_recommendations(recs))
+        comparison = ModelComparison.compare_results(valid_results, valid_scores)
+        table = ModelComparison.generate_comparison_table(comparison)
+        console.print(table)
 
-    # Show costs
-    print(executor.get_cost_summary())
+        # Show best models
+        best_model = ModelComparison.identify_best(comparison)
+        best_value = ModelComparison.identify_best_value(comparison)
+
+        console.print(f"\nBest Overall: {best_model}")
+        console.print(f"Best Value: {best_value}")
+
+        # Cost statistics
+        stats = cost_tracker.get_statistics()
+        console.print(f"\nTotal Cost: ${stats['total_cost']:.2f}")
+        console.print(f"Total Tokens: {stats['total_tokens']:,}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
----
-
-For more examples, see the [USAGE.md](USAGE.md) documentation and the `/examples` directory.
+This completes the API reference documentation for LLM TaskBench.

@@ -1,303 +1,209 @@
 """
-Retry logic and rate limiting for LLM TaskBench API calls.
+Retry logic and rate limiting for API calls.
 
-This module provides decorators and utilities for handling transient failures
-and rate limiting when calling LLM APIs.
+This module provides decorators and utilities for handling transient errors
+and rate limiting when making API requests.
 """
 
 import asyncio
 import functools
 import logging
 import time
-from typing import Any, Callable, Optional, Set, Type, TypeVar
-
-from taskbench.api.client import OpenRouterAPIError
+from typing import Callable, Optional, Set, Type
 
 logger = logging.getLogger(__name__)
 
-# Type variable for generic function return type
-T = TypeVar('T')
+
+class RateLimiter:
+    """
+    Token bucket rate limiter for API requests.
+
+    Tracks requests per minute and enforces rate limits by sleeping
+    when the limit would be exceeded.
+
+    Example:
+        ```python
+        limiter = RateLimiter(max_requests_per_minute=60)
+        await limiter.acquire()  # Wait if rate limit would be exceeded
+        # Make API request
+        ```
+    """
+
+    def __init__(self, max_requests_per_minute: int = 60):
+        """
+        Initialize the rate limiter.
+
+        Args:
+            max_requests_per_minute: Maximum requests allowed per minute
+        """
+        self.max_requests = max_requests_per_minute
+        self.requests: list[float] = []
+        self.lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        """
+        Acquire permission to make a request.
+
+        Sleeps if making a request now would exceed the rate limit.
+        """
+        async with self.lock:
+            now = time.time()
+
+            # Remove requests older than 1 minute
+            cutoff = now - 60.0
+            self.requests = [t for t in self.requests if t > cutoff]
+
+            # Check if we're at the limit
+            if len(self.requests) >= self.max_requests:
+                # Calculate how long to wait
+                oldest_request = min(self.requests)
+                sleep_time = 60.0 - (now - oldest_request)
+
+                if sleep_time > 0:
+                    logger.info(
+                        f"Rate limit reached ({len(self.requests)}/{self.max_requests}). "
+                        f"Sleeping for {sleep_time:.2f}s"
+                    )
+                    await asyncio.sleep(sleep_time)
+                    now = time.time()
+
+            # Record this request
+            self.requests.append(now)
 
 
 def retry_with_backoff(
     max_retries: int = 3,
-    initial_delay: float = 1.0,
+    base_delay: float = 1.0,
     max_delay: float = 60.0,
-    exponential_base: float = 2.0,
-    retryable_status_codes: Optional[Set[int]] = None
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    retryable_exceptions: Optional[Set[Type[Exception]]] = None,
+    non_retryable_exceptions: Optional[Set[Type[Exception]]] = None
+) -> Callable:
     """
-    Decorator that adds exponential backoff retry logic to async functions.
+    Decorator for retrying async functions with exponential backoff.
 
-    This decorator will retry the function on transient errors (rate limits,
-    server errors) but not on client errors (authentication, bad requests).
+    Retries transient errors (5xx, timeouts, rate limits) but not
+    permanent errors (4xx except 429).
 
     Args:
         max_retries: Maximum number of retry attempts (default: 3)
-        initial_delay: Initial delay in seconds before first retry (default: 1.0)
-        max_delay: Maximum delay between retries in seconds (default: 60.0)
-        exponential_base: Base for exponential backoff calculation (default: 2.0)
-        retryable_status_codes: Set of HTTP status codes to retry on.
-            If None, defaults to {429, 500, 502, 503, 504}
+        base_delay: Initial delay in seconds (default: 1.0)
+        max_delay: Maximum delay in seconds (default: 60.0)
+        retryable_exceptions: Set of exception types to retry (if None, uses defaults)
+        non_retryable_exceptions: Set of exception types to never retry (if None, uses defaults)
 
     Returns:
         Decorated function with retry logic
 
     Example:
-        >>> @retry_with_backoff(max_retries=5, initial_delay=2.0)
-        ... async def call_api():
-        ...     # API call that might fail
-        ...     return await client.complete(model="...", prompt="...")
-        ...
-        >>> result = await call_api()  # Will retry on transient errors
+        ```python
+        @retry_with_backoff(max_retries=3, base_delay=2.0)
+        async def make_api_call():
+            # ... API call code ...
+        ```
     """
-    # Default retryable status codes (transient errors only)
-    if retryable_status_codes is None:
-        retryable_status_codes = {429, 500, 502, 503, 504}
+    # Import here to avoid circular dependencies
+    from taskbench.api.client import (
+        AuthenticationError,
+        BadRequestError,
+        OpenRouterError,
+        RateLimitError,
+    )
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    # Default retryable exceptions (transient errors)
+    if retryable_exceptions is None:
+        retryable_exceptions = {
+            RateLimitError,  # 429 - Rate limit
+            OpenRouterError,  # Generic errors (including 5xx)
+            asyncio.TimeoutError,
+            ConnectionError,
+        }
+
+    # Default non-retryable exceptions (permanent errors)
+    if non_retryable_exceptions is None:
+        non_retryable_exceptions = {
+            AuthenticationError,  # 401 - Invalid API key
+            BadRequestError,  # 400 - Malformed request
+            ValueError,  # Programming errors
+            TypeError,
+        }
+
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
-            last_exception: Optional[Exception] = None
+        async def wrapper(*args, **kwargs):
+            last_exception = None
 
             for attempt in range(max_retries + 1):
                 try:
-                    # Try to execute the function
                     result = await func(*args, **kwargs)
-
-                    # Log success if this was a retry
-                    if attempt > 0:
-                        logger.info(
-                            f"Function {func.__name__} succeeded on attempt {attempt + 1}/{max_retries + 1}"
-                        )
-
                     return result
 
-                except OpenRouterAPIError as e:
+                except Exception as e:
                     last_exception = e
 
-                    # Check if this is a retryable error
-                    if e.status_code not in retryable_status_codes:
-                        logger.warning(
-                            f"Non-retryable error (status {e.status_code}) in {func.__name__}: {e}"
+                    # Check if this is a non-retryable error
+                    if any(isinstance(e, exc_type) for exc_type in non_retryable_exceptions):
+                        logger.error(
+                            f"Non-retryable error in {func.__name__}: {type(e).__name__}: {str(e)}"
                         )
                         raise
 
-                    # Don't retry if we've exhausted attempts
-                    if attempt >= max_retries:
-                        logger.error(
-                            f"Max retries ({max_retries}) exceeded for {func.__name__}. "
-                            f"Last error: {e}"
-                        )
+                    # Check if this is a retryable error
+                    is_retryable = any(isinstance(e, exc_type) for exc_type in retryable_exceptions)
+
+                    if not is_retryable or attempt >= max_retries:
+                        # Not retryable or out of retries
+                        if attempt >= max_retries:
+                            logger.error(
+                                f"Max retries ({max_retries}) exceeded for {func.__name__}"
+                            )
                         raise
 
                     # Calculate delay with exponential backoff
-                    delay = min(
-                        initial_delay * (exponential_base ** attempt),
-                        max_delay
-                    )
+                    delay = min(base_delay * (2 ** attempt), max_delay)
 
                     logger.warning(
-                        f"Retryable error (status {e.status_code}) in {func.__name__} "
-                        f"(attempt {attempt + 1}/{max_retries + 1}). "
-                        f"Retrying in {delay:.1f}s... Error: {e}"
-                    )
-
-                    # Wait before retrying
-                    await asyncio.sleep(delay)
-
-                except asyncio.TimeoutError as e:
-                    last_exception = e
-
-                    # Treat timeouts as retryable
-                    if attempt >= max_retries:
-                        logger.error(
-                            f"Max retries ({max_retries}) exceeded for {func.__name__} due to timeout"
-                        )
-                        raise
-
-                    delay = min(
-                        initial_delay * (exponential_base ** attempt),
-                        max_delay
-                    )
-
-                    logger.warning(
-                        f"Timeout in {func.__name__} (attempt {attempt + 1}/{max_retries + 1}). "
-                        f"Retrying in {delay:.1f}s..."
+                        f"Retry {attempt + 1}/{max_retries} for {func.__name__} "
+                        f"after {type(e).__name__}: {str(e)}. "
+                        f"Waiting {delay:.2f}s..."
                     )
 
                     await asyncio.sleep(delay)
-
-                except Exception as e:
-                    # Don't retry on unexpected exceptions
-                    logger.error(
-                        f"Unexpected error in {func.__name__}: {e}. Not retrying."
-                    )
-                    raise
 
             # This should never be reached, but just in case
             if last_exception:
                 raise last_exception
-            raise RuntimeError(f"Retry logic failed unexpectedly in {func.__name__}")
 
         return wrapper
+
     return decorator
 
 
-class RateLimiter:
+def with_rate_limit(limiter: RateLimiter) -> Callable:
     """
-    Token bucket rate limiter for controlling API request rates.
+    Decorator to enforce rate limiting on async functions.
 
-    This class implements a token bucket algorithm to prevent burst requests
-    and maintain a steady rate of API calls.
+    Args:
+        limiter: RateLimiter instance to use
+
+    Returns:
+        Decorated function with rate limiting
 
     Example:
-        >>> limiter = RateLimiter(requests_per_minute=60)
-        >>> async def make_requests():
-        ...     for i in range(100):
-        ...         await limiter.acquire()
-        ...         result = await api_call()
-        ...         print(f"Request {i} completed")
+        ```python
+        limiter = RateLimiter(max_requests_per_minute=60)
+
+        @with_rate_limit(limiter)
+        async def make_request():
+            # ... API call code ...
+        ```
     """
 
-    def __init__(
-        self,
-        requests_per_minute: int = 60,
-        burst_size: Optional[int] = None
-    ):
-        """
-        Initialize the rate limiter.
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            await limiter.acquire()
+            return await func(*args, **kwargs)
 
-        Args:
-            requests_per_minute: Maximum number of requests allowed per minute
-            burst_size: Maximum burst size (default: same as requests_per_minute)
-        """
-        self.requests_per_minute = requests_per_minute
-        self.burst_size = burst_size or requests_per_minute
+        return wrapper
 
-        # Token bucket parameters
-        self.tokens = float(self.burst_size)  # Start with full bucket
-        self.max_tokens = float(self.burst_size)
-        self.refill_rate = requests_per_minute / 60.0  # Tokens per second
-        self.last_refill = time.time()
-
-        # Lock for thread safety
-        self._lock = asyncio.Lock()
-
-        logger.info(
-            f"RateLimiter initialized: {requests_per_minute} req/min, "
-            f"burst_size={self.burst_size}"
-        )
-
-    def _refill_tokens(self) -> None:
-        """Refill tokens based on elapsed time since last refill."""
-        now = time.time()
-        elapsed = now - self.last_refill
-
-        # Calculate new tokens based on elapsed time
-        new_tokens = elapsed * self.refill_rate
-        self.tokens = min(self.max_tokens, self.tokens + new_tokens)
-        self.last_refill = now
-
-    async def acquire(self, tokens: int = 1) -> None:
-        """
-        Acquire tokens from the bucket, waiting if necessary.
-
-        This method will block until the requested number of tokens is available.
-
-        Args:
-            tokens: Number of tokens to acquire (default: 1)
-
-        Example:
-            >>> limiter = RateLimiter(requests_per_minute=60)
-            >>> await limiter.acquire()  # Wait for 1 token
-            >>> # Make API call
-        """
-        if tokens > self.max_tokens:
-            raise ValueError(
-                f"Requested tokens ({tokens}) exceeds maximum burst size ({self.max_tokens})"
-            )
-
-        async with self._lock:
-            while True:
-                # Refill tokens based on elapsed time
-                self._refill_tokens()
-
-                # Check if we have enough tokens
-                if self.tokens >= tokens:
-                    self.tokens -= tokens
-                    logger.debug(f"Acquired {tokens} token(s). Remaining: {self.tokens:.2f}")
-                    return
-
-                # Calculate how long to wait for enough tokens
-                tokens_needed = tokens - self.tokens
-                wait_time = tokens_needed / self.refill_rate
-
-                logger.debug(
-                    f"Insufficient tokens ({self.tokens:.2f}/{tokens}). "
-                    f"Waiting {wait_time:.2f}s..."
-                )
-
-                # Release lock while waiting
-                await asyncio.sleep(wait_time)
-
-    async def try_acquire(self, tokens: int = 1) -> bool:
-        """
-        Try to acquire tokens without waiting.
-
-        Args:
-            tokens: Number of tokens to acquire (default: 1)
-
-        Returns:
-            True if tokens were acquired, False otherwise
-
-        Example:
-            >>> limiter = RateLimiter(requests_per_minute=60)
-            >>> if await limiter.try_acquire():
-            ...     # Make API call
-            ...     pass
-            ... else:
-            ...     # Handle rate limit
-            ...     print("Rate limited, skipping request")
-        """
-        async with self._lock:
-            self._refill_tokens()
-
-            if self.tokens >= tokens:
-                self.tokens -= tokens
-                logger.debug(f"Acquired {tokens} token(s). Remaining: {self.tokens:.2f}")
-                return True
-
-            logger.debug(f"Insufficient tokens ({self.tokens:.2f}/{tokens})")
-            return False
-
-    def get_available_tokens(self) -> float:
-        """
-        Get the current number of available tokens.
-
-        Returns:
-            Number of tokens currently available
-
-        Example:
-            >>> limiter = RateLimiter(requests_per_minute=60)
-            >>> print(f"Available tokens: {limiter.get_available_tokens()}")
-        """
-        # Update tokens first
-        now = time.time()
-        elapsed = now - self.last_refill
-        new_tokens = elapsed * self.refill_rate
-        current_tokens = min(self.max_tokens, self.tokens + new_tokens)
-        return current_tokens
-
-    def reset(self) -> None:
-        """
-        Reset the rate limiter to full capacity.
-
-        Example:
-            >>> limiter = RateLimiter(requests_per_minute=60)
-            >>> # ... make some requests ...
-            >>> limiter.reset()  # Reset to full capacity
-        """
-        self.tokens = float(self.max_tokens)
-        self.last_refill = time.time()
-        logger.info("RateLimiter reset to full capacity")
+    return decorator

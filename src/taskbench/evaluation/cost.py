@@ -1,14 +1,13 @@
 """
-Cost calculation and tracking for LLM TaskBench.
+Cost tracking and calculation for LLM evaluations.
 
-This module provides utilities for calculating and tracking costs of LLM
-API usage based on token consumption and model pricing.
+This module provides functionality to calculate costs based on token usage
+and track cumulative costs across multiple evaluations.
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -19,118 +18,65 @@ logger = logging.getLogger(__name__)
 
 class CostTracker:
     """
-    Track and calculate costs for LLM API usage.
+    Calculate and track costs for LLM evaluations.
 
-    This class loads model pricing from a YAML configuration file and provides
-    methods to calculate costs based on token usage.
+    Loads model pricing information and calculates costs based on token usage.
+    Maintains running totals for cost analysis.
 
     Example:
-        >>> tracker = CostTracker()
-        >>> cost = tracker.calculate_cost("anthropic/claude-sonnet-4.5", 1000, 500)
-        >>> print(f"Cost: ${cost:.4f}")
-        >>> tracker.track_evaluation(eval_result)
-        >>> total = tracker.get_total_cost()
-        >>> print(f"Total cost: ${total:.2f}")
+        ```python
+        tracker = CostTracker("config/models.yaml")
+        cost = tracker.calculate_cost("anthropic/claude-sonnet-4.5", 1000, 500)
+        print(f"Cost: ${cost:.4f}")
+
+        tracker.track_evaluation(result)
+        print(f"Total cost: ${tracker.get_total_cost():.2f}")
+        ```
     """
 
-    def __init__(self, models_config_path: Optional[str] = None):
+    def __init__(self, models_config_path: str = "config/models.yaml"):
         """
         Initialize the cost tracker.
 
         Args:
-            models_config_path: Path to models.yaml configuration file.
-                If not provided, looks for config/models.yaml relative to project root.
-
-        Raises:
-            FileNotFoundError: If the models configuration file is not found
-            ValueError: If the configuration file is malformed
-        """
-        # Determine config path
-        if models_config_path is None:
-            # Try to find config/models.yaml relative to this file
-            current_file = Path(__file__)
-            project_root = current_file.parent.parent.parent.parent
-            models_config_path = project_root / "config" / "models.yaml"
-        else:
-            models_config_path = Path(models_config_path)
-
-        # Load model pricing
-        self.models: Dict[str, ModelConfig] = {}
-        self._load_models(models_config_path)
-
-        # Track evaluations
-        self.evaluations: List[EvaluationResult] = []
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        self.total_cost = 0.0
-
-        logger.info(f"CostTracker initialized with {len(self.models)} models")
-
-    def _load_models(self, config_path: Path) -> None:
-        """
-        Load model configurations from YAML file.
-
-        Args:
-            config_path: Path to the models YAML configuration
+            models_config_path: Path to YAML file containing model pricing
 
         Raises:
             FileNotFoundError: If config file doesn't exist
-            ValueError: If config is malformed
+            ValueError: If config file is invalid
         """
-        if not config_path.exists():
+        self.models_config_path = models_config_path
+        self.models: Dict[str, ModelConfig] = {}
+        self.evaluations: List[EvaluationResult] = []
+
+        # Load model pricing
+        self._load_models_config()
+
+    def _load_models_config(self) -> None:
+        """Load model pricing from YAML configuration."""
+        path = Path(self.models_config_path)
+
+        if not path.exists():
             raise FileNotFoundError(
-                f"Models configuration file not found: {config_path}. "
-                "Please ensure config/models.yaml exists."
+                f"Models configuration file not found: {self.models_config_path}"
             )
 
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f)
-        except yaml.YAMLError as e:
-            raise ValueError(f"Failed to parse models configuration: {e}") from e
 
-        # Validate structure
-        if not isinstance(data, dict) or 'models' not in data:
-            raise ValueError(
-                "Invalid models configuration: must contain 'models' key with list of models"
-            )
+            models_list = data.get("models", [])
 
-        # Load each model
-        models_list = data['models']
-        if not isinstance(models_list, list):
-            raise ValueError("'models' must be a list")
-
-        for model_data in models_list:
-            try:
+            for model_data in models_list:
                 model_config = ModelConfig(**model_data)
                 self.models[model_config.model_id] = model_config
-                logger.debug(f"Loaded pricing for {model_config.model_id}")
-            except Exception as e:
-                logger.warning(f"Failed to load model config: {e}")
-                continue
 
-        if not self.models:
-            raise ValueError("No valid model configurations found")
+            logger.info(f"Loaded pricing for {len(self.models)} models")
 
-        logger.info(f"Loaded {len(self.models)} model configurations from {config_path}")
-
-    def get_model_config(self, model_id: str) -> Optional[ModelConfig]:
-        """
-        Get the configuration for a specific model.
-
-        Args:
-            model_id: Model identifier
-
-        Returns:
-            ModelConfig object if found, None otherwise
-
-        Example:
-            >>> tracker = CostTracker()
-            >>> config = tracker.get_model_config("anthropic/claude-sonnet-4.5")
-            >>> if config:
-            ...     print(f"Input price: ${config.input_price_per_1m}")
-        """
-        return self.models.get(model_id)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to load models configuration: {str(e)}"
+            ) from e
 
     def calculate_cost(
         self,
@@ -139,240 +85,145 @@ class CostTracker:
         output_tokens: int
     ) -> float:
         """
-        Calculate cost for a given number of tokens.
+        Calculate cost for a specific API call.
 
         Args:
             model_id: Model identifier (e.g., "anthropic/claude-sonnet-4.5")
-            input_tokens: Number of input tokens
-            output_tokens: Number of output tokens
+            input_tokens: Number of input tokens consumed
+            output_tokens: Number of output tokens generated
 
         Returns:
-            Total cost in USD, rounded to $0.01 precision
+            Cost in USD, rounded to $0.01 precision
 
         Raises:
-            ValueError: If model_id is not found in configuration
+            ValueError: If model_id is not found in pricing database
 
         Example:
-            >>> tracker = CostTracker()
-            >>> cost = tracker.calculate_cost("anthropic/claude-sonnet-4.5", 1000, 500)
-            >>> print(f"Cost: ${cost:.2f}")
+            ```python
+            cost = tracker.calculate_cost(
+                "anthropic/claude-sonnet-4.5",
+                input_tokens=1000,
+                output_tokens=500
+            )
+            # cost = (1000/1M * $3.00) + (500/1M * $15.00) = $0.0105
+            ```
         """
-        model_config = self.models.get(model_id)
-
-        if model_config is None:
+        if model_id not in self.models:
             raise ValueError(
-                f"Model '{model_id}' not found in configuration. "
-                f"Available models: {list(self.models.keys())}"
+                f"Model '{model_id}' not found in pricing database. "
+                f"Available models: {', '.join(self.models.keys())}"
             )
 
-        # Calculate cost using ModelConfig method
-        cost = model_config.calculate_cost(input_tokens, output_tokens)
+        model = self.models[model_id]
 
-        logger.debug(
-            f"Cost calculation: model={model_id}, input={input_tokens}, "
-            f"output={output_tokens}, cost=${cost:.4f}"
-        )
+        # Calculate costs
+        input_cost = (input_tokens / 1_000_000) * model.input_price_per_1m
+        output_cost = (output_tokens / 1_000_000) * model.output_price_per_1m
+        total_cost = input_cost + output_cost
 
-        return cost
+        # Round to $0.01 precision
+        return round(total_cost, 2)
 
-    def track_evaluation(self, evaluation: EvaluationResult) -> None:
+    def track_evaluation(self, result: EvaluationResult) -> None:
         """
-        Track an evaluation result and update cost statistics.
+        Track an evaluation result for cost analysis.
 
         Args:
-            evaluation: EvaluationResult to track
-
-        Example:
-            >>> tracker = CostTracker()
-            >>> result = EvaluationResult(...)
-            >>> tracker.track_evaluation(result)
-            >>> print(f"Total tracked: ${tracker.get_total_cost():.2f}")
+            result: EvaluationResult to track
         """
-        self.evaluations.append(evaluation)
-        self.total_input_tokens += evaluation.input_tokens
-        self.total_output_tokens += evaluation.output_tokens
-        self.total_cost += evaluation.cost_usd
-
+        self.evaluations.append(result)
         logger.debug(
-            f"Tracked evaluation: model={evaluation.model_name}, "
-            f"cost=${evaluation.cost_usd:.4f}, "
-            f"total_cost=${self.total_cost:.4f}"
+            f"Tracked evaluation: {result.model_name}, "
+            f"cost=${result.cost_usd:.4f}"
         )
 
     def get_total_cost(self) -> float:
         """
-        Get the total cost of all tracked evaluations.
+        Get total cost of all tracked evaluations.
 
         Returns:
-            Total cost in USD, rounded to $0.01 precision
-
-        Example:
-            >>> tracker = CostTracker()
-            >>> # ... track some evaluations ...
-            >>> total = tracker.get_total_cost()
-            >>> print(f"Total spent: ${total:.2f}")
+            Total cost in USD
         """
-        return round(self.total_cost, 2)
+        return round(sum(eval.cost_usd for eval in self.evaluations), 2)
 
-    def get_cost_breakdown(self) -> Dict[str, Dict[str, float]]:
+    def get_cost_breakdown(self) -> Dict[str, float]:
         """
-        Get cost breakdown by model.
+        Get per-model cost breakdown.
 
         Returns:
-            Dictionary mapping model names to their cost statistics:
-            {
-                "model_name": {
-                    "cost": total_cost,
-                    "input_tokens": total_input_tokens,
-                    "output_tokens": total_output_tokens,
-                    "evaluations": count
-                }
-            }
+            Dictionary mapping model names to their total costs
 
         Example:
-            >>> tracker = CostTracker()
-            >>> # ... track some evaluations ...
-            >>> breakdown = tracker.get_cost_breakdown()
-            >>> for model, stats in breakdown.items():
-            ...     print(f"{model}: ${stats['cost']:.2f}")
+            ```python
+            breakdown = tracker.get_cost_breakdown()
+            # {"claude-sonnet-4.5": 0.36, "gpt-4o": 0.42}
+            ```
         """
-        breakdown: Dict[str, Dict[str, float]] = {}
+        breakdown: Dict[str, float] = {}
 
-        for eval_result in self.evaluations:
-            model = eval_result.model_name
+        for eval in self.evaluations:
+            model_name = eval.model_name
+            if model_name not in breakdown:
+                breakdown[model_name] = 0.0
+            breakdown[model_name] += eval.cost_usd
 
-            if model not in breakdown:
-                breakdown[model] = {
-                    "cost": 0.0,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "evaluations": 0
-                }
+        # Round all values
+        return {k: round(v, 2) for k, v in breakdown.items()}
 
-            breakdown[model]["cost"] += eval_result.cost_usd
-            breakdown[model]["input_tokens"] += eval_result.input_tokens
-            breakdown[model]["output_tokens"] += eval_result.output_tokens
-            breakdown[model]["evaluations"] += 1
-
-        # Round costs to 2 decimal places
-        for model in breakdown:
-            breakdown[model]["cost"] = round(breakdown[model]["cost"], 2)
-
-        return breakdown
-
-    def get_statistics(self) -> Dict[str, any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """
         Get comprehensive cost statistics.
 
         Returns:
-            Dictionary containing:
-            - total_cost: Total cost in USD
-            - total_evaluations: Number of evaluations tracked
-            - total_input_tokens: Total input tokens
-            - total_output_tokens: Total output tokens
-            - total_tokens: Total tokens (input + output)
-            - average_cost_per_evaluation: Average cost per evaluation
-            - models_used: Number of unique models used
-            - breakdown: Cost breakdown by model
+            Dictionary with total cost, tokens, averages, and breakdown
 
         Example:
-            >>> tracker = CostTracker()
-            >>> # ... track some evaluations ...
-            >>> stats = tracker.get_statistics()
-            >>> print(f"Total: ${stats['total_cost']:.2f}")
-            >>> print(f"Evaluations: {stats['total_evaluations']}")
-            >>> print(f"Avg per eval: ${stats['average_cost_per_evaluation']:.4f}")
+            ```python
+            stats = tracker.get_statistics()
+            print(f"Total cost: ${stats['total_cost']:.2f}")
+            print(f"Average per eval: ${stats['avg_cost_per_eval']:.2f}")
+            ```
         """
-        total_evaluations = len(self.evaluations)
-        total_tokens = self.total_input_tokens + self.total_output_tokens
+        if not self.evaluations:
+            return {
+                "total_cost": 0.0,
+                "total_tokens": 0,
+                "total_evaluations": 0,
+                "avg_cost_per_eval": 0.0,
+                "avg_tokens_per_eval": 0,
+                "cost_by_model": {}
+            }
 
-        # Calculate average cost per evaluation
-        avg_cost = (
-            round(self.total_cost / total_evaluations, 4)
-            if total_evaluations > 0
-            else 0.0
-        )
+        total_tokens = sum(eval.total_tokens for eval in self.evaluations)
+        total_cost = self.get_total_cost()
+        num_evals = len(self.evaluations)
 
-        # Get unique models
-        models_used = len(set(eval.model_name for eval in self.evaluations))
-
-        statistics = {
-            "total_cost": round(self.total_cost, 2),
-            "total_evaluations": total_evaluations,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
+        return {
+            "total_cost": total_cost,
             "total_tokens": total_tokens,
-            "average_cost_per_evaluation": avg_cost,
-            "models_used": models_used,
-            "breakdown": self.get_cost_breakdown()
+            "total_evaluations": num_evals,
+            "avg_cost_per_eval": round(total_cost / num_evals, 4),
+            "avg_tokens_per_eval": int(total_tokens / num_evals),
+            "cost_by_model": self.get_cost_breakdown()
         }
 
-        return statistics
-
-    def reset(self) -> None:
+    def get_model_config(self, model_id: str) -> Optional[ModelConfig]:
         """
-        Reset all tracked evaluations and statistics.
+        Get configuration for a specific model.
 
-        Example:
-            >>> tracker = CostTracker()
-            >>> # ... track some evaluations ...
-            >>> tracker.reset()  # Clear all tracked data
-            >>> assert tracker.get_total_cost() == 0.0
-        """
-        self.evaluations.clear()
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        self.total_cost = 0.0
-        logger.info("CostTracker reset: all statistics cleared")
-
-    def export_summary(self) -> str:
-        """
-        Export a formatted summary of cost statistics.
+        Args:
+            model_id: Model identifier
 
         Returns:
-            Formatted string with cost summary
-
-        Example:
-            >>> tracker = CostTracker()
-            >>> # ... track some evaluations ...
-            >>> print(tracker.export_summary())
+            ModelConfig if found, None otherwise
         """
-        stats = self.get_statistics()
+        return self.models.get(model_id)
 
-        summary = []
-        summary.append("=" * 60)
-        summary.append("COST SUMMARY")
-        summary.append("=" * 60)
-        summary.append(f"Total Cost:           ${stats['total_cost']:.2f}")
-        summary.append(f"Total Evaluations:    {stats['total_evaluations']}")
-        summary.append(f"Average Cost/Eval:    ${stats['average_cost_per_evaluation']:.4f}")
-        summary.append(f"Models Used:          {stats['models_used']}")
-        summary.append(f"Total Tokens:         {stats['total_tokens']:,}")
-        summary.append(f"  - Input:            {stats['total_input_tokens']:,}")
-        summary.append(f"  - Output:           {stats['total_output_tokens']:,}")
-        summary.append("")
-        summary.append("BREAKDOWN BY MODEL:")
-        summary.append("-" * 60)
+    def list_models(self) -> List[ModelConfig]:
+        """
+        Get list of all available models.
 
-        breakdown = stats['breakdown']
-        for model, model_stats in sorted(breakdown.items(), key=lambda x: x[1]['cost'], reverse=True):
-            summary.append(f"\n{model}:")
-            summary.append(f"  Cost:         ${model_stats['cost']:.2f}")
-            summary.append(f"  Evaluations:  {int(model_stats['evaluations'])}")
-            summary.append(f"  Tokens:       {int(model_stats['input_tokens'] + model_stats['output_tokens']):,}")
-
-        summary.append("=" * 60)
-
-        return "\n".join(summary)
-
-    def __str__(self) -> str:
-        """String representation of CostTracker."""
-        return (
-            f"CostTracker(models={len(self.models)}, "
-            f"evaluations={len(self.evaluations)}, "
-            f"total_cost=${self.total_cost:.2f})"
-        )
-
-    def __repr__(self) -> str:
-        """Repr of CostTracker."""
-        return self.__str__()
+        Returns:
+            List of ModelConfig objects
+        """
+        return list(self.models.values())

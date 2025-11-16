@@ -1,741 +1,325 @@
 """
 CLI interface for LLM TaskBench.
 
-This module provides a command-line interface using Typer for evaluating
-LLMs on custom tasks, managing models, and viewing results.
+Provides command-line interface for running evaluations, viewing results,
+and getting recommendations.
 """
 
 import asyncio
 import json
-import logging
-import sys
+import os
 from pathlib import Path
 from typing import List, Optional
 
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich import box
 
+from taskbench.api.client import OpenRouterClient
 from taskbench.core.task import TaskParser
-from taskbench.core.models import EvaluationResult, TaskDefinition, JudgeScore
-from taskbench.evaluation.executor import ModelExecutor
 from taskbench.evaluation.cost import CostTracker
-from taskbench.evaluation.comparison import ModelComparison
-from taskbench.evaluation.recommender import RecommendationEngine
-from taskbench.utils.logging import setup_logging
+from taskbench.evaluation.executor import ModelExecutor
+from taskbench.evaluation.judge import LLMJudge, ModelComparison
 
-# Create Typer app
+# Load environment variables
+load_dotenv()
+
 app = typer.Typer(
     name="taskbench",
-    help="LLM TaskBench - Evaluate LLMs on custom tasks",
+    help="LLM TaskBench - Task-specific LLM evaluation framework",
     add_completion=False
 )
-
-# Rich console for beautiful output
 console = Console()
-
-# Global logger (configured on first command)
-logger = logging.getLogger(__name__)
-
-
-def setup_cli_logging(verbose: bool = False) -> None:
-    """
-    Setup logging for CLI commands.
-
-    Args:
-        verbose: Enable verbose (DEBUG) logging
-    """
-    level = logging.DEBUG if verbose else logging.INFO
-    setup_logging(level=level)
 
 
 @app.command()
 def evaluate(
-    task_yaml: str = typer.Argument(
-        ...,
-        help="Path to task definition YAML file"
-    ),
-    models: Optional[str] = typer.Option(
-        None,
-        "--models", "-m",
-        help="Comma-separated list of model IDs to evaluate (e.g., 'anthropic/claude-sonnet-4.5,openai/gpt-4o')"
+    task_yaml: str = typer.Argument(..., help="Path to task definition YAML file"),
+    models: str = typer.Option(
+        "anthropic/claude-sonnet-4.5,openai/gpt-4o,qwen/qwen-2.5-72b-instruct",
+        "--models",
+        "-m",
+        help="Comma-separated list of model IDs to evaluate"
     ),
     input_file: Optional[str] = typer.Option(
         None,
-        "--input-file", "-i",
-        help="Path to input data file (if not specified, uses stdin)"
+        "--input-file",
+        "-i",
+        help="Path to input data file"
     ),
-    output: Optional[str] = typer.Option(
-        None,
-        "--output", "-o",
-        help="Path to save results JSON file"
+    output: str = typer.Option(
+        "results/evaluation_results.json",
+        "--output",
+        "-o",
+        help="Output file for results"
+    ),
+    run_judge: bool = typer.Option(
+        True,
+        "--judge/--no-judge",
+        help="Run LLM-as-judge evaluation"
     ),
     verbose: bool = typer.Option(
         False,
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         help="Enable verbose logging"
     )
-) -> None:
+):
     """
-    Evaluate one or more models on a task.
-
-    This command loads a task definition, runs it on specified models,
-    displays results in a beautiful table, and optionally saves to JSON.
+    Evaluate multiple LLMs on a specific task.
 
     Example:
-
-        # Evaluate two models on a task
-        taskbench evaluate tasks/lecture_analysis.yaml \\
-            --models "anthropic/claude-sonnet-4.5,openai/gpt-4o" \\
-            --input-file tests/fixtures/sample_transcript.txt \\
-            --output results.json
-
-        # Use default models (from task definition or all available)
-        taskbench evaluate tasks/lecture_analysis.yaml \\
-            --input-file transcript.txt
+        taskbench evaluate tasks/lecture_analysis.yaml --models claude-sonnet-4.5,gpt-4o --input-file data/transcript.txt
     """
-    setup_cli_logging(verbose)
+    asyncio.run(_evaluate_async(task_yaml, models, input_file, output, run_judge, verbose))
 
+
+async def _evaluate_async(
+    task_yaml: str,
+    models_str: str,
+    input_file: Optional[str],
+    output: str,
+    run_judge: bool,
+    verbose: bool
+):
+    """Async implementation of evaluate command."""
     try:
+        # Get API key
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            console.print("[red]Error: OPENROUTER_API_KEY not set in environment[/red]")
+            console.print("Please set it in .env file or export it as an environment variable")
+            raise typer.Exit(1)
+
         # Load task definition
-        console.print(f"\n[cyan]Loading task definition from {task_yaml}...[/cyan]")
+        console.print(f"[cyan]Loading task definition from {task_yaml}...[/cyan]")
         parser = TaskParser()
         task = parser.load_from_yaml(task_yaml)
 
         # Validate task
         is_valid, errors = parser.validate_task(task)
         if not is_valid:
-            console.print("\n[red]Task validation failed:[/red]")
+            console.print("[red]Task validation failed:[/red]")
             for error in errors:
-                console.print(f"  [red][/red] {error}")
-            raise typer.Exit(code=1)
+                console.print(f"  - {error}")
+            raise typer.Exit(1)
 
-        console.print(f"[green][/green] Task loaded: {task.name}")
+        console.print(f"[green] Task '{task.name}' loaded successfully[/green]")
 
         # Load input data
         if input_file:
-            console.print(f"\n[cyan]Loading input data from {input_file}...[/cyan]")
-            input_path = Path(input_file)
-            if not input_path.exists():
-                console.print(f"[red]Error: Input file not found: {input_file}[/red]")
-                raise typer.Exit(code=1)
-            input_data = input_path.read_text(encoding='utf-8')
-            console.print(f"[green][/green] Loaded {len(input_data)} characters of input data")
+            with open(input_file, 'r', encoding='utf-8') as f:
+                input_data = f.read()
+            console.print(f"[green] Loaded input data from {input_file}[/green]")
         else:
-            console.print("\n[yellow]Reading input data from stdin (Ctrl+D when done)...[/yellow]")
-            input_data = sys.stdin.read()
+            # Use example data if available
+            if task.examples and len(task.examples) > 0:
+                input_data = task.examples[0].get("input", "Sample input data")
+                console.print("[yellow]No input file provided, using example from task definition[/yellow]")
+            else:
+                console.print("[red]Error: No input file provided and no examples in task definition[/red]")
+                raise typer.Exit(1)
 
-        if not input_data.strip():
-            console.print("[red]Error: Input data is empty[/red]")
-            raise typer.Exit(code=1)
+        # Parse model list
+        model_ids = [m.strip() for m in models_str.split(",")]
+        console.print(f"[cyan]Evaluating {len(model_ids)} models: {', '.join(model_ids)}[/cyan]\n")
 
-        # Parse model IDs
-        if models:
-            model_ids = [m.strip() for m in models.split(",")]
-        else:
-            # Default to a few common models
-            console.print("[yellow]No models specified, using default models[/yellow]")
-            model_ids = [
-                "anthropic/claude-sonnet-4.5",
-                "openai/gpt-4o",
-                "google/gemini-2.0-flash-exp"
-            ]
+        # Initialize components
+        async with OpenRouterClient(api_key) as client:
+            cost_tracker = CostTracker()
+            executor = ModelExecutor(client, cost_tracker)
 
-        console.print(f"\n[cyan]Evaluating {len(model_ids)} model(s):[/cyan]")
-        for model_id in model_ids:
-            console.print(f"  " {model_id}")
+            # Run evaluations
+            results = await executor.evaluate_multiple(
+                model_ids=model_ids,
+                task=task,
+                input_data=input_data
+            )
 
-        # Execute evaluation
-        console.print()
-        executor = ModelExecutor()
-        results = asyncio.run(
-            executor.evaluate_multiple(model_ids, task, input_data, show_progress=True)
-        )
+            # Run judge if requested
+            if run_judge:
+                console.print("\n[bold cyan]Running LLM-as-judge evaluation...[/bold cyan]\n")
+                judge = LLMJudge(client)
+                scores = []
 
-        # Display results table
-        console.print("\n")
-        display_results_table(results)
+                for result in results:
+                    if result.status == "success":
+                        try:
+                            score = await judge.evaluate(task, result, input_data)
+                            scores.append(score)
+                            console.print(
+                                f"[green] {result.model_name}[/green]: "
+                                f"Score {score.overall_score}/100, "
+                                f"{len(score.violations)} violations"
+                            )
+                        except Exception as e:
+                            console.print(f"[red] Failed to judge {result.model_name}: {str(e)}[/red]")
+                            scores.append(None)
+                    else:
+                        scores.append(None)
 
-        # Display cost summary
-        console.print()
-        cost_summary = executor.get_cost_summary()
-        console.print(Panel(cost_summary, title="Cost Summary", border_style="green"))
+                # Show comparison if we have scores
+                valid_results = [r for r, s in zip(results, scores) if s is not None]
+                valid_scores = [s for s in scores if s is not None]
 
-        # Save results if output path specified
-        if output:
-            save_results(results, output)
-            console.print(f"\n[green][/green] Results saved to {output}")
+                if valid_scores:
+                    console.print("\n")
+                    comparison = ModelComparison.compare_results(valid_results, valid_scores)
+                    table = ModelComparison.generate_comparison_table(comparison)
+                    console.print(table)
 
-        # Exit with error code if any evaluations failed
-        failed_count = sum(1 for r in results if r.status != "success")
-        if failed_count > 0:
-            console.print(f"\n[yellow]Warning: {failed_count} evaluation(s) failed[/yellow]")
-            raise typer.Exit(code=1)
+                    # Show recommendations
+                    console.print("\n[bold cyan]=Ê RECOMMENDATIONS[/bold cyan]\n")
 
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Evaluation cancelled by user[/yellow]")
-        raise typer.Exit(code=130)
+                    best_model = ModelComparison.identify_best(comparison)
+                    best_value = ModelComparison.identify_best_value(comparison)
+
+                    console.print(f"<Æ [bold green]Best Overall[/bold green]: {best_model}")
+                    best_item = next(c for c in comparison if c["model"] == best_model)
+                    console.print(f"   Score: {best_item['overall_score']}/100, Cost: ${best_item['cost_usd']:.4f}")
+
+                    if best_value != best_model:
+                        console.print(f"\n=Ž [bold yellow]Best Value[/bold yellow]: {best_value}")
+                        value_item = next(c for c in comparison if c["model"] == best_value)
+                        console.print(f"   Score: {value_item['overall_score']}/100, Cost: ${value_item['cost_usd']:.4f}")
+
+            # Save results
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            output_data = {
+                "task": task.model_dump(),
+                "results": [r.model_dump() for r in results],
+                "scores": [s.model_dump() if s else None for s in scores] if run_judge else [],
+                "statistics": cost_tracker.get_statistics()
+            }
+
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(output_data, f, indent=2, default=str)
+
+            console.print(f"\n[green] Results saved to {output}[/green]")
+
     except Exception as e:
-        logger.error(f"Evaluation failed: {e}", exc_info=verbose)
-        console.print(f"\n[red]Error: {e}[/red]")
+        console.print(f"[red]Error: {str(e)}[/red]")
         if verbose:
-            console.print_exception()
-        raise typer.Exit(code=1)
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(1)
 
 
 @app.command()
 def models(
     list_models: bool = typer.Option(
         False,
-        "--list", "-l",
+        "--list",
+        "-l",
         help="List all available models with pricing"
     ),
     info: Optional[str] = typer.Option(
         None,
         "--info",
-        help="Show detailed information about a specific model"
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose", "-v",
-        help="Enable verbose logging"
+        "-i",
+        help="Show detailed info for specific model"
     )
-) -> None:
+):
     """
     Show available models and pricing information.
 
     Example:
-
-        # List all models
         taskbench models --list
-
-        # Get info about a specific model
-        taskbench models --info "anthropic/claude-sonnet-4.5"
+        taskbench models --info anthropic/claude-sonnet-4.5
     """
-    setup_cli_logging(verbose)
-
     try:
-        tracker = CostTracker()
+        cost_tracker = CostTracker()
 
         if info:
-            # Show detailed info about a specific model
-            model_config = tracker.get_model_config(info)
-            if not model_config:
-                console.print(f"[red]Error: Model '{info}' not found[/red]")
-                console.print(f"\nAvailable models: {', '.join(tracker.models.keys())}")
-                raise typer.Exit(code=1)
+            # Show detailed info for one model
+            model = cost_tracker.get_model_config(info)
+            if not model:
+                console.print(f"[red]Model '{info}' not found[/red]")
+                raise typer.Exit(1)
 
-            # Display model info in a panel
-            info_text = f"""
-[bold]{model_config.display_name}[/bold]
-Provider: {model_config.provider}
-Model ID: {model_config.model_id}
-
-Pricing:
-  Input:  ${model_config.input_price_per_1m:.2f} per 1M tokens
-  Output: ${model_config.output_price_per_1m:.2f} per 1M tokens
-
-Context Window: {model_config.context_window:,} tokens
-"""
-            console.print(Panel(info_text, title=f"Model Info: {info}", border_style="cyan"))
+            console.print(f"\n[bold cyan]{model.display_name}[/bold cyan]")
+            console.print(f"ID: {model.model_id}")
+            console.print(f"Provider: {model.provider}")
+            console.print(f"Context Window: {model.context_window:,} tokens")
+            console.print(f"Input Price: ${model.input_price_per_1m:.2f} per 1M tokens")
+            console.print(f"Output Price: ${model.output_price_per_1m:.2f} per 1M tokens")
+            console.print()
 
         elif list_models:
-            # Display table of all models
-            table = Table(title="Available Models", box=box.ROUNDED)
-            table.add_column("Model ID", style="cyan", no_wrap=True)
-            table.add_column("Display Name", style="white")
-            table.add_column("Provider", style="yellow")
-            table.add_column("Input Price\n(per 1M tokens)", justify="right", style="green")
-            table.add_column("Output Price\n(per 1M tokens)", justify="right", style="green")
-            table.add_column("Context Window", justify="right", style="blue")
+            # Show all models in table
+            models_list = cost_tracker.list_models()
 
-            for model_config in sorted(tracker.models.values(), key=lambda m: m.display_name):
+            table = Table(title="Available Models", show_header=True, header_style="bold magenta")
+            table.add_column("Model ID", style="cyan")
+            table.add_column("Display Name")
+            table.add_column("Provider", style="green")
+            table.add_column("Input $/1M", justify="right")
+            table.add_column("Output $/1M", justify="right")
+
+            for model in models_list:
                 table.add_row(
-                    model_config.model_id,
-                    model_config.display_name,
-                    model_config.provider,
-                    f"${model_config.input_price_per_1m:.2f}",
-                    f"${model_config.output_price_per_1m:.2f}",
-                    f"{model_config.context_window:,}"
+                    model.model_id,
+                    model.display_name,
+                    model.provider,
+                    f"${model.input_price_per_1m:.2f}",
+                    f"${model.output_price_per_1m:.2f}"
                 )
 
             console.print()
             console.print(table)
             console.print()
-            console.print(f"[cyan]Total models available: {len(tracker.models)}[/cyan]")
 
         else:
-            # No option specified, show help
-            console.print("[yellow]Please specify --list or --info <model_id>[/yellow]")
-            console.print("\nExamples:")
-            console.print("  taskbench models --list")
-            console.print("  taskbench models --info 'anthropic/claude-sonnet-4.5'")
+            console.print("[yellow]Use --list to show all models or --info <model_id> for details[/yellow]")
 
     except Exception as e:
-        logger.error(f"Failed to load models: {e}", exc_info=verbose)
-        console.print(f"\n[red]Error: {e}[/red]")
-        if verbose:
-            console.print_exception()
-        raise typer.Exit(code=1)
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(1)
 
 
 @app.command()
 def validate(
-    task_yaml: str = typer.Argument(
-        ...,
-        help="Path to task definition YAML file to validate"
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose", "-v",
-        help="Enable verbose logging"
-    )
-) -> None:
+    task_yaml: str = typer.Argument(..., help="Path to task definition YAML file")
+):
     """
-    Validate a task definition YAML file.
-
-    This command checks that the task definition is valid and all required
-    fields are present and correctly formatted.
+    Validate a task definition file.
 
     Example:
-
-        taskbench validate tasks/lecture_analysis.yaml
+        taskbench validate tasks/my_task.yaml
     """
-    setup_cli_logging(verbose)
-
     try:
-        console.print(f"\n[cyan]Validating task definition: {task_yaml}[/cyan]\n")
+        parser = TaskParser()
+
+        console.print(f"[cyan]Validating {task_yaml}...[/cyan]")
 
         # Load task
-        parser = TaskParser()
         task = parser.load_from_yaml(task_yaml)
-
-        console.print(f"[green][/green] Task YAML loaded successfully")
-        console.print(f"  Name: {task.name}")
-        console.print(f"  Input Type: {task.input_type}")
-        console.print(f"  Output Format: {task.output_format}")
+        console.print(f"[green] YAML is valid and parseable[/green]")
 
         # Validate task
         is_valid, errors = parser.validate_task(task)
 
         if is_valid:
-            console.print(f"\n[green] Task validation passed![/green]\n")
-
-            # Show task details
-            details = f"""
-Task: {task.name}
-Description: {task.description}
-Input Type: {task.input_type}
-Output Format: {task.output_format}
-
-Evaluation Criteria ({len(task.evaluation_criteria)}):
-"""
-            for criterion in task.evaluation_criteria:
-                details += f"  " {criterion}\n"
-
-            if task.constraints:
-                details += f"\nConstraints ({len(task.constraints)}):\n"
-                for key, value in task.constraints.items():
-                    details += f"  " {key}: {value}\n"
-
-            if task.examples:
-                details += f"\nExamples: {len(task.examples)}\n"
-
-            console.print(Panel(details, title="Task Details", border_style="green"))
-            raise typer.Exit(code=0)
+            console.print(f"[green] Task '{task.name}' passed all validation checks[/green]")
+            console.print(f"\nTask: {task.name}")
+            console.print(f"Input type: {task.input_type}")
+            console.print(f"Output format: {task.output_format}")
+            console.print(f"Evaluation criteria: {len(task.evaluation_criteria)}")
+            console.print(f"Constraints: {len(task.constraints)}")
+            raise typer.Exit(0)
         else:
-            console.print(f"\n[red] Task validation failed:[/red]\n")
+            console.print(f"[red] Task validation failed with {len(errors)} error(s):[/red]")
             for error in errors:
-                console.print(f"  [red][/red] {error}")
-            console.print()
-            raise typer.Exit(code=1)
-
-    except FileNotFoundError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        logger.error(f"Validation failed: {e}", exc_info=verbose)
-        console.print(f"\n[red]Error: {e}[/red]")
-        if verbose:
-            console.print_exception()
-        raise typer.Exit(code=1)
-
-
-@app.command()
-def results(
-    results_file: str = typer.Argument(
-        "results.json",
-        help="Path to results JSON file"
-    ),
-    format: str = typer.Option(
-        "table",
-        "--format", "-f",
-        help="Output format: table, json, or csv"
-    ),
-    output: Optional[str] = typer.Option(
-        None,
-        "--output", "-o",
-        help="Save output to file instead of displaying"
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose", "-v",
-        help="Enable verbose logging"
-    )
-) -> None:
-    """
-    Display evaluation results from a JSON file.
-
-    This command loads previously saved evaluation results and displays
-    them in various formats (table, JSON, or CSV).
-
-    Example:
-
-        # Display as table
-        taskbench results results.json
-
-        # Export as CSV
-        taskbench results results.json --format csv --output results.csv
-
-        # Show as JSON
-        taskbench results results.json --format json
-    """
-    setup_cli_logging(verbose)
-
-    try:
-        # Load results
-        results_path = Path(results_file)
-        if not results_path.exists():
-            console.print(f"[red]Error: Results file not found: {results_file}[/red]")
-            raise typer.Exit(code=1)
-
-        console.print(f"\n[cyan]Loading results from {results_file}...[/cyan]")
-        results = load_results(results_file)
-        console.print(f"[green][/green] Loaded {len(results)} result(s)")
-
-        # Format output
-        if format == "table":
-            output_text = None
-            if not output:
-                # Display directly to console
-                console.print()
-                display_results_table(results)
-                console.print()
-            else:
-                # This doesn't make much sense for table format, but support it anyway
-                console.print("[yellow]Note: Table format is best viewed in terminal, not saved to file[/yellow]")
-                display_results_table(results)
-
-        elif format == "json":
-            output_text = format_results_json(results)
-            if output:
-                Path(output).write_text(output_text, encoding='utf-8')
-                console.print(f"\n[green][/green] Results saved to {output}")
-            else:
-                console.print("\n" + output_text)
-
-        elif format == "csv":
-            output_text = format_results_csv(results)
-            if output:
-                Path(output).write_text(output_text, encoding='utf-8')
-                console.print(f"\n[green][/green] Results saved to {output}")
-            else:
-                console.print("\n" + output_text)
-
-        else:
-            console.print(f"[red]Error: Invalid format '{format}'. Must be: table, json, or csv[/red]")
-            raise typer.Exit(code=1)
+                console.print(f"  - {error}")
+            raise typer.Exit(1)
 
     except Exception as e:
-        logger.error(f"Failed to display results: {e}", exc_info=verbose)
-        console.print(f"\n[red]Error: {e}[/red]")
-        if verbose:
-            console.print_exception()
-        raise typer.Exit(code=1)
-
-
-@app.command()
-def recommend(
-    results_file: str = typer.Option(
-        "results.json",
-        "--results-file", "-r",
-        help="Path to evaluation results JSON file"
-    ),
-    scores_file: str = typer.Option(
-        "scores.json",
-        "--scores-file", "-s",
-        help="Path to judge scores JSON file"
-    ),
-    budget: Optional[float] = typer.Option(
-        None,
-        "--budget", "-b",
-        help="Maximum budget per request in USD (e.g., 0.10)"
-    ),
-    output: Optional[str] = typer.Option(
-        None,
-        "--output", "-o",
-        help="Save recommendations to JSON file"
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose", "-v",
-        help="Enable verbose logging"
-    )
-) -> None:
-    """
-    Generate model recommendations from evaluation results.
-
-    This command analyzes evaluation results and judge scores to provide
-    intelligent recommendations about which models to use based on:
-    - Overall performance (accuracy, format, compliance)
-    - Cost efficiency (best value for money)
-    - Budget constraints
-    - Different use cases (production, development, etc.)
-
-    Example:
-
-        # Generate recommendations from results
-        taskbench recommend --results-file results.json --scores-file scores.json
-
-        # Filter by budget (max 10 cents per request)
-        taskbench recommend --budget 0.10
-
-        # Save recommendations to JSON
-        taskbench recommend --output recommendations.json
-    """
-    setup_cli_logging(verbose)
-
-    try:
-        # Load evaluation results
-        results_path = Path(results_file)
-        if not results_path.exists():
-            console.print(f"[red]Error: Results file not found: {results_file}[/red]")
-            console.print("[yellow]Tip: Run 'taskbench evaluate' first to generate results[/yellow]")
-            raise typer.Exit(code=1)
-
-        console.print(f"\n[cyan]Loading evaluation results from {results_file}...[/cyan]")
-        results = load_results(results_file)
-        console.print(f"[green]✓[/green] Loaded {len(results)} evaluation result(s)")
-
-        # Load judge scores
-        scores_path = Path(scores_file)
-        if not scores_path.exists():
-            console.print(f"\n[yellow]Warning: Scores file not found: {scores_file}[/yellow]")
-            console.print("[yellow]Recommendations will be limited without judge scores[/yellow]")
-            console.print("[yellow]Tip: Use the judge functionality to generate scores[/yellow]")
-            scores = []
-        else:
-            console.print(f"\n[cyan]Loading judge scores from {scores_file}...[/cyan]")
-            scores = load_scores(scores_file)
-            console.print(f"[green]✓[/green] Loaded {len(scores)} judge score(s)")
-
-        # Filter by budget if specified
-        if budget is not None:
-            console.print(f"\n[cyan]Filtering models by budget: ${budget:.4f} per request[/cyan]")
-            original_count = len(results)
-            results = [r for r in results if r.cost_usd <= budget]
-            filtered_count = original_count - len(results)
-
-            if filtered_count > 0:
-                console.print(f"[yellow]→[/yellow] Filtered out {filtered_count} model(s) exceeding budget")
-
-            if not results:
-                console.print(f"\n[red]Error: No models found within budget of ${budget:.4f}[/red]")
-                console.print("[yellow]Try increasing the budget or running more evaluations[/yellow]")
-                raise typer.Exit(code=1)
-
-        if not results:
-            console.print("\n[red]Error: No evaluation results available[/red]")
-            raise typer.Exit(code=1)
-
-        # Create comparison data
-        console.print("\n[cyan]Analyzing results and generating comparison...[/cyan]")
-        comparison = ModelComparison()
-        comparison_data = comparison.compare_results(results, scores)
-        console.print(f"[green]✓[/green] Comparison complete: {comparison_data['successful_models']} successful, {comparison_data['failed_models']} failed")
-
-        # Display comparison table
-        console.print()
-        comparison_table = comparison.generate_comparison_table(comparison_data)
-        console.print(comparison_table)
-
-        # Generate recommendations
-        console.print("\n[cyan]Generating intelligent recommendations...[/cyan]")
-        engine = RecommendationEngine()
-        recommendations = engine.generate_recommendations(comparison_data)
-        console.print(f"[green]✓[/green] Recommendations generated")
-
-        # Display formatted recommendations
-        console.print()
-        formatted_recs = engine.format_recommendations(recommendations)
-        console.print(formatted_recs)
-
-        # Save to JSON if requested
-        if output:
-            output_path = Path(output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            export_data = engine.export_recommendations_json(recommendations)
-            with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, indent=2, default=str)
-
-            console.print(f"\n[green]✓[/green] Recommendations saved to {output}")
-
-    except Exception as e:
-        logger.error(f"Failed to generate recommendations: {e}", exc_info=verbose)
-        console.print(f"\n[red]Error: {e}[/red]")
-        if verbose:
-            console.print_exception()
-        raise typer.Exit(code=1)
-
-
-# Helper functions
-
-def display_results_table(results: List[EvaluationResult]) -> None:
-    """
-    Display evaluation results in a Rich table.
-
-    Args:
-        results: List of EvaluationResult objects to display
-    """
-    table = Table(title="Evaluation Results", box=box.ROUNDED)
-    table.add_column("Model", style="cyan", no_wrap=True)
-    table.add_column("Status", style="white")
-    table.add_column("Input\nTokens", justify="right", style="blue")
-    table.add_column("Output\nTokens", justify="right", style="blue")
-    table.add_column("Total\nTokens", justify="right", style="blue")
-    table.add_column("Cost\n(USD)", justify="right", style="green")
-    table.add_column("Latency\n(ms)", justify="right", style="yellow")
-
-    for result in results:
-        # Status with emoji
-        if result.status == "success":
-            status = "[green] Success[/green]"
-        else:
-            status = f"[red] {result.status}[/red]"
-
-        table.add_row(
-            result.model_name,
-            status,
-            f"{result.input_tokens:,}" if result.status == "success" else "",
-            f"{result.output_tokens:,}" if result.status == "success" else "",
-            f"{result.total_tokens:,}" if result.status == "success" else "",
-            f"${result.cost_usd:.4f}" if result.status == "success" else "",
-            f"{result.latency_ms:.0f}" if result.status == "success" else ""
-        )
-
-    console.print(table)
-
-    # Show errors if any
-    failed_results = [r for r in results if r.status != "success"]
-    if failed_results:
-        console.print("\n[yellow]Failed Evaluations:[/yellow]")
-        for result in failed_results:
-            console.print(f"  [red][/red] {result.model_name}: {result.error}")
-
-
-def save_results(results: List[EvaluationResult], output_path: str) -> None:
-    """
-    Save evaluation results to a JSON file.
-
-    Args:
-        results: List of EvaluationResult objects
-        output_path: Path to save the JSON file
-    """
-    output_file = Path(output_path)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    # Convert to JSON-serializable format
-    results_data = [result.model_dump() for result in results]
-
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(results_data, f, indent=2, default=str)
-
-    logger.info(f"Saved {len(results)} results to {output_path}")
-
-
-def load_results(results_path: str) -> List[EvaluationResult]:
-    """
-    Load evaluation results from a JSON file.
-
-    Args:
-        results_path: Path to the JSON file
-
-    Returns:
-        List of EvaluationResult objects
-    """
-    with open(results_path, 'r', encoding='utf-8') as f:
-        results_data = json.load(f)
-
-    results = [EvaluationResult(**data) for data in results_data]
-    logger.info(f"Loaded {len(results)} results from {results_path}")
-    return results
-
-
-def load_scores(scores_path: str) -> List[JudgeScore]:
-    """
-    Load judge scores from a JSON file.
-
-    Args:
-        scores_path: Path to the JSON file
-
-    Returns:
-        List of JudgeScore objects
-    """
-    with open(scores_path, 'r', encoding='utf-8') as f:
-        scores_data = json.load(f)
-
-    scores = [JudgeScore(**data) for data in scores_data]
-    logger.info(f"Loaded {len(scores)} scores from {scores_path}")
-    return scores
-
-
-def format_results_json(results: List[EvaluationResult]) -> str:
-    """
-    Format results as JSON string.
-
-    Args:
-        results: List of EvaluationResult objects
-
-    Returns:
-        Formatted JSON string
-    """
-    results_data = [result.model_dump() for result in results]
-    return json.dumps(results_data, indent=2, default=str)
-
-
-def format_results_csv(results: List[EvaluationResult]) -> str:
-    """
-    Format results as CSV string.
-
-    Args:
-        results: List of EvaluationResult objects
-
-    Returns:
-        CSV formatted string
-    """
-    lines = []
-    # Header
-    lines.append("model_name,task_name,status,input_tokens,output_tokens,total_tokens,cost_usd,latency_ms,error")
-
-    # Data rows
-    for result in results:
-        error_msg = result.error.replace('"', '""') if result.error else ""
-        lines.append(
-            f'"{result.model_name}","{result.task_name}","{result.status}",'
-            f'{result.input_tokens},{result.output_tokens},{result.total_tokens},'
-            f'{result.cost_usd},{result.latency_ms:.2f},"{error_msg}"'
-        )
-
-    return "\n".join(lines)
-
-
-def main() -> None:
-    """Main entry point for the CLI."""
-    app()
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    app()

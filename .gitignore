@@ -1,7 +1,9 @@
 # Archive
 Archive/
 
-
+# LLM TaskBench specific
+/*.yaml
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,7 +1,8 @@
-# Model Pricing Configuration for LLM TaskBench
-# Prices are per 1 million tokens in USD
-# Source: OpenRouter pricing (https://openrouter.ai/models)
+# LLM Model Pricing Database
+#
+# Prices are in USD per 1 million tokens
 # Last updated: 2025-11-15
+# Source: OpenRouter pricing (https://openrouter.ai/models)
 
 models:
   - model_id: "anthropic/claude-sonnet-4.5"
@@ -10,31 +11,27 @@ models:
     input_price_per_1m: 3.00
     output_price_per_1m: 15.00
     context_window: 200000
-    description: "Anthropic's most balanced model for complex tasks"
 
   - model_id: "openai/gpt-4o"
     display_name: "GPT-4o"
     provider: "OpenAI"
-    input_price_per_1m: 2.50
-    output_price_per_1m: 10.00
+    input_price_per_1m: 5.00
+    output_price_per_1m: 15.00
     context_window: 128000
-    description: "OpenAI's flagship multimodal model"
 
-  - model_id: "google/gemini-2.0-flash-exp"
-    display_name: "Gemini 2.0 Flash (Experimental)"
+  - model_id: "google/gemini-2.0-flash-exp:free"
+    display_name: "Gemini 2.0 Flash (Free)"
     provider: "Google"
     input_price_per_1m: 0.00
     output_price_per_1m: 0.00
     context_window: 1000000
-    description: "Google's experimental next-generation flash model (free during preview)"
 
-  - model_id: "meta-llama/llama-3.1-405b"
-    display_name: "Meta Llama 3.1 405B"
+  - model_id: "meta-llama/llama-3.1-405b-instruct"
+    display_name: "Llama 3.1 405B Instruct"
     provider: "Meta"
     input_price_per_1m: 2.70
     output_price_per_1m: 2.70
     context_window: 128000
-    description: "Meta's largest open-source language model"
 
   - model_id: "qwen/qwen-2.5-72b-instruct"
     display_name: "Qwen 2.5 72B Instruct"
@@ -42,23 +39,20 @@ models:
     input_price_per_1m: 0.35
     output_price_per_1m: 0.40
     context_window: 128000
-    description: "Alibaba's highly capable instruction-tuned model"
 
-  - model_id: "anthropic/claude-3.5-haiku"
-    display_name: "Claude 3.5 Haiku"
+  - model_id: "anthropic/claude-3.5-sonnet"
+    display_name: "Claude 3.5 Sonnet"
     provider: "Anthropic"
-    input_price_per_1m: 0.80
-    output_price_per_1m: 4.00
+    input_price_per_1m: 3.00
+    output_price_per_1m: 15.00
     context_window: 200000
-    description: "Anthropic's fastest and most affordable model"
 
-  - model_id: "openai/gpt-4o-mini"
-    display_name: "GPT-4o Mini"
+  - model_id: "openai/gpt-4-turbo"
+    display_name: "GPT-4 Turbo"
     provider: "OpenAI"
-    input_price_per_1m: 0.15
-    output_price_per_1m: 0.60
+    input_price_per_1m: 10.00
+    output_price_per_1m: 30.00
     context_window: 128000
-    description: "OpenAI's small, fast, and affordable model"
 
   - model_id: "google/gemini-pro-1.5"
     display_name: "Gemini Pro 1.5"
@@ -66,20 +60,17 @@ models:
     input_price_per_1m: 1.25
     output_price_per_1m: 5.00
     context_window: 2000000
-    description: "Google's pro model with extended context"
 
-  - model_id: "anthropic/claude-opus-4"
-    display_name: "Claude Opus 4"
-    provider: "Anthropic"
-    input_price_per_1m: 15.00
-    output_price_per_1m: 75.00
-    context_window: 200000
-    description: "Anthropic's most powerful model for complex reasoning"
-
-  - model_id: "openai/o1-preview"
-    display_name: "OpenAI o1 Preview"
-    provider: "OpenAI"
-    input_price_per_1m: 15.00
-    output_price_per_1m: 60.00
+  - model_id: "mistralai/mistral-large"
+    display_name: "Mistral Large"
+    provider: "Mistral AI"
+    input_price_per_1m: 2.00
+    output_price_per_1m: 6.00
     context_window: 128000
-    description: "OpenAI's reasoning model optimized for complex problem-solving"
+
+  - model_id: "cohere/command-r-plus"
+    display_name: "Command R+"
+    provider: "Cohere"
+    input_price_per_1m: 2.50
+    output_price_per_1m: 10.00
+    context_window: 128000
