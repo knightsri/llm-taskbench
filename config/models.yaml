@@ -1,0 +1,76 @@
+# LLM Model Pricing Database
+#
+# Prices are in USD per 1 million tokens
+# Last updated: 2025-11-15
+# Source: OpenRouter pricing (https://openrouter.ai/models)
+
+models:
+  - model_id: "anthropic/claude-sonnet-4.5"
+    display_name: "Claude Sonnet 4.5"
+    provider: "Anthropic"
+    input_price_per_1m: 3.00
+    output_price_per_1m: 15.00
+    context_window: 200000
+
+  - model_id: "openai/gpt-4o"
+    display_name: "GPT-4o"
+    provider: "OpenAI"
+    input_price_per_1m: 5.00
+    output_price_per_1m: 15.00
+    context_window: 128000
+
+  - model_id: "google/gemini-2.0-flash-exp:free"
+    display_name: "Gemini 2.0 Flash (Free)"
+    provider: "Google"
+    input_price_per_1m: 0.00
+    output_price_per_1m: 0.00
+    context_window: 1000000
+
+  - model_id: "meta-llama/llama-3.1-405b-instruct"
+    display_name: "Llama 3.1 405B Instruct"
+    provider: "Meta"
+    input_price_per_1m: 2.70
+    output_price_per_1m: 2.70
+    context_window: 128000
+
+  - model_id: "qwen/qwen-2.5-72b-instruct"
+    display_name: "Qwen 2.5 72B Instruct"
+    provider: "Alibaba"
+    input_price_per_1m: 0.35
+    output_price_per_1m: 0.40
+    context_window: 128000
+
+  - model_id: "anthropic/claude-3.5-sonnet"
+    display_name: "Claude 3.5 Sonnet"
+    provider: "Anthropic"
+    input_price_per_1m: 3.00
+    output_price_per_1m: 15.00
+    context_window: 200000
+
+  - model_id: "openai/gpt-4-turbo"
+    display_name: "GPT-4 Turbo"
+    provider: "OpenAI"
+    input_price_per_1m: 10.00
+    output_price_per_1m: 30.00
+    context_window: 128000
+
+  - model_id: "google/gemini-pro-1.5"
+    display_name: "Gemini Pro 1.5"
+    provider: "Google"
+    input_price_per_1m: 1.25
+    output_price_per_1m: 5.00
+    context_window: 2000000
+
+  - model_id: "mistralai/mistral-large"
+    display_name: "Mistral Large"
+    provider: "Mistral AI"
+    input_price_per_1m: 2.00
+    output_price_per_1m: 6.00
+    context_window: 128000
+
+  - model_id: "cohere/command-r-plus"
+    display_name: "Command R+"
+    provider: "Cohere"
+    input_price_per_1m: 2.50
+    output_price_per_1m: 10.00
+    context_window: 128000

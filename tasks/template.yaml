@@ -1,0 +1,161 @@
+# LLM TaskBench Task Definition Template
+#
+# This template provides a comprehensive example of all possible fields
+# for defining a custom task. Copy this file and modify it for your needs.
+#
+# Required fields are marked with [REQUIRED]
+# Optional fields are marked with [OPTIONAL]
+
+# [REQUIRED] Unique identifier for this task
+# Use lowercase with underscores, e.g., "my_custom_task"
+name: "your_task_name_here"
+
+# [REQUIRED] Human-readable description of what this task accomplishes
+# Be specific about the goal and expected behavior
+description: "Describe what the LLM should accomplish in this task"
+
+# [REQUIRED] Type of input data
+# Valid values: "transcript", "text", "csv", "json"
+input_type: "text"
+
+# [REQUIRED] Expected output format
+# Valid values: "csv", "json", "markdown"
+output_format: "json"
+
+# [REQUIRED] List of criteria used to evaluate the model's output
+# These should be specific, measurable criteria
+# The LLM judge will use these to score the output
+evaluation_criteria:
+  - "Criterion 1: Describe what makes a good output"
+  - "Criterion 2: Another quality metric"
+  - "Criterion 3: Format requirements"
+  - "Criterion 4: Accuracy expectations"
+  - "Criterion 5: Completeness requirements"
+
+# [OPTIONAL] Constraints that outputs must satisfy
+# These are hard requirements that will be checked by the judge
+# Common constraint types:
+constraints:
+  # Duration constraints (for time-based tasks)
+  min_duration_minutes: 2
+  max_duration_minutes: 10
+
+  # Count constraints (for enumeration tasks)
+  min_count: 5
+  max_count: 50
+
+  # Length constraints (for text tasks)
+  min_length: 100
+  max_length: 1000
+
+  # Format-specific constraints
+  required_csv_columns: ["column1", "column2", "column3"]
+  required_json_keys: ["key1", "key2"]
+  timestamp_format: "HH:MM:SS"
+
+  # Custom constraints (any key-value pairs your task needs)
+  custom_constraint_1: "value"
+  custom_constraint_2: 42
+
+# [OPTIONAL] Examples of good and bad outputs
+# Provide 2-3 examples showing what you expect
+# Include quality scores and notes explaining why each example is good/bad
+examples:
+  - input: "Example input data for the task..."
+    expected_output: |
+      {
+        "result": "This is what good output looks like",
+        "score": 95
+      }
+    quality_score: 95
+    notes: "Perfect example: meets all criteria, clear format, accurate content"
+
+  - input: "Another example with different characteristics..."
+    expected_output: |
+      {
+        "result": "This output has minor issues",
+        "score": 80
+      }
+    quality_score: 80
+    notes: "Good but not perfect: meets most criteria but has minor format issues"
+
+  - input: "Example of what NOT to do..."
+    expected_output: |
+      This is poorly formatted and incomplete
+    quality_score: 40
+    notes: "Bad example: wrong format, missing required fields, incomplete"
+
+# [REQUIRED] Detailed instructions for the LLM-as-judge evaluator
+# This is crucial - the judge uses these instructions to score outputs
+# Be very specific about:
+#   1. How to calculate scores (what's worth how many points)
+#   2. What constitutes a violation
+#   3. What to look for in the output
+judge_instructions: |
+  You are evaluating an LLM's performance on this task. Score the output carefully
+  based on the following criteria:
+
+  SCORING RUBRIC (total 100 points):
+
+  1. ACCURACY (40 points):
+     - Is the content factually correct?
+     - Did it understand the input properly?
+     - Are all required elements present?
+     - Give 40 points for perfect accuracy, deduct proportionally for errors
+
+  2. FORMAT (30 points):
+     - Is the output in the correct format (JSON/CSV/Markdown)?
+     - Are all required fields/columns present?
+     - Is the structure valid and parseable?
+     - Give 30 points for perfect format, deduct 10 points per format violation
+
+  3. COMPLIANCE (30 points):
+     - Does it meet all constraints from the task definition?
+     - Are there any violations of min/max requirements?
+     - Is the output complete and thorough?
+     - Deduct 5 points for each constraint violation
+
+  VIOLATION DETECTION:
+
+  List each violation you find in the violations array. Common violation types:
+  - "under_min": Output is below minimum requirement
+  - "over_max": Output exceeds maximum requirement
+  - "invalid_format": Format does not match specification
+  - "missing_required": Required field/element is missing
+  - "incorrect_content": Content is factually wrong or nonsensical
+
+  REASONING:
+
+  Provide detailed reasoning that explains:
+  - What the model did well
+  - What specific violations or errors occurred
+  - How you calculated the scores
+  - Overall assessment of whether the output is usable
+
+  Your response MUST be valid JSON with this structure:
+  {
+    "accuracy_score": 0-100,
+    "format_score": 0-100,
+    "compliance_score": 0-100,
+    "overall_score": 0-100,
+    "violations": ["list", "of", "violations"],
+    "reasoning": "Detailed explanation of scores..."
+  }
+
+# USAGE TIPS:
+#
+# 1. Keep criteria specific and measurable
+#    Bad:  "Output should be good"
+#    Good: "Output should include at least 5 items with timestamps"
+#
+# 2. Provide clear examples
+#    Show both good and bad outputs so the LLM understands expectations
+#
+# 3. Make judge instructions detailed
+#    The judge needs to know EXACTLY how to score - be specific about point values
+#
+# 4. Test your constraints
+#    Make sure min < max, and constraints are achievable
+#
+# 5. Start simple, iterate
+#    Begin with basic criteria, then add more as you refine the task

@@ -1,0 +1,49 @@
+[00:00:00] Welcome to today's lecture on Python programming. Today we're going to cover some fundamental concepts that will help you become a better Python developer.
+
+[00:02:15] Let's start with data structures. Python provides several built-in data structures that are incredibly powerful. The first one we'll discuss is lists.
+
+[00:03:30] Lists in Python are ordered, mutable collections. You can store any type of data in a list - integers, strings, even other lists. Lists are created using square brackets.
+
+[00:05:45] Here's an example: my_list = [1, 2, 3, 'hello', 'world']. You can access elements by index, starting from 0. Lists also support slicing, which is a powerful feature.
+
+[00:08:20] Now let's talk about dictionaries. Dictionaries are key-value pairs, similar to hash maps in other languages. They're incredibly efficient for lookups.
+
+[00:10:00] You create a dictionary using curly braces: my_dict = {'name': 'John', 'age': 30}. You access values using keys: my_dict['name'] returns 'John'.
+
+[00:12:30] Dictionaries are unordered in Python versions before 3.7, but insertion order is preserved in 3.7+. This is important to remember.
+
+[00:15:00] Next, let's discuss sets. Sets are unordered collections of unique elements. They're perfect when you need to ensure no duplicates.
+
+[00:17:15] You create a set like this: my_set = {1, 2, 3}. Sets support mathematical operations like union, intersection, and difference.
+
+[00:20:00] Moving on to tuples. Tuples are similar to lists but immutable - once created, you cannot change them.
+
+[00:22:30] Tuples are created with parentheses: my_tuple = (1, 2, 3). They're useful when you want to ensure data doesn't change.
+
+[00:25:00] Now let's talk about list comprehensions, which are a Pythonic way to create lists. Instead of using loops, you can create lists in one line.
+
+[00:27:45] For example: squares = [x**2 for x in range(10)] creates a list of squares from 0 to 9.
+
+[00:30:00] Let's move on to functions. Functions are reusable blocks of code that perform specific tasks.
+
+[00:32:30] You define a function using the def keyword: def my_function(param1, param2): return param1 + param2
+
+[00:35:00] Functions can have default parameters, variable-length arguments, and keyword arguments. This makes them very flexible.
+
+[00:38:00] Let's discuss lambda functions, which are small anonymous functions. They're useful for simple operations.
+
+[00:40:30] Lambda syntax: lambda x: x * 2 creates a function that doubles its input.
+
+[00:43:00] Now let's talk about classes and object-oriented programming in Python.
+
+[00:45:30] Classes are blueprints for creating objects. You define a class with the class keyword.
+
+[00:48:00] Here's an example: class Dog: def __init__(self, name): self.name = name
+
+[00:51:00] The __init__ method is the constructor, called when you create a new object.
+
+[00:53:30] Let's discuss inheritance. Classes can inherit from other classes, allowing code reuse.
+
+[00:56:00] You inherit by putting the parent class in parentheses: class Puppy(Dog): pass
+
+[00:59:00] That concludes our overview of Python fundamentals. Thank you for attending!
