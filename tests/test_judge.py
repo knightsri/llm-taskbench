@@ -85,8 +85,8 @@ class TestLLMJudge:
         assert "Accuracy" in prompt
         assert "Completeness" in prompt
         assert "Format compliance" in prompt
-        assert "max_length" in prompt
-        assert "min_items" in prompt
+        assert "Max Length" in prompt  # Constraints are formatted with title case
+        assert "Min Items" in prompt
         assert sample_result.output in prompt
         assert "Sample input data" in prompt
         assert "accuracy_score" in prompt

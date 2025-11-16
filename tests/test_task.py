@@ -95,7 +95,7 @@ class TestTaskParser:
         assert is_valid is False
         assert len(errors) > 0
         assert any("name" in error.lower() for error in errors)
-        assert any("criteria" in error.lower() for error in errors)
+        assert any("criterion" in error.lower() for error in errors)  # Changed to match actual error message
 
     def test_validate_invalid_constraints(self):
         """Test validation catches invalid constraints."""

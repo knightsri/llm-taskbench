@@ -94,8 +94,8 @@ class TestModelExecutor:
         assert "Test task description" in prompt
         assert "JSON" in prompt.upper()
         assert "Test input data" in prompt
-        assert "max_length" in prompt
-        assert "min_items" in prompt
+        assert "Max Length" in prompt  # Constraints are formatted with title case
+        assert "Min Items" in prompt
 
     def test_build_prompt_with_examples(self, sample_task_with_examples):
         """Test building a prompt with examples."""
@@ -348,7 +348,7 @@ class TestModelExecutor:
 
             # Verify cost tracking
             total_cost = executor.cost_tracker.get_total_cost()
-            assert total_cost == 0.10  # 2 models × $0.05
+            assert total_cost == 0.10  # 2 models ï¿½ $0.05
 
     def test_get_cost_summary(self):
         """Test cost summary retrieval."""
