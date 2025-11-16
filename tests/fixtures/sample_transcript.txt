@@ -1,0 +1,31 @@
+Introduction to Machine Learning - Lecture Transcript
+Instructor: Dr. Sarah Johnson
+Date: November 15, 2025
+Duration: Approximately 18 minutes
+
+[00:00:00]
+Welcome everyone to today's lecture on Introduction to Machine Learning. I'm Dr. Sarah Johnson, and over the next few minutes, we'll explore the fundamental concepts that form the foundation of this exciting field. Before we dive in, let me remind you that the slides from today's lecture will be available on the course website by this evening.
+
+[00:00:45]
+Let's start with the basics. Machine learning is fundamentally about teaching computers to learn from data without being explicitly programmed. Think about how you learned to recognize a cat. Nobody gave you a detailed algorithm or set of rules. Instead, you saw many examples of cats, and your brain learned to identify the patterns - the whiskers, the ears, the general shape. Machine learning works in a similar way. We show the computer many examples, and it learns to identify patterns automatically.
+
+[00:02:30]
+Now, there are three main types of machine learning that you need to understand. The first is supervised learning. In supervised learning, we provide the algorithm with labeled data - that is, data where we already know the correct answer. For example, if we're teaching a computer to recognize handwritten digits, we'd show it thousands of images of handwritten numbers, and we'd tell it "this is a 5, this is a 7, this is a 2" and so on. The algorithm learns from these labeled examples and eventually can recognize new handwritten digits it has never seen before. Common supervised learning tasks include classification, where we're putting data into categories, and regression, where we're predicting continuous values like house prices or stock prices.
+
+[00:05:15]
+The second type is unsupervised learning. Unlike supervised learning, here we don't provide labels or correct answers. Instead, we give the algorithm unlabeled data and ask it to find patterns or structure on its own. A common example is clustering, where the algorithm groups similar data points together. For instance, if you give an unsupervised learning algorithm data about customer purchasing behavior, it might automatically group customers into segments - perhaps identifying budget-conscious shoppers, luxury buyers, and impulse purchasers - without you having to tell it what groups to look for. This is particularly useful when you don't know in advance what patterns might exist in your data.
+
+[00:07:45]
+The third main type is reinforcement learning. This is perhaps the most different from how we typically think about learning. In reinforcement learning, an agent learns to make decisions by taking actions in an environment and receiving rewards or penalties based on those actions. Think of training a dog - when it does something good, it gets a treat; when it does something bad, it doesn't. The dog learns which behaviors lead to rewards. Similarly, in reinforcement learning, the algorithm learns through trial and error, constantly adjusting its strategy to maximize rewards over time. This approach has been incredibly successful in areas like game playing - for example, the AlphaGo system that beat world champions at Go used reinforcement learning.
+
+[00:10:20]
+Now let's talk about the concept of training versus testing. This is crucial to understand. When we build a machine learning model, we never evaluate it on the same data we used to train it. Why? Because that wouldn't tell us if the model has truly learned or if it has just memorized the training examples. Instead, we split our data into at least two parts: a training set and a test set. We train the model on the training set, then evaluate its performance on the test set - data it has never seen before. This tells us whether our model can generalize to new situations or if it's just memorizing.
+
+[00:12:35]
+This brings us to one of the most important challenges in machine learning: overfitting and underfitting. Overfitting occurs when a model learns the training data too well, including all its noise and peculiarities. It's like a student who memorizes the exact questions and answers from practice exams but can't handle variations on the real test. An overfit model performs brilliantly on training data but poorly on new data because it hasn't learned the underlying patterns - it's just memorized specific examples. On the other hand, underfitting occurs when a model is too simple to capture the underlying patterns in the data. It's like trying to predict something complex with an overly simple rule. The goal is to find the sweet spot in between.
+
+[00:15:10]
+Finally, let's discuss features and feature engineering. In machine learning, features are the individual measurable properties or characteristics of the data we're analyzing. If we're predicting house prices, our features might include the number of bedrooms, the square footage, the location, the age of the house, and so on. Feature engineering is the process of selecting, creating, and transforming these features to make them more useful for our machine learning algorithms. Often, the quality of your features is more important than the choice of algorithm. Good features can make the difference between a mediocre model and an excellent one. This is where domain knowledge becomes crucial - understanding your problem deeply helps you create better features.
+
+[00:17:25]
+To wrap up today's lecture, remember these key points: machine learning is about learning patterns from data. There are three main types - supervised, unsupervised, and reinforcement learning. Always split your data into training and test sets to properly evaluate your models. Be aware of the overfitting and underfitting problem. And finally, never underestimate the importance of good features. In our next lecture, we'll dive deeper into specific supervised learning algorithms, starting with linear regression and decision trees. Make sure to complete the reading assignment on the fundamentals of statistics, as it will be essential for understanding next week's material. Thank you for your attention, and I'll see you in the next session.
