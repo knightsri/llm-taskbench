@@ -28,3 +28,8 @@ Underlying issues observed:
 
 Notes on chunking:
 - Chunked mode with dynamic chunk sizing (based on model context windows) was enabled. Chunk sizing worked; failures stemmed from hallucination/coverage/timestamp misuse, not chunk errors.
+
+Next actions (recommendations):
+- Tighten task/use-case instructions: explicitly forbid timestamps outside the observed transcript range; require coverage only within provided start/end; “no invented content.”
+- Consider smaller per-chunk output budgets and/or more, smaller chunks to reduce drift in long transcripts.
+- Re-run judge after prompt tightening; verify JSON validity (no truncation) and that durations stay within 4–8 minutes.

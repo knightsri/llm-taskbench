@@ -1,4 +1,4 @@
-# LLM TaskBench User Guide
+﻿# LLM TaskBench User Guide
 
 ## Install & configure
 ```bash
@@ -40,14 +40,18 @@ taskbench evaluate TASK_YAML \
   --models auto \
   --input-file tests/fixtures/sample_transcript.txt \
   --output results/run.json \
+  --chunked --chunk-chars 20000 --chunk-overlap 500 \
+  --dynamic-chunk \
   --skip-judge        # optional: defer judging
 ```
 Flags:
 - `--usecase` path to use-case YAML (goal/notes drive prompts)
-- `--models auto` to use use-case–driven recommendations
+- `--models auto` to use use-case-driven recommendations
 - `--judge/--no-judge` (default judge on), `--skip-judge` overrides
 - `--models` comma-separated IDs
 - `--input-file`, `--output`
+- `--chunked` for long inputs; `--chunk-chars`, `--chunk-overlap` to tune sizes
+- `--dynamic-chunk/--no-dynamic-chunk` to derive chunk size from selected models' context windows (default on)
 
 ### Recommend
 ```bash
@@ -88,8 +92,11 @@ taskbench sample --models anthropic/claude-sonnet-4.5,openai/gpt-4o --no-judge
 - Use-cases: `usecases/*.yaml` drive prompts, judge rubric, and model recommendations.
 
 ## Files
-- `tasks/lecture_analysis.yaml` – sample task
-- `usecases/concepts_extraction.yaml` – sample use-case
-- `tests/fixtures/sample_transcript.txt` – sample input
-- `config/models.yaml` – pricing catalog
-- `docs/openrouter-cost-tracking-guide.md` – cost API details
+- `tasks/lecture_analysis.yaml` â€“ sample task
+- `usecases/concepts_extraction.yaml` â€“ sample use-case
+- `tests/fixtures/sample_transcript.txt` â€“ sample input
+- `config/models.yaml` â€“ pricing catalog
+- `docs/openrouter-cost-tracking-guide.md` â€“ cost API details
+
+
+

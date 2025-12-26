@@ -38,9 +38,10 @@ taskbench sample \
 4) Run your own task  
 ```bash
 taskbench evaluate tasks/lecture_analysis.yaml \
-  --models anthropic/claude-sonnet-4.5,openai/gpt-4o \
-  --input-file tests/fixtures/sample_transcript.txt \
-  --output results/my_run.json \
+ --models anthropic/claude-sonnet-4.5,openai/gpt-4o \
+ --input-file tests/fixtures/sample_transcript.txt \
+ --output results/my_run.json \
+  --chunked --chunk-chars 20000 --chunk-overlap 500 --dynamic-chunk \
   --skip-judge      # or omit to judge automatically
 ```
 
@@ -52,6 +53,7 @@ taskbench recommend --results results/my_run.json
 ## Key commands
 - `taskbench evaluate` – run models on a task; `--skip-judge` to defer judging; parallel by default.
 - `--usecase` to load use-case goals/notes and drive prompts; `--models auto` to pick recommended models.
+- `--chunked` (plus `--chunk-chars/--chunk-overlap` and `--dynamic-chunk/--no-dynamic-chunk`) for long inputs; dynamic chunking sizes to the smallest selected model’s context window by default.
 - `taskbench recommend` – load a saved results JSON, render comparison, and recommendations.
 - `taskbench models` – list priced models from `config/models.yaml`.
 - `taskbench validate` – validate task YAML.

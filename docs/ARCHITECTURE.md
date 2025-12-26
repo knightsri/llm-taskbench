@@ -19,6 +19,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 - UI: FastAPI + Streamlit for selecting use-cases, inputs, recommended models, running evaluations, judging, and viewing recommendations.
 - Cost visibility: inline + generation lookup billing, per-run and per-use-case rollups displayed in CLI and UI.
 - Parallel execution by default with retry/backoff and rate limiting hooks.
+- Model-aware chunking: executor derives chunk sizes from selected models’ context windows (cached), with overlap for continuity; CLI/UI share the same chunked flow.
 
 ### Key Features
 
