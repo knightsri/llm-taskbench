@@ -74,24 +74,22 @@ This combination reveals model capabilities beyond simple Q&A.
 
 ## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   LLM TaskBench System                   │
-│                                                           │
-│  User (CLI) → Task Parser → LLM Orchestrator (Agentic)  │
-│                                    ↓                      │
-│                         Model Execution                   │
-│                    (OpenRouter/Direct APIs)               │
-│                                    ↓                      │
-│                     LLM-as-Judge Evaluator               │
-│                    (Claude/GPT-4 scoring)                 │
-│                                    ↓                      │
-│                    Cost Analysis Engine                   │
-│                (Tradeoffs + Recommendations)              │
-│                                    ↓                      │
-│                    Results + Export                       │
-│                  (Tables, CSV, JSON)                      │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    User["User (CLI)"] --> TaskParser["Task Parser"]
+    TaskParser --> Orchestrator["LLM Orchestrator<br/>(Agentic)"]
+    Orchestrator --> ModelExec["Model Execution<br/>(OpenRouter/Direct APIs)"]
+    ModelExec --> Judge["LLM-as-Judge Evaluator<br/>(Claude/GPT-4 scoring)"]
+    Judge --> CostAnalysis["Cost Analysis Engine<br/>(Tradeoffs + Recommendations)"]
+    CostAnalysis --> Results["Results + Export<br/>(Tables, CSV, JSON)"]
+    
+    style User fill:#e1f5ff
+    style TaskParser fill:#fff4e1
+    style Orchestrator fill:#f0e1ff
+    style ModelExec fill:#e1ffe1
+    style Judge fill:#ffe1e1
+    style CostAnalysis fill:#fff4e1
+    style Results fill:#e1f5ff
 ```
 
 **Core Components:**

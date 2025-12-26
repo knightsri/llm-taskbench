@@ -1,21 +1,25 @@
 name: "lecture_concept_extraction"
-description: "Extract teaching concepts from lecture transcripts with precise timestamps"
+description: "Extract teaching concepts from lecture transcripts with precise timestamps and segment durations."
 
 input_type: "transcript"
-output_format: "csv"
+output_format: "json"
+input_format_hint: |
+  - Transcript lines begin with timestamps in MM:SS (occasionally written without brackets), e.g., `22:14`, `25:31`.
+  - Treat every timestamp as HH:MM:SS by prefixing `00:` to the transcript value (e.g., `22:14` -> `00:22:14`).
+  - Do not infer or invent timestamps outside the provided transcript window; align outputs strictly to the observed min/max timestamps.
 
 evaluation_criteria:
-  - "Concept count (target: 20-24 for 3-hour lecture)"
   - "Timestamp accuracy (within ±5 seconds)"
-  - "Duration compliance (2-7 minutes per segment)"
-  - "Concept names are descriptive and clear"
-  - "No overlapping time ranges"
+  - "Duration compliance (4-8 minutes per segment, unless strongly justified)"
+  - "Concept titles are descriptive; summaries show depth (not surface headings)"
+  - "No overlapping or missing time ranges across the full window"
+  - "Output is valid JSON array with required fields"
 
 constraints:
-  min_duration_minutes: 2
-  max_duration_minutes: 7
-  target_duration_minutes: "3-6"
-  required_csv_columns: ["concept", "start_time", "end_time"]
+  min_duration_minutes: 4
+  max_duration_minutes: 8
+  allow_shorter_if_justified: true
+  required_json_keys: ["title", "description", "start_time", "end_time"]
   timestamp_format: "HH:MM:SS"
 
 examples:
@@ -23,50 +27,64 @@ examples:
       [00:20:06] Today we'll explore Python's data structures. Let's start with lists...
       [00:21:30] Lists are mutable sequences that can hold different types...
       [00:23:15] Now let's move on to dictionaries, which are key-value pairs...
-    expected_output: "01_Python_Lists,00:20:06,00:23:15"
+    expected_output: |
+      [
+        {
+          "title": "01_Python_Lists",
+          "description": "Introduces lists as mutable sequences, discusses heterogeneous elements and basic operations.",
+          "start_time": "00:20:06",
+          "end_time": "00:23:15"
+        }
+      ]
     quality_score: 95
-    notes: "Perfect: 3.15 minute segment, descriptive name, clean timestamps"
+    notes: "Duration ~3:09 (shorter than target) but acceptable if depth is strong and coverage continues; descriptive title and timestamps are clean."
 
   - input: |
       [01:15:00] Machine learning models require feature engineering...
       [01:16:45] Feature scaling is critical for many algorithms...
       [01:21:30] Let's discuss normalization versus standardization...
-    expected_output: "15_Feature_Engineering_and_Scaling,01:15:00,01:21:30"
+    expected_output: |
+      [
+        {
+          "title": "Feature_Engineering_and_Scaling",
+          "description": "Covers feature engineering fundamentals and compares scaling methods including normalization vs standardization.",
+          "start_time": "01:15:00",
+          "end_time": "01:21:30"
+        }
+      ]
     quality_score: 92
-    notes: "Good: 6.5 minute segment, covers related subtopics appropriately"
+    notes: "Duration ~6:30 within target; cohesive subtopics and clear summary."
 
 judge_instructions: |
   Evaluate the model's output against these specific criteria:
 
   1. ACCURACY (40 points):
-     - Did it identify all major teaching concepts in the transcript?
-     - Are concepts semantically distinct (not redundant)?
-     - Are timestamps accurate to the actual content timing?
-     - Give full points for identifying 90%+ of key concepts correctly
+     - Identify major teaching concepts with depth (not just headings).
+     - Timestamps accurate to actual content timing.
+     - Distinct concepts (no redundancy); cover the entire window with minimal gaps.
+     - Full points for ~90% coverage with accurate timing and meaningful summaries.
+     - The source transcript uses MM:SS timestamps (e.g., "22:14"); outputs must normalize to HH:MM:SS by prefixing 00 (e.g., 00:22:14). Penalize if the model treats MM:SS as hours or invents times beyond the transcript range.
 
   2. FORMAT (30 points):
-     - Is it valid CSV with the required columns: concept, start_time, end_time?
-     - Are timestamps in HH:MM:SS format?
-     - Do concept names follow the convention: NN_Descriptive_Name (e.g., 01_Introduction)?
-     - Are there proper headers?
-     - Give full points for perfect format compliance
+     - Valid JSON array; each item has title, description, start_time, end_time.
+     - Timestamps in HH:MM:SS format.
+     - Titles concise and descriptive.
+     - Full points for perfect JSON and field completeness.
 
   3. COMPLIANCE (30 points):
-     - Are ALL segments between 2-7 minutes? (violations: -5 points each)
-     - Are there NO overlapping timestamps?
-     - Are concepts in chronological order?
-     - For a 3-hour lecture, are there approximately 20-24 concepts?
-     - Give full points if all constraints are met
+     - Segments between 4-8 minutes; allow shorter only if strongly justified by content.
+     - No overlapping timestamps; chronological order.
+     - Minimal gaps across the full window.
+     - Full points if all constraints are met.
 
   Count and list violations:
-  - Under 2 minutes: VIOLATION (segment too short)
-  - Over 7 minutes: VIOLATION (segment too long)
-  - Overlapping timestamps: VIOLATION (time ranges overlap)
-  - Invalid format: VIOLATION (CSV format issues)
-  - Missing concepts: Note significant gaps in coverage
+  - Under 4 minutes (without strong justification): VIOLATION
+  - Over 8 minutes: VIOLATION
+  - Overlapping timestamps: VIOLATION
+  - Invalid format: VIOLATION (JSON/fields missing)
+  - Gaps: Note significant gaps in coverage
 
-  Provide detailed reasoning that explains:
-  - What the model did well
-  - What specific violations occurred
-  - How many concepts were correctly identified
-  - Overall assessment of usability
+  Provide detailed reasoning:
+  - Coverage: what was missed and where (time ranges)
+  - Depth/quality: are summaries useful for students?
+  - Constraint checks: duration, overlap, format, ordering

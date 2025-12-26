@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  taskbench-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - TASKBENCH_MAX_CONCURRENCY=${TASKBENCH_MAX_CONCURRENCY:-5}
+      - TASKBENCH_USE_GENERATION_LOOKUP=${TASKBENCH_USE_GENERATION_LOOKUP:-true}
+    volumes:
+      - ./tasks:/app/tasks
+      - ./config:/app/config
+      - ./results:/app/results
+      - ./tests/fixtures:/app/tests/fixtures
+    working_dir: /app
+    command: ["uvicorn", "taskbench.ui_api:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+
+  taskbench-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./tasks:/app/tasks
+      - ./config:/app/config
+      - ./results:/app/results
+      - ./tests/fixtures:/app/tests/fixtures
+    working_dir: /app
+    command: ["streamlit", "run", "ui_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    ports:
+      - "8501:8501"
+    depends_on:
+      - taskbench-api

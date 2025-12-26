@@ -9,6 +9,7 @@ This document contains all the detailed guidance for implementing LLM TaskBench 
 ---
 
 ## Table of Contents
+
 1. [Work Methodology](#work-methodology)
 2. [Implementation Priorities](#implementation-priorities)
 3. [Testing Requirements](#testing-requirements)
@@ -25,11 +26,13 @@ This document contains all the detailed guidance for implementing LLM TaskBench 
 ### Phase 1: Foundation (Do First - 30 min)
 
 **Read Context Files** (in order):
+
 1. `CLAUDE.md` - Project overview, architecture, constraints, patterns
 2. `ARCHITECTURE.md` - Detailed technical design (if exists)
 3. `INTEGRATION-TASK-LIST.md` - Your task checklist
 
 **Setup Environment**:
+
 ```bash
 # Create branch
 git checkout -b claude/implementation-$(date +%Y%m%d)
@@ -53,7 +56,33 @@ npm install
 
 For **EACH** task in `INTEGRATION-TASK-LIST.md`:
 
+```mermaid
+flowchart TD
+    Start([Start Task]) --> Step1["Step 1: Implement<br/>• Follow code patterns<br/>• Add type hints<br/>• Use Pydantic<br/>• Handle errors<br/>• Add docstrings"]
+    
+    Step1 --> Step2["Step 2: Test<br/>pytest tests/test_module.py -v<br/>pytest --cov=app.module"]
+    
+    Step2 --> TestPass{Tests Pass?}
+    TestPass -->|No| FixTests[Fix failures immediately]
+    FixTests --> Step2
+    TestPass -->|Yes| Step3["Step 3: Quality Check<br/>black . && isort .<br/>mypy src/<br/>docker-compose build"]
+    
+    Step3 --> Step4["Step 4: Document & Commit<br/>• Update task list [x]<br/>• Write clear commit message<br/>• Push to branch"]
+    
+    Step4 --> NextTask{More Tasks?}
+    NextTask -->|Yes| Start
+    NextTask -->|No| Done([Complete])
+    
+    style Start fill:#e1f5ff
+    style Step1 fill:#fff4e1
+    style Step2 fill:#f0e1ff
+    style Step3 fill:#e1ffe1
+    style Step4 fill:#ffe1e1
+    style Done fill:#e1f5ff
+```
+
 #### Step 1: Implement (Write Code)
+
 - Follow code patterns from CLAUDE.md
 - Add type hints (mypy strict mode)
 - Use Pydantic for all data validation
@@ -61,6 +90,7 @@ For **EACH** task in `INTEGRATION-TASK-LIST.md`:
 - Add docstrings for public functions
 
 #### Step 2: Test (Verify It Works)
+
 ```bash
 # Unit tests
 pytest tests/test_<module>.py -v
@@ -72,6 +102,7 @@ pytest tests/test_<module>.py --cov=app.<module>
 ```
 
 #### Step 3: Quality Check
+
 ```bash
 # Format code
 black . && isort .
@@ -84,6 +115,7 @@ docker-compose build backend
 ```
 
 #### Step 4: Document & Commit
+
 ```bash
 # Update task list
 # Change [ ] to [x] for completed task in INTEGRATION-TASK-LIST.md
@@ -105,6 +137,7 @@ git push -u origin claude/implementation-$(date +%Y%m%d)
 ### Phase 3: Integration & Cleanup (Final Day)
 
 **Full Test Suite**:
+
 ```bash
 cd backend
 pytest --cov --cov-report=html
@@ -112,6 +145,7 @@ pytest --cov --cov-report=html
 ```
 
 **Docker Stack Test**:
+
 ```bash
 ./RunTaskBench.sh
 
@@ -125,7 +159,8 @@ docker-compose logs frontend --tail=50
 ```
 
 **Manual UI Test**:
-1. Open http://localhost:9999
+
+1. Open <http://localhost:9999>
 2. Create a task
 3. Select 2 models
 4. Run evaluation
@@ -142,9 +177,11 @@ docker-compose logs frontend --tail=50
 These are the core features. Everything else can wait.
 
 #### 1. Quality Check Generation ⭐ (Task 1.2)
+
 **Why**: Core innovation of framework  
 **What**: LLM analyzes task, generates validation rules  
 **Implementation**:
+
 ```python
 # app/core/quality_gen.py
 async def generate_quality_checks(task_description: str) -> list[QualityCheck]:
@@ -168,9 +205,11 @@ async def generate_quality_checks(task_description: str) -> list[QualityCheck]:
 ```
 
 #### 2. Multi-Model Execution (Task 2.1)
+
 **Why**: Core benchmarking functionality  
 **What**: Run same task across multiple LLMs  
 **Implementation**:
+
 ```python
 # app/core/executor.py
 async def execute_evaluation(
@@ -206,9 +245,11 @@ async def execute_evaluation(
 ```
 
 #### 3. Metric Calculation (Task 2.3)
+
 **Why**: Provides the comparison data  
 **What**: Calculate 6 core metrics  
 **Implementation**:
+
 ```python
 # app/core/metrics.py
 def calculate_accuracy(output: str, gold_data: dict) -> float:
@@ -237,9 +278,11 @@ def calculate_completeness(output: str, gold_data: dict) -> float:
 ```
 
 #### 4. Cost Tracking (Task 2.4)
+
 **Why**: Users need cost transparency  
 **What**: Track tokens and calculate costs  
 **Implementation**:
+
 ```python
 # app/core/cost.py
 class CostTracker:
@@ -279,9 +322,11 @@ class CostTracker:
 ```
 
 #### 5. Docker Stack (Task 3.6)
+
 **Why**: One-command deployment  
 **What**: Full stack with Docker Compose  
 **Key Files**:
+
 - `docker-compose.yml` - Services definition
 - `backend/Dockerfile` - FastAPI container
 - `frontend/Dockerfile` - React build
@@ -292,12 +337,15 @@ class CostTracker:
 ### 🔧 Important (SHOULD Work - 20% of effort)
 
 #### 6. Task Builder UI (Task 3.1)
+
 React component for task definition with LLM-generated quality checks preview
 
 #### 7. Results Dashboard (Task 3.3)
+
 Table showing metrics, costs, rankings
 
 #### 8. Error Handling (Task 2.5)
+
 Retry logic (3x), abandon threshold (5 failures), checkpointing
 
 ---
@@ -305,9 +353,11 @@ Retry logic (3x), abandon threshold (5 failures), checkpointing
 ### 💡 Nice-to-Have (IF Time - 10% of effort)
 
 #### 9. Real-time Progress
+
 WebSocket updates during execution
 
 #### 10. Export Results
+
 PDF/CSV export functionality
 
 ---
@@ -319,6 +369,7 @@ PDF/CSV export functionality
 **Target**: 80%+ coverage overall
 
 **Structure**:
+
 ```
 tests/
 ├── test_quality_gen.py      # Quality check generation
@@ -332,6 +383,7 @@ tests/
 ```
 
 **Patterns**:
+
 ```python
 # tests/test_quality_gen.py
 import pytest
@@ -365,6 +417,7 @@ async def test_generate_quality_checks():
 ```
 
 **Never Hit Real APIs**:
+
 - Mock all external calls (OpenRouter, Anthropic, OpenAI)
 - Use fixtures for sample data
 - Keep tests fast (<1s per test)
@@ -374,6 +427,7 @@ async def test_generate_quality_checks():
 ### Integration Tests
 
 **Test API Endpoints**:
+
 ```python
 # tests/test_api.py
 from fastapi.testclient import TestClient
@@ -623,6 +677,7 @@ async def call_openrouter(model: str, prompt: str) -> str:
 ## Commit Strategy
 
 ### Commit Frequency
+
 - After **each completed task** in checklist (every 30-60 min)
 - After **fixing test failures**
 - Before **major refactoring**
@@ -638,6 +693,7 @@ Closes: Task X.Y in INTEGRATION-TASK-LIST.md
 ```
 
 **Types**:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `test`: Add/update tests
@@ -646,6 +702,7 @@ Closes: Task X.Y in INTEGRATION-TASK-LIST.md
 - `chore`: Maintenance
 
 **Good Examples**:
+
 ```bash
 feat: Add quality check generation
 
@@ -873,6 +930,7 @@ taskbench-worker    Up
 ```
 
 **Manual UI Test**:
+
 - ✅ Task builder loads
 - ✅ Quality checks generate in real-time
 - ✅ Model selector shows available models
@@ -887,12 +945,14 @@ taskbench-worker    Up
 ### High Priority Blockers
 
 **1. Task 2.6: Consistency Measurement**
+
 - **Issue**: Need to decide N (number of runs)
 - **Current**: Placeholder with N=10
 - **Question**: Should LLM recommend N based on task? User override?
 - **Workaround**: Fixed N=10 for now
 
 **2. Task 3.4: Advanced Model Filtering**
+
 - **Issue**: Unclear requirements for filtering UI
 - **Current**: Basic string search only
 - **Question**: Need regex? Tag-based? Advanced queries?
@@ -901,6 +961,7 @@ taskbench-worker    Up
 ### Medium Priority Blockers
 
 **3. Task 3.7: Real-time Progress Updates**
+
 - **Issue**: WebSocket vs. polling decision
 - **Current**: Polling every 2s
 - **Question**: Should we use WebSockets for better UX?
@@ -913,6 +974,7 @@ taskbench-worker    Up
 ## Known Issues
 
 ### Non-Critical
+
 1. **Frontend build warning**: Unused import in ModelSelector.tsx (line 12)
    - **Impact**: None, just linter warning
    - **Fix**: Remove unused import
@@ -922,6 +984,7 @@ taskbench-worker    Up
    - **Fix**: `docker-compose exec backend alembic upgrade head`
 
 ### Critical (None)
+
 No critical issues identified.
 
 ---
@@ -933,6 +996,7 @@ No critical issues identified.
 **Files Deleted**: 3 (obsolete test fixtures)
 
 **Lines of Code**:
+
 - Backend: ~3,200 lines
 - Frontend: ~1,800 lines
 - Tests: ~1,500 lines
@@ -944,11 +1008,13 @@ No critical issues identified.
 ## Next Steps
 
 ### For User Review
+
 1. Review blocked tasks and provide design decisions
 2. Test full evaluation flow with real API keys
 3. Review LLM-generated quality checks for accuracy
 
 ### For Next Phase (FUTURE-TODO.md)
+
 1. Add PDF export functionality
 2. Implement WebSocket progress updates
 3. Add batch evaluation (multiple inputs)
@@ -959,12 +1025,15 @@ No critical issues identified.
 ## Notable Implementation Details
 
 ### Quality Check Generation
+
 Implemented with Claude API using structured prompts. Generates 5-8 checks per task with ~95% relevance in testing.
 
 ### Cost Tracking
+
 Token-level granularity with breakdown by model and phase. Actual costs typically within 5% of estimates.
 
 ### Error Handling
+
 Comprehensive retry logic with exponential backoff. Abandon threshold prevents infinite loops. All errors logged for debugging.
 
 ---
@@ -972,6 +1041,7 @@ Comprehensive retry logic with exponential backoff. Abandon threshold prevents i
 ## Files Modified (Summary)
 
 **Created**:
+
 - backend/app/core/quality_gen.py (145 lines)
 - backend/app/core/executor.py (234 lines)
 - backend/app/core/metrics.py (178 lines)
@@ -979,6 +1049,7 @@ Comprehensive retry logic with exponential backoff. Abandon threshold prevents i
 ... [abbreviated]
 
 **Modified**:
+
 - docker-compose.yml (added Celery worker)
 - backend/requirements.txt (added httpx, celery)
 - frontend/package.json (added recharts)
@@ -990,6 +1061,7 @@ Full diff available in branch.
 
 **Report Generated**: 2025-11-18 at 16:30 UTC
 **Ready for review**: Yes ✅
+
 ```
 
 ---

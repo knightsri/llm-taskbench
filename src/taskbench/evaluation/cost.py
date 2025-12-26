@@ -48,6 +48,8 @@ class CostTracker:
         self.models_config_path = models_config_path
         self.models: Dict[str, ModelConfig] = {}
         self.evaluations: List[EvaluationResult] = []
+        self.total_input_tokens: int = 0
+        self.total_output_tokens: int = 0
 
         # Load model pricing
         self._load_models_config()
@@ -82,7 +84,8 @@ class CostTracker:
         self,
         model_id: str,
         input_tokens: int,
-        output_tokens: int
+        output_tokens: int,
+        inline_cost: Optional[float] = None
     ) -> float:
         """
         Calculate cost for a specific API call.
@@ -108,6 +111,9 @@ class CostTracker:
             # cost = (1000/1M * $3.00) + (500/1M * $15.00) = $0.0105
             ```
         """
+        if inline_cost is not None:
+            return round(float(inline_cost), 4)
+
         if model_id not in self.models:
             raise ValueError(
                 f"Model '{model_id}' not found in pricing database. "
@@ -116,13 +122,11 @@ class CostTracker:
 
         model = self.models[model_id]
 
-        # Calculate costs
         input_cost = (input_tokens / 1_000_000) * model.input_price_per_1m
         output_cost = (output_tokens / 1_000_000) * model.output_price_per_1m
         total_cost = input_cost + output_cost
 
-        # Round to $0.01 precision
-        return round(total_cost, 2)
+        return round(total_cost, 4)
 
     def track_evaluation(self, result: EvaluationResult) -> None:
         """
@@ -132,6 +136,8 @@ class CostTracker:
             result: EvaluationResult to track
         """
         self.evaluations.append(result)
+        self.total_input_tokens += result.input_tokens
+        self.total_output_tokens += result.output_tokens
         logger.debug(
             f"Tracked evaluation: {result.model_name}, "
             f"cost=${result.cost_usd:.4f}"
@@ -151,7 +157,7 @@ class CostTracker:
         Get per-model cost breakdown.
 
         Returns:
-            Dictionary mapping model names to their total costs
+            Dictionary mapping model names to their total costs and token usage
 
         Example:
             ```python
@@ -159,16 +165,24 @@ class CostTracker:
             # {"claude-sonnet-4.5": 0.36, "gpt-4o": 0.42}
             ```
         """
-        breakdown: Dict[str, float] = {}
+        breakdown: Dict[str, Dict[str, Any]] = {}
 
         for eval in self.evaluations:
             model_name = eval.model_name
             if model_name not in breakdown:
-                breakdown[model_name] = 0.0
-            breakdown[model_name] += eval.cost_usd
+                breakdown[model_name] = {
+                    "cost": 0.0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "evaluations": 0
+                }
+            breakdown[model_name]["cost"] += eval.cost_usd
+            breakdown[model_name]["input_tokens"] += eval.input_tokens
+            breakdown[model_name]["output_tokens"] += eval.output_tokens
+            breakdown[model_name]["evaluations"] += 1
 
-        # Round all values
-        return {k: round(v, 2) for k, v in breakdown.items()}
+        # Round cost values
+        return {k: {**v, "cost": round(v["cost"], 4)} for k, v in breakdown.items()}
 
     def get_statistics(self) -> Dict[str, Any]:
         """
@@ -188,6 +202,8 @@ class CostTracker:
             return {
                 "total_cost": 0.0,
                 "total_tokens": 0,
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
                 "total_evaluations": 0,
                 "avg_cost_per_eval": 0.0,
                 "avg_tokens_per_eval": 0,
@@ -201,6 +217,8 @@ class CostTracker:
         return {
             "total_cost": total_cost,
             "total_tokens": total_tokens,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
             "total_evaluations": num_evals,
             "avg_cost_per_eval": round(total_cost / num_evals, 4),
             "avg_tokens_per_eval": int(total_tokens / num_evals),

@@ -1,0 +1,20 @@
+name: "concepts_extraction_from_lecture"
+goal: "Extract teaching concepts from a long lecture transcript into 4-8 minute segments with good coverage and depth."
+chunk_min_minutes: 4
+chunk_max_minutes: 8
+coverage_required: true
+allow_shorter_if_justified: true
+cost_priority: "high"
+quality_priority: "high"
+notes: |
+  - No gaps from the provided start/end timestamps.
+  - Honor any mid-session breaks; do not place segments across a break.
+  - Prefer concise, descriptive concept titles and 2-3 sentence summaries.
+  - Depth matters: avoid surface-level headings.
+  - Output format: JSON array of {title, description, start_time, end_time} with HH:MM:SS timestamps.
+default_judge_model: "${TASKBENCH_DEFAULT_JUDGE_MODEL:-anthropic/claude-sonnet-4.5}"
+default_candidate_models:
+  - anthropic/claude-sonnet-4.5
+  - openai/gpt-4o
+  - google/gemini-2.5-flash
+  - z-ai/glm-4.7

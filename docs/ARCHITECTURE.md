@@ -13,6 +13,13 @@
 
 LLM TaskBench is a task-specific LLM evaluation framework that enables developers and researchers to objectively compare language models on custom, domain-specific tasks. The framework combines agentic orchestration with LLM-as-judge evaluation to provide accurate, reproducible performance metrics.
 
+### Recent Enhancements
+- Use-case layer: declarative use-case specs (goal, constraints, notes) that drive prompt/rubric generation for both executor and judge.
+- Model recommendations: orchestrator suggests models from OpenRouter based on use-case traits (e.g., long-context, cost priority) with env-driven defaults (e.g., `GENERAL_TASK_LLM`).
+- UI: FastAPI + Streamlit for selecting use-cases, inputs, recommended models, running evaluations, judging, and viewing recommendations.
+- Cost visibility: inline + generation lookup billing, per-run and per-use-case rollups displayed in CLI and UI.
+- Parallel execution by default with retry/backoff and rate limiting hooks.
+
 ### Key Features
 
 - **Task-Specific Evaluation**: Define custom tasks with YAML configuration
@@ -32,73 +39,44 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 
 ## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLI Interface                            │
-│                    (taskbench/cli/main.py)                       │
-│                                                                   │
-│  Commands: evaluate, models, validate                           │
-└────────────────────┬────────────────────────────────────────────┘
-                     │
-                     v
-┌─────────────────────────────────────────────────────────────────┐
-│                    Orchestration Layer                          │
-│                 (taskbench/evaluation/*)                        │
-│                                                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │  Executor    │  │    Judge     │  │ CostTracker  │         │
-│  │              │  │              │  │              │         │
-│  │ - Builds     │  │ - Evaluates  │  │ - Calculates │         │
-│  │   prompts    │  │   outputs    │  │   costs      │         │
-│  │ - Runs tasks │  │ - Scores     │  │ - Tracks     │         │
-│  │ - Collects   │  │   models     │  │   usage      │         │
-│  │   results    │  │ - Detects    │  │ - Provides   │         │
-│  │              │  │   violations │  │   stats      │         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
-└────────────────────┬────────────────────────────────────────────┘
-                     │
-                     v
-┌─────────────────────────────────────────────────────────────────┐
-│                      API Client Layer                           │
-│                   (taskbench/api/*)                             │
-│                                                                   │
-│  ┌──────────────────────┐  ┌──────────────────────┐           │
-│  │  OpenRouterClient    │  │    Retry Logic       │           │
-│  │                      │  │                      │           │
-│  │ - HTTP requests      │  │ - Exponential        │           │
-│  │ - Authentication     │  │   backoff            │           │
-│  │ - Error handling     │  │ - Rate limiting      │           │
-│  │ - JSON mode          │  │ - Transient errors   │           │
-│  └──────────────────────┘  └──────────────────────┘           │
-└────────────────────┬────────────────────────────────────────────┘
-                     │
-                     v
-┌─────────────────────────────────────────────────────────────────┐
-│                        Core Models                               │
-│                   (taskbench/core/*)                            │
-│                                                                   │
-│  ┌────────────────┐  ┌────────────────┐  ┌─────────────────┐  │
-│  │ TaskDefinition │  │ EvaluationResult│  │  JudgeScore     │  │
-│  │ ModelConfig    │  │ CompletionResp. │  │  TaskParser     │  │
-│  └────────────────┘  └────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                     │
-                     v
-┌─────────────────────────────────────────────────────────────────┐
-│                    External Services                            │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────┐          │
-│  │         OpenRouter API                            │          │
-│  │  (aggregates multiple LLM providers)             │          │
-│  │                                                    │          │
-│  │  - Anthropic (Claude)                            │          │
-│  │  - OpenAI (GPT-4)                                │          │
-│  │  - Google (Gemini)                               │          │
-│  │  - Meta (Llama)                                  │          │
-│  │  - Alibaba (Qwen)                                │          │
-│  │  - And more...                                   │          │
-│  └──────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    CLI["CLI Interface<br/>(taskbench/cli/main.py)<br/><br/>Commands: evaluate, models, validate"]
+    
+    subgraph Orchestration["Orchestration Layer (taskbench/evaluation/*)"]
+        Executor["Executor<br/>- Builds prompts<br/>- Runs tasks<br/>- Collects results"]
+        Judge["Judge<br/>- Evaluates outputs<br/>- Scores models<br/>- Detects violations"]
+        CostTracker["CostTracker<br/>- Calculates costs<br/>- Tracks usage<br/>- Provides stats"]
+        Orchestrator["Model Recommender<br/>- Use-case aware<br/>- Cost/context filters"]
+    end
+    
+    subgraph APIClient["API Client Layer (taskbench/api/*)"]
+        OpenRouter["OpenRouterClient<br/>- HTTP requests<br/>- Authentication<br/>- Error handling<br/>- JSON mode"]
+        Retry["Retry Logic<br/>- Exponential backoff<br/>- Rate limiting<br/>- Transient errors"]
+    end
+    
+    subgraph CoreModels["Core Models (taskbench/core/*)"]
+        TaskDef["TaskDefinition<br/>ModelConfig"]
+        EvalResult["EvaluationResult<br/>CompletionResp."]
+        JudgeScore["JudgeScore<br/>TaskParser"]
+    end
+    
+    subgraph External["External Services"]
+        OpenRouterAPI["OpenRouter API<br/>(aggregates multiple LLM providers)<br/><br/>• Anthropic (Claude)<br/>• OpenAI (GPT-4)<br/>• Google (Gemini)<br/>• Meta (Llama)<br/>• Alibaba (Qwen)<br/>• And more..."]
+    end
+    
+    CLI --> Orchestration
+    Orchestration --> APIClient
+    CLI --> UI["FastAPI/Streamlit UI<br/>Runs & Use-cases"]
+    UI --> Orchestration
+    APIClient --> CoreModels
+    CoreModels --> External
+    
+    style CLI fill:#e1f5ff
+    style Orchestration fill:#fff4e1
+    style APIClient fill:#f0e1ff
+    style CoreModels fill:#e1ffe1
+    style External fill:#ffe1e1
 ```
 
 ## Component Descriptions
@@ -108,6 +86,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Provides user-facing command-line interface.
 
 **Responsibilities**:
+
 - Parse command-line arguments using Typer
 - Load environment variables and configuration
 - Coordinate between evaluation components
@@ -115,6 +94,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 - Handle errors and provide user feedback
 
 **Key Commands**:
+
 - `evaluate`: Run multi-model evaluation on a task
 - `models`: List available models and pricing
 - `validate`: Validate task definition YAML files
@@ -160,12 +140,14 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Load, validate, and save task definitions from YAML.
 
 **Responsibilities**:
+
 - Parse YAML files into TaskDefinition objects
 - Validate task structure and constraints
 - Check for logical errors (e.g., min >= max)
 - Save tasks back to YAML format
 
 **Validation Rules**:
+
 - Required fields must be present
 - Input/output types must be valid
 - Constraints must be logically consistent
@@ -176,6 +158,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Interface with OpenRouter API for LLM completions.
 
 **Responsibilities**:
+
 - Manage HTTP connections with httpx
 - Handle authentication and headers
 - Parse API responses
@@ -183,6 +166,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 - Support both standard and JSON mode completions
 
 **Error Handling**:
+
 - `AuthenticationError`: Invalid API key (401)
 - `RateLimitError`: Rate limit exceeded (429)
 - `BadRequestError`: Malformed request (400)
@@ -213,6 +197,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Execute tasks on LLM models and collect results.
 
 **Responsibilities**:
+
 - Build comprehensive prompts from task definitions
 - Make API calls with configured parameters
 - Calculate costs using CostTracker
@@ -220,6 +205,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 - Display progress with Rich progress bars
 
 **Prompt Building Strategy**:
+
 1. Task description and context
 2. Output format requirements (emphasized)
 3. **CRITICAL CONSTRAINTS** section (bold)
@@ -235,6 +221,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Evaluate model outputs using LLM-as-judge pattern.
 
 **Responsibilities**:
+
 - Build evaluation prompts for judge model
 - Request JSON-formatted scores
 - Parse and validate judge responses
@@ -242,12 +229,14 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 - Generate comparison reports
 
 **Evaluation Dimensions**:
+
 - **Accuracy Score** (0-100): Content correctness
 - **Format Score** (0-100): Format compliance
 - **Compliance Score** (0-100): Constraint adherence
 - **Overall Score** (0-100): Weighted combination
 
 **Violation Categories**:
+
 - `under_min`: Below minimum requirements
 - `over_max`: Exceeds maximum limits
 - `format`: Format specification violations
@@ -259,6 +248,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Compare and rank evaluation results.
 
 **Responsibilities**:
+
 - Combine evaluation results with judge scores
 - Sort models by overall score
 - Calculate value metrics (score/cost ratio)
@@ -272,6 +262,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 **Purpose**: Calculate and track evaluation costs.
 
 **Responsibilities**:
+
 - Load model pricing from YAML configuration
 - Calculate costs from token usage
 - Track cumulative costs across evaluations
@@ -279,6 +270,7 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 - Generate cost statistics
 
 **Pricing Model**:
+
 - Input tokens: Price per 1M tokens
 - Output tokens: Price per 1M tokens (usually higher)
 - Total cost = (input_tokens/1M × input_price) + (output_tokens/1M × output_price)
@@ -289,93 +281,129 @@ LLM TaskBench is a task-specific LLM evaluation framework that enables developer
 
 ### Evaluation Flow
 
-```
-1. User runs: taskbench evaluate tasks/task.yaml --models model1,model2
-
-2. CLI loads task definition from YAML
-   └─> TaskParser.load_from_yaml() → TaskDefinition
-
-3. CLI validates task
-   └─> TaskParser.validate_task() → (bool, List[errors])
-
-4. CLI loads input data from file or examples
-
-5. For each model:
-   a. Executor builds prompt
-      └─> ModelExecutor.build_prompt(task, input) → str
-
-   b. API client makes request
-      └─> OpenRouterClient.complete() → CompletionResponse
-
-   c. Cost tracker calculates cost
-      └─> CostTracker.calculate_cost() → float
-
-   d. Executor creates result
-      └─> EvaluationResult(output, tokens, cost, ...)
-
-6. If --judge enabled:
-   a. For each result:
-      - Judge builds evaluation prompt
-        └─> LLMJudge.build_judge_prompt() → str
-
-      - Judge requests JSON scores
-        └─> OpenRouterClient.complete_with_json() → CompletionResponse
-
-      - Judge parses scores
-        └─> JudgeScore(accuracy, format, compliance, ...)
-
-7. CLI generates comparison
-   └─> ModelComparison.compare_results() → List[comparison_data]
-
-8. CLI displays results table
-   └─> ModelComparison.generate_comparison_table() → Rich.Table
-
-9. CLI saves results to JSON
-   └─> {task, results, scores, statistics}
+```mermaid
+sequenceDiagram
+    actor User
+    participant CLI
+    participant TaskParser
+    participant Executor
+    participant APIClient
+    participant CostTracker
+    participant Judge
+    participant Comparison
+    
+    User->>CLI: taskbench evaluate task.yaml --models model1,model2
+    CLI->>TaskParser: load_from_yaml()
+    TaskParser-->>CLI: TaskDefinition
+    
+    CLI->>TaskParser: validate_task()
+    TaskParser-->>CLI: (bool, List[errors])
+    
+    CLI->>CLI: Load input data
+    
+    loop For each model
+        CLI->>Executor: build_prompt(task, input)
+        Executor-->>CLI: prompt string
+        
+        CLI->>APIClient: complete(prompt)
+        APIClient-->>CLI: CompletionResponse
+        
+        CLI->>CostTracker: calculate_cost(tokens)
+        CostTracker-->>CLI: cost float
+        
+        CLI->>Executor: create_result()
+        Executor-->>CLI: EvaluationResult
+    end
+    
+    alt --judge enabled
+        loop For each result
+            CLI->>Judge: build_judge_prompt()
+            Judge-->>CLI: judge prompt
+            
+            CLI->>APIClient: complete_with_json()
+            APIClient-->>CLI: JSON scores
+            
+            CLI->>Judge: parse_scores()
+            Judge-->>CLI: JudgeScore
+        end
+    end
+    
+    CLI->>Comparison: compare_results()
+    Comparison-->>CLI: comparison_data
+    
+    CLI->>Comparison: generate_comparison_table()
+    Comparison-->>CLI: Rich.Table
+    
+    CLI->>CLI: Save to JSON
+    CLI-->>User: Display results
 ```
 
 ### Task Definition Flow
 
-```
-YAML File → TaskParser → Validation → TaskDefinition → Executor → Prompt
-
-Task components used in prompt:
-- description: Main instruction
-- output_format: Format requirements
-- constraints: **CRITICAL CONSTRAINTS** section
-- examples: Example outputs
-- evaluation_criteria: What to aim for
-- judge_instructions: NOT used in task prompt (only for judge)
+```mermaid
+flowchart LR
+    YAML[YAML File] --> Parser[TaskParser]
+    Parser --> Validation[Validation]
+    Validation --> TaskDef[TaskDefinition]
+    TaskDef --> Executor[Executor]
+    Executor --> Prompt[Prompt]
+    
+    subgraph PromptComponents["Task components used in prompt"]
+        Desc[description:<br/>Main instruction]
+        Format[output_format:<br/>Format requirements]
+        Constraints[constraints:<br/>CRITICAL CONSTRAINTS]
+        Examples[examples:<br/>Example outputs]
+        Criteria[evaluation_criteria:<br/>What to aim for]
+        JudgeNote[judge_instructions:<br/>NOT used in task prompt<br/>only for judge]
+    end
+    
+    TaskDef -.-> PromptComponents
+    
+    style YAML fill:#e1f5ff
+    style TaskDef fill:#fff4e1
+    style Prompt fill:#e1ffe1
+    style JudgeNote fill:#ffe1e1
 ```
 
 ### Judge Evaluation Flow
 
-```
-Input: TaskDefinition + EvaluationResult + Original Input Data
-
-1. Build judge prompt including:
-   - Task description and criteria
-   - Constraints to check
-   - Original input (for context)
-   - Model output to evaluate
-   - Scoring rubric
-   - JSON response format
-
-2. Send to judge model (Claude Sonnet 4.5) with JSON mode
-
-3. Parse JSON response:
-   {
-     "accuracy_score": 0-100,
-     "format_score": 0-100,
-     "compliance_score": 0-100,
-     "overall_score": 0-100,
-     "violations": ["list of issues"],
-     "reasoning": "detailed explanation"
-   }
-
-4. Create JudgeScore object with validation
-
-5. Return score for comparison
+```mermaid
+flowchart TD
+    Input["Input:<br/>• TaskDefinition<br/>• EvaluationResult<br/>• Original Input Data"]
+    
+    Input --> BuildPrompt["Build judge prompt"]
+    
+    subgraph PromptContents["Prompt includes:"]
+        PC1[Task description & criteria]
+        PC2[Constraints to check]
+        PC3[Original input for context]
+        PC4[Model output to evaluate]
+        PC5[Scoring rubric]
+        PC6[JSON response format]
+    end
+    
+    BuildPrompt -.-> PromptContents
+    BuildPrompt --> SendAPI["Send to judge model<br/>(Claude Sonnet 4.5)<br/>with JSON mode"]
+    
+    SendAPI --> ParseJSON["Parse JSON response"]
+    
+    subgraph JSONSchema["JSON Response:"]
+        JS1[accuracy_score: 0-100]
+        JS2[format_score: 0-100]
+        JS3[compliance_score: 0-100]
+        JS4[overall_score: 0-100]
+        JS5[violations: list of issues]
+        JS6[reasoning: explanation]
+    end
+    
+    ParseJSON -.-> JSONSchema
+    ParseJSON --> CreateScore["Create JudgeScore object<br/>with validation"]
+    
+    CreateScore --> Return["Return score for comparison"]
+    
+    style Input fill:#e1f5ff
+    style SendAPI fill:#fff4e1
+    style Return fill:#e1ffe1
 ```
 
 ## Design Decisions
@@ -385,6 +413,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Use OpenRouter as the unified API gateway.
 
 **Rationale**:
+
 - Single API for multiple providers (Anthropic, OpenAI, Google, Meta, etc.)
 - Consistent interface across different models
 - Built-in rate limiting and load balancing
@@ -392,6 +421,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 - No need to manage multiple API keys
 
 **Trade-offs**:
+
 - Dependency on third-party service
 - Slight latency overhead vs. direct APIs
 - Limited to models available on OpenRouter
@@ -401,6 +431,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Use Claude Sonnet 4.5 as the evaluation judge.
 
 **Rationale**:
+
 - Scales to custom tasks without manual evaluation
 - Provides detailed, explainable scores
 - Detects subtle violations humans might miss
@@ -408,6 +439,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 - Faster and cheaper than human evaluation
 
 **Trade-offs**:
+
 - Judge model adds cost (mitigated by using temperature=0.3)
 - Judge can have biases or errors
 - Requires careful prompt engineering for judge instructions
@@ -419,6 +451,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Use Pydantic for all data structures.
 
 **Rationale**:
+
 - Runtime type checking and validation
 - Automatic JSON serialization/deserialization
 - Clear documentation through type hints
@@ -426,6 +459,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 - Validation errors provide clear messages
 
 **Benefits**:
+
 - Catches errors early (at data ingestion)
 - Self-documenting code
 - Easy to extend with validators
@@ -436,6 +470,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Use YAML instead of JSON or Python for task definitions.
 
 **Rationale**:
+
 - Human-readable and editable
 - Supports multi-line strings (for judge instructions)
 - Comments for documentation
@@ -443,6 +478,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 - Declarative (non-executable) for security
 
 **Alternative Considered**: Python classes
+
 - Rejected: Requires Python knowledge, harder to version control, potential security issues
 
 ### 5. Why Async/Await?
@@ -450,12 +486,14 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Use asyncio throughout the application.
 
 **Rationale**:
+
 - Non-blocking I/O for API calls
 - Better performance for multi-model evaluation
 - Scales well for concurrent requests
 - Modern Python best practice for I/O-bound applications
 
 **Complexity Trade-off**:
+
 - Slightly more complex than synchronous code
 - Worth it for performance gains (can evaluate 10 models in parallel)
 
@@ -464,6 +502,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Split evaluation into two phases: execution and judging.
 
 **Rationale**:
+
 - Single Responsibility Principle
 - Can run without judge (--no-judge flag)
 - Easy to swap judge models
@@ -475,6 +514,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Use Rich library for terminal output.
 
 **Rationale**:
+
 - Professional-looking output
 - Progress bars for long operations
 - Color-coded results (green=good, red=bad)
@@ -486,6 +526,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 **Decision**: Built-in cost tracking as a first-class feature.
 
 **Rationale**:
+
 - LLM API costs can add up quickly
 - Users need visibility into spending
 - Helps compare models on cost-effectiveness
@@ -504,6 +545,9 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 | **typer** | >=0.9.0 | CLI framework |
 | **rich** | >=13.0.0 | Terminal formatting and progress bars |
 | **python-dotenv** | >=1.0.0 | Environment variable management |
+| **fastapi** | >=0.110.0 | REST API for UI/backend |
+| **uvicorn** | >=0.23.0 | ASGI server |
+| **streamlit** | >=1.30.0 | Frontend UI |
 
 ### Development Dependencies
 
@@ -559,6 +603,7 @@ Input: TaskDefinition + EvaluationResult + Original Input Data
 ### Future Extensibility
 
 The architecture supports future enhancements:
+
 - **Custom Judge Models**: Easy to swap judge implementation
 - **Additional Providers**: Can add direct API clients
 - **Web Interface**: Pydantic models ready for FastAPI
@@ -611,3 +656,26 @@ LLM TaskBench is architected as a modular, extensible framework for task-specifi
 6. **Extensibility**: Clean separation of concerns
 
 The architecture supports the core workflow: define tasks declaratively, execute on multiple models efficiently, evaluate with LLM-as-judge objectively, and compare results comprehensively.
+### 10. Model Recommender (`taskbench/evaluation/orchestrator.py`)
+
+**Purpose**: Suggest appropriate models for a use-case.
+
+**Responsibilities**:
+- Read use-case/task traits (e.g., long-context, cost priority).
+- Filter OpenRouter models (context window, pricing) and drop curated denylists.
+- Provide a candidate set to CLI/UI; supports auto-selection when `--models auto`.
+
+**Design Pattern**: Strategy/filtering heuristics with env-driven defaults.
+
+### 11. Use-Case Layer (`usecases/*.yaml`)
+
+**Purpose**: Capture intent/constraints beyond the task schema.
+
+**Fields (example)**:
+- name, goal, chunk_min/max, coverage_required, notes.
+- default_judge_model (can reference env, e.g., `${GENERAL_TASK_LLM:-anthropic/claude-sonnet-4.5}`).
+- default_candidate_models (seed list, not hard-wired).
+
+**Usage**:
+- Executor and Judge consume the use-case to build prompts/rubrics.
+- Orchestrator uses it to recommend models.

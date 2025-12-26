@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  taskbench-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - TASKBENCH_MAX_CONCURRENCY=${TASKBENCH_MAX_CONCURRENCY:-5}
+      - TASKBENCH_USE_GENERATION_LOOKUP=${TASKBENCH_USE_GENERATION_LOOKUP:-true}
+    volumes:
+      - ./tasks:/app/tasks
+      - ./config:/app/config
+      - ./results:/app/results
+      - ./tests/fixtures:/app/tests/fixtures
+    working_dir: /app
+    entrypoint: ["taskbench"]
+    command: ["--help"]
+
+# Usage:
+#   docker compose -f docker-compose.cli.yml build
+#   docker compose -f docker-compose.cli.yml run --rm taskbench-cli evaluate ...

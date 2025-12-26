@@ -306,25 +306,18 @@ class ModelComparison:
 
         # Add rows
         for model in models:
-            # Determine score color based on performance tier
             score = model["overall_score"]
             if score >= 90:
                 score_color = "green"
-                tier = "Excellent"
             elif score >= 80:
                 score_color = "cyan"
-                tier = "Good"
             elif score >= 70:
                 score_color = "yellow"
-                tier = "Acceptable"
             else:
                 score_color = "red"
-                tier = "Poor"
 
-            # Format score with color
             score_text = Text(str(score), style=f"bold {score_color}")
 
-            # Format violations
             violation_count = len(model["violations"])
             if violation_count == 0:
                 violations_text = Text("None", style="green")
@@ -333,28 +326,17 @@ class ModelComparison:
             else:
                 violations_text = Text(str(violation_count), style="red")
 
-            # Format cost
             cost_text = f"${model['cost']:.4f}"
 
-            # Format value rating
             value = model["value_rating"]
-            if value > 0:
-                value_text = Text(f"{value:.1f}", style="cyan")
-            else:
-                value_text = Text("N/A", style="dim")
+            value_text = Text(f"{value:.1f}", style="cyan") if value > 0 else Text("N/A", style="dim")
 
-            # Format status
-            if model["status"] == "success":
-                status_text = Text("✓ Success", style="green")
-            else:
-                status_text = Text("✗ Failed", style="red")
+            status_text = Text("✔ Success", style="green") if model["status"] == "success" else Text("✖ Failed", style="red")
 
-            # Format model name (truncate if too long)
             model_name = model["name"]
             if len(model_name) > 33:
                 model_name = model_name[:30] + "..."
 
-            # Add row
             table.add_row(
                 f"#{model['rank']}",
                 model_name,

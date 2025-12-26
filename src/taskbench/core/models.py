@@ -105,6 +105,14 @@ class CompletionResponse(BaseModel):
     output_tokens: int = Field(..., description="Number of output tokens generated")
     total_tokens: int = Field(..., description="Total tokens (input + output)")
     latency_ms: float = Field(..., description="Response latency in milliseconds")
+    generation_id: Optional[str] = Field(
+        default=None,
+        description="OpenRouter generation ID (gen-*) for follow-up cost lookups"
+    )
+    billed_cost_usd: Optional[float] = Field(
+        default=None,
+        description="Cost reported directly by the provider/OpenRouter, if available"
+    )
     timestamp: datetime = Field(
         default_factory=datetime.now,
         description="When the response was received"
@@ -147,10 +155,22 @@ class EvaluationResult(BaseModel):
     output_tokens: int = Field(..., description="Output tokens generated")
     total_tokens: int = Field(..., description="Total tokens used")
     cost_usd: float = Field(..., description="Cost in USD for this evaluation")
+    billed_cost_usd: Optional[float] = Field(
+        default=None,
+        description="Cost reported by OpenRouter billing (if available)"
+    )
     latency_ms: float = Field(..., description="Execution latency in milliseconds")
     timestamp: datetime = Field(
         default_factory=datetime.now,
         description="When the evaluation was performed"
+    )
+    generation_id: Optional[str] = Field(
+        default=None,
+        description="OpenRouter generation ID for auditing/cost lookups"
+    )
+    provider: Optional[str] = Field(
+        default=None,
+        description="Provider that served the request, if known"
     )
     status: str = Field(default="success", description="Evaluation status (success/failed)")
     error: Optional[str] = Field(default=None, description="Error message if status is failed")

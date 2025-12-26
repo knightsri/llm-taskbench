@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from taskbench.api.retry import retry_with_backoff, RateLimiter, with_rate_limit
 from taskbench.core.models import CompletionResponse
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,8 @@ class OpenRouterClient:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        timeout: float = 120.0
+        timeout: float = 120.0,
+        limiter: Optional[RateLimiter] = None
     ):
         """
         Initialize the OpenRouter client.
@@ -68,10 +70,12 @@ class OpenRouterClient:
             api_key: OpenRouter API key
             base_url: Base URL for OpenRouter API (default: official endpoint)
             timeout: Request timeout in seconds (default: 120s)
+            limiter: Optional RateLimiter to guard outbound requests
         """
         self.api_key = api_key
         self.base_url = base_url
         self.timeout = timeout
+        self.limiter = limiter
 
         # Initialize async HTTP client
         self.client = httpx.AsyncClient(
@@ -88,54 +92,57 @@ class OpenRouterClient:
             "Content-Type": "application/json"
         }
 
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    async def _post(self, path: str, payload: Dict[str, Any]) -> httpx.Response:
+        """
+        Internal POST with retry and optional rate limiting.
+        """
+        if self.limiter:
+            await self.limiter.acquire()
+        return await self.client.post(path, json=payload)
+
     async def complete(
         self,
         model: str,
         prompt: str,
         max_tokens: int = 1000,
         temperature: float = 0.7,
+        json_mode: bool = False,
         **kwargs: Any
     ) -> CompletionResponse:
         """
-        Send a completion request to OpenRouter.
+        Send a completion request to OpenRouter with usage tracking by default.
 
         Args:
             model: Model identifier (e.g., "anthropic/claude-sonnet-4.5")
             prompt: The prompt to send to the model
             max_tokens: Maximum tokens to generate (default: 1000)
             temperature: Sampling temperature 0-1 (default: 0.7)
+            json_mode: If True, request structured JSON response
             **kwargs: Additional parameters to pass to the API
 
         Returns:
             CompletionResponse with the model's output and metadata
-
-        Raises:
-            AuthenticationError: If API key is invalid
-            RateLimitError: If rate limit is exceeded
-            BadRequestError: If request is malformed
-            OpenRouterError: For other API errors
         """
-        # Build request payload
-        payload = {
+        payload: Dict[str, Any] = {
             "model": model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
             "max_tokens": max_tokens,
             "temperature": temperature,
+            "usage": {"include": True},  # inline usage accounting
             **kwargs
         }
+
+        if json_mode:
+            payload.setdefault("response_format", {"type": "json_object"})
 
         # Measure latency
         start_time = time.perf_counter()
 
         try:
-            # Make API request
-            response = await self.client.post(
-                f"{self.base_url}/chat/completions",
-                json=payload
-            )
-
+            response = await self._post(f"{self.base_url}/chat/completions", payload)
             latency_ms = (time.perf_counter() - start_time) * 1000
 
             # Handle HTTP errors
@@ -161,26 +168,27 @@ class OpenRouterClient:
                     f"Unexpected error ({response.status_code}): {response.text}"
                 )
 
-            # Parse response
             data = response.json()
 
             # Extract content
             content = data["choices"][0]["message"]["content"]
 
             # Extract token usage
-            usage = data.get("usage", {})
+            usage = data.get("usage", {}) or {}
             input_tokens = usage.get("prompt_tokens", 0)
             output_tokens = usage.get("completion_tokens", 0)
             total_tokens = usage.get("total_tokens", input_tokens + output_tokens)
+            cost_inline = usage.get("cost")
 
-            # Create CompletionResponse
             completion = CompletionResponse(
                 content=content,
                 model=model,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
-                latency_ms=latency_ms
+                latency_ms=latency_ms,
+                generation_id=data.get("id"),
+                billed_cost_usd=cost_inline,
             )
 
             logger.info(
@@ -225,36 +233,34 @@ class OpenRouterClient:
             OpenRouterError: If response is not valid JSON
         """
         # Enhance prompt with JSON instructions
-        json_prompt = f"{prompt}\n\nRespond ONLY with valid JSON. Do not include any explanatory text outside the JSON structure."
+        json_prompt = (
+            f"{prompt}\n\nRespond ONLY with valid JSON. "
+            f"Do not include any explanatory text outside the JSON structure."
+        )
 
-        # Request completion
         response = await self.complete(
             model=model,
             prompt=json_prompt,
             max_tokens=max_tokens,
             temperature=temperature,
+            json_mode=True,
             **kwargs
         )
 
         # Validate JSON
         try:
-            # Try to parse the content as JSON
             content = response.content.strip()
 
-            # Remove markdown code blocks if present
+            # Remove markdown code fences if present
             if content.startswith("```json"):
-                content = content[7:]  # Remove ```json
+                content = content[7:]
             if content.startswith("```"):
-                content = content[3:]  # Remove ```
+                content = content[3:]
             if content.endswith("```"):
-                content = content[:-3]  # Remove trailing ```
+                content = content[:-3]
 
             content = content.strip()
-
-            # Validate JSON
             json.loads(content)
-
-            # Update response with cleaned content
             response.content = content
 
             logger.info(f"JSON mode completion successful: model={model}")
@@ -272,6 +278,25 @@ class OpenRouterClient:
         """Close the HTTP client and cleanup resources."""
         await self.client.aclose()
         logger.info("OpenRouter client closed")
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    async def get_generation_stats(self, generation_id: str) -> Dict[str, Any]:
+        """
+        Fetch detailed cost/token stats for a given generation ID.
+        """
+        response = await self.client.get(
+            f"{self.base_url}/generation",
+            params={"id": generation_id}
+        )
+
+        if response.status_code == 404:
+            raise OpenRouterError(f"Generation ID not found: {generation_id}")
+        if response.status_code != 200:
+            raise OpenRouterError(
+                f"Failed to fetch generation stats ({response.status_code}): {response.text}"
+            )
+
+        return response.json()
 
     async def __aenter__(self) -> "OpenRouterClient":
         """Async context manager entry."""

@@ -19,11 +19,11 @@ models:
     output_price_per_1m: 15.00
     context_window: 128000
 
-  - model_id: "google/gemini-2.0-flash-exp:free"
-    display_name: "Gemini 2.0 Flash (Free)"
+  - model_id: "google/gemini-2.5-flash"
+    display_name: "Gemini 2.5 Flash"
     provider: "Google"
-    input_price_per_1m: 0.00
-    output_price_per_1m: 0.00
+    input_price_per_1m: 0.40
+    output_price_per_1m: 0.80
     context_window: 1000000
 
   - model_id: "meta-llama/llama-3.1-405b-instruct"
@@ -38,6 +38,13 @@ models:
     provider: "Alibaba"
     input_price_per_1m: 0.35
     output_price_per_1m: 0.40
+    context_window: 128000
+
+  - model_id: "z-ai/glm-4.7"
+    display_name: "Z.AI GLM 4.7"
+    provider: "Z.AI"
+    input_price_per_1m: 2.00
+    output_price_per_1m: 6.00
     context_window: 128000
 
   - model_id: "anthropic/claude-3.5-sonnet"
