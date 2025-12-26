@@ -18,9 +18,12 @@ from rich.table import Table
 
 from taskbench.api.client import OpenRouterClient
 from taskbench.core.task import TaskParser
+from taskbench.core.models import EvaluationResult, JudgeScore
 from taskbench.evaluation.cost import CostTracker
 from taskbench.evaluation.executor import ModelExecutor
-from taskbench.evaluation.judge import LLMJudge, ModelComparison
+from taskbench.evaluation.judge import LLMJudge
+from taskbench.evaluation.comparison import ModelComparison
+from taskbench.evaluation.recommender import RecommendationEngine
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +39,12 @@ console = Console()
 @app.command()
 def evaluate(
     task_yaml: str = typer.Argument(..., help="Path to task definition YAML file"),
+    usecase_yaml: str = typer.Option(
+        "usecases/concepts_extraction.yaml",
+        "--usecase",
+        "-u",
+        help="Path to use-case YAML file"
+    ),
     models: str = typer.Option(
         "anthropic/claude-sonnet-4.5,openai/gpt-4o,qwen/qwen-2.5-72b-instruct",
         "--models",
@@ -59,6 +68,31 @@ def evaluate(
         "--judge/--no-judge",
         help="Run LLM-as-judge evaluation"
     ),
+    skip_judge: bool = typer.Option(
+        False,
+        "--skip-judge",
+        help="Skip judge evaluation (overrides --judge)"
+    ),
+    chunked: bool = typer.Option(
+        False,
+        "--chunked/--no-chunked",
+        help="Enable chunked processing for long inputs"
+    ),
+    chunk_chars: int = typer.Option(
+        20000,
+        "--chunk-chars",
+        help="Max characters per chunk when chunked mode is enabled"
+    ),
+    chunk_overlap: int = typer.Option(
+        500,
+        "--chunk-overlap",
+        help="Overlap characters between chunks when chunked mode is enabled"
+    ),
+    dynamic_chunk: bool = typer.Option(
+        True,
+        "--dynamic-chunk/--no-dynamic-chunk",
+        help="Derive chunk size from selected models' context windows (default: on)"
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -72,19 +106,40 @@ def evaluate(
     Example:
         taskbench evaluate tasks/lecture_analysis.yaml --models claude-sonnet-4.5,gpt-4o --input-file data/transcript.txt
     """
-    asyncio.run(_evaluate_async(task_yaml, models, input_file, output, run_judge, verbose))
+    asyncio.run(_evaluate_async(
+        task_yaml,
+        usecase_yaml,
+        models,
+        input_file,
+        output,
+        run_judge,
+        skip_judge,
+        chunked,
+        chunk_chars,
+        chunk_overlap,
+        dynamic_chunk,
+        verbose
+    ))
 
 
 async def _evaluate_async(
     task_yaml: str,
+    usecase_yaml: str,
     models_str: str,
     input_file: Optional[str],
     output: str,
     run_judge: bool,
+    skip_judge: bool,
+    chunked: bool,
+    chunk_chars: int,
+    chunk_overlap: int,
+    dynamic_chunk: bool,
     verbose: bool
 ):
     """Async implementation of evaluate command."""
     try:
+        if skip_judge:
+            run_judge = False
         # Get API key
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
@@ -96,6 +151,14 @@ async def _evaluate_async(
         console.print(f"[cyan]Loading task definition from {task_yaml}...[/cyan]")
         parser = TaskParser()
         task = parser.load_from_yaml(task_yaml)
+        usecase = None
+        if usecase_yaml and Path(usecase_yaml).exists():
+            try:
+                from taskbench.usecase import UseCase
+                usecase = UseCase.load(usecase_yaml)
+                console.print(f"[green]✔ Use case loaded: {usecase.name}[/green]")
+            except Exception as uc_err:
+                console.print(f"[yellow]Warning: failed to load use case {usecase_yaml}: {uc_err}[/yellow]")
 
         # Validate task
         is_valid, errors = parser.validate_task(task)
@@ -121,8 +184,18 @@ async def _evaluate_async(
                 console.print("[red]Error: No input file provided and no examples in task definition[/red]")
                 raise typer.Exit(1)
 
-        # Parse model list
+        # Parse model list (allow "auto" to use orchestrator with usecase)
         model_ids = [m.strip() for m in models_str.split(",")]
+        if len(model_ids) == 1 and model_ids[0].lower() == "auto":
+            from taskbench.evaluation.orchestrator import LLMOrchestrator
+            async with OpenRouterClient(api_key) as client_tmp:
+                orch = LLMOrchestrator(client_tmp)
+                model_ids = orch.recommend_for_usecase(
+                    usecase_goal=usecase.goal if usecase else task.description,
+                    require_large_context=True,
+                    prioritize_cost=(usecase.cost_priority == "high") if usecase else False
+                )
+            console.print(f"[cyan]Recommended models: {', '.join(model_ids)}[/cyan]")
         console.print(f"[cyan]Evaluating {len(model_ids)} models: {', '.join(model_ids)}[/cyan]\n")
 
         # Initialize components
@@ -134,19 +207,25 @@ async def _evaluate_async(
             results = await executor.evaluate_multiple(
                 model_ids=model_ids,
                 task=task,
-                input_data=input_data
+                input_data=input_data,
+                usecase=usecase,
+                chunk_mode=chunked,
+                chunk_chars=chunk_chars,
+                chunk_overlap=chunk_overlap,
+                dynamic_chunk=dynamic_chunk
             )
+
+            scores: List[Optional[JudgeScore]] = []
 
             # Run judge if requested
             if run_judge:
                 console.print("\n[bold cyan]Running LLM-as-judge evaluation...[/bold cyan]\n")
                 judge = LLMJudge(client)
-                scores = []
 
                 for result in results:
                     if result.status == "success":
                         try:
-                            score = await judge.evaluate(task, result, input_data)
+                            score = await judge.evaluate(task, result, input_data, usecase=usecase)
                             scores.append(score)
                             console.print(
                                 f"[green] {result.model_name}[/green]: "
@@ -164,25 +243,25 @@ async def _evaluate_async(
                 valid_scores = [s for s in scores if s is not None]
 
                 if valid_scores:
+
                     console.print("\n")
-                    comparison = ModelComparison.compare_results(valid_results, valid_scores)
-                    table = ModelComparison.generate_comparison_table(comparison)
+                    comp = ModelComparison()
+                    comparison = comp.compare_results(valid_results, valid_scores)
+                    table = comp.generate_comparison_table(comparison)
                     console.print(table)
-
                     # Show recommendations
-                    console.print("\n[bold cyan]=Ê RECOMMENDATIONS[/bold cyan]\n")
+                    console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
+                    engine = RecommendationEngine()
+                    recs = engine.generate_recommendations(comparison)
+                    console.print(engine.format_recommendations(recs))
 
-                    best_model = ModelComparison.identify_best(comparison)
-                    best_value = ModelComparison.identify_best_value(comparison)
 
-                    console.print(f"<Æ [bold green]Best Overall[/bold green]: {best_model}")
-                    best_item = next(c for c in comparison if c["model"] == best_model)
-                    console.print(f"   Score: {best_item['overall_score']}/100, Cost: ${best_item['cost_usd']:.4f}")
 
-                    if best_value != best_model:
-                        console.print(f"\n=Ž [bold yellow]Best Value[/bold yellow]: {best_value}")
-                        value_item = next(c for c in comparison if c["model"] == best_value)
-                        console.print(f"   Score: {value_item['overall_score']}/100, Cost: ${value_item['cost_usd']:.4f}")
+
+
+
+
+
 
             # Save results
             output_path = Path(output)
@@ -192,7 +271,8 @@ async def _evaluate_async(
                 "task": task.model_dump(),
                 "results": [r.model_dump() for r in results],
                 "scores": [s.model_dump() if s else None for s in scores] if run_judge else [],
-                "statistics": cost_tracker.get_statistics()
+                "statistics": cost_tracker.get_statistics(),
+                "run_judge": run_judge
             }
 
             with open(output_path, 'w', encoding='utf-8') as f:
@@ -319,6 +399,102 @@ def validate(
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def recommend(
+    results_file: str = typer.Option(
+        "results/evaluation_results.json",
+        "--results",
+        "-r",
+        help="Path to a saved evaluation results JSON file"
+    )
+):
+    """
+    Generate recommendations from a saved evaluation run.
+    """
+    try:
+        path = Path(results_file)
+        if not path.exists():
+            console.print(f"[red]Results file not found: {results_file}[/red]")
+            raise typer.Exit(1)
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        raw_results = data.get("results", [])
+        raw_scores = data.get("scores", [])
+
+        results = []
+        scores = []
+
+        for item in raw_results:
+            results.append(EvaluationResult(**item))
+
+        for s in raw_scores:
+            if s is not None:
+                scores.append(JudgeScore(**s))
+
+        if not results or not scores:
+            console.print("[red]No results or scores found in the file.[/red]")
+            raise typer.Exit(1)
+
+        comp = ModelComparison()
+        comparison = comp.compare_results(results, scores)
+        table = comp.generate_comparison_table(comparison)
+        console.print(table)
+
+        engine = RecommendationEngine()
+        recs = engine.generate_recommendations(comparison)
+        console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
+        console.print(engine.format_recommendations(recs))
+
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def sample(
+    models: str = typer.Option(
+        "anthropic/claude-sonnet-4.5,openai/gpt-4o,qwen/qwen-2.5-72b-instruct",
+        "--models",
+        "-m",
+        help="Comma-separated list of model IDs to evaluate for the sample run"
+    ),
+    judge: bool = typer.Option(
+        False,
+        "--judge/--no-judge",
+        help="Run judge evaluation for the sample run (default: no judge)"
+    ),
+    output: str = typer.Option(
+        "results/sample_run.json",
+        "--output",
+        "-o",
+        help="Output file for the sample run results"
+    )
+):
+    """
+    Run a sample evaluation using the bundled lecture analysis task and sample transcript.
+    """
+    sample_task = Path("tasks/lecture_analysis.yaml")
+    sample_input = Path("tests/fixtures/sample_transcript.txt")
+
+    if not sample_task.exists():
+        console.print(f"[red]Sample task not found at {sample_task}[/red]")
+        raise typer.Exit(1)
+    if not sample_input.exists():
+        console.print(f"[red]Sample input not found at {sample_input}[/red]")
+        raise typer.Exit(1)
+
+    console.print("[cyan]Running sample evaluation...[/cyan]")
+    evaluate.callback(  # type: ignore
+        task_yaml=str(sample_task),
+        models=models,
+        input_file=str(sample_input),
+        output=output,
+        run_judge=judge,
+        skip_judge=not judge,
+        verbose=False
+    )
 
 
 if __name__ == "__main__":
