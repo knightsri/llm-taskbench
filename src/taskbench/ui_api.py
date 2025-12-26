@@ -26,7 +26,7 @@ class RunRequest(BaseModel):
     models: List[str]
     input_text: str
     judge: bool = True
-    max_tokens: int = 2000
+    max_tokens: int = 4000
     temperature: float = 0.7
     usecase_path: Optional[str] = None
     auto_models: bool = False

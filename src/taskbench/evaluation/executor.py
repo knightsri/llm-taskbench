@@ -61,6 +61,18 @@ class ModelExecutor:
             os.getenv("TASKBENCH_MAX_CONCURRENCY", "5")
         )
         self.use_generation_lookup = os.getenv("TASKBENCH_USE_GENERATION_LOOKUP", "true").lower() == "true"
+        self.default_max_tokens = int(
+            os.getenv("TASKBENCH_MAX_TOKENS", "4000")
+        )
+        self.default_chunk_chars = int(
+            os.getenv("TASKBENCH_CHUNK_CHARS", "20000")
+        )
+        self.default_chunk_overlap = int(
+            os.getenv("TASKBENCH_CHUNK_OVERLAP", "500")
+        )
+        self.default_temperature = float(
+            os.getenv("TASKBENCH_TEMPERATURE", "0.7")
+        )
         # Cache for computed chunk sizes keyed by model set
         self._chunk_cache: dict[str, Tuple[int, int]] = {}
 
@@ -163,6 +175,14 @@ class ModelExecutor:
                 ""
             ])
 
+        # Add input format hints if available (critical for timestamp handling)
+        if task.input_format_hint:
+            prompt_parts.extend([
+                "## IMPORTANT: Input Format Rules",
+                task.input_format_hint,
+                ""
+            ])
+
         prompt_parts.extend([
             "## Output Format",
             f"You MUST provide output in {task.output_format.upper()} format.",
@@ -233,6 +253,16 @@ class ModelExecutor:
                 prompt_parts.append("- Cover the full time range with no gaps.")
             prompt_parts.append("")
 
+        # Add anti-hallucination warning
+        prompt_parts.extend([
+            "## STRICT REQUIREMENTS",
+            "- DO NOT invent, fabricate, or hallucinate ANY content not present in the input.",
+            "- Use ONLY information explicitly visible in the provided input data.",
+            "- If timestamps are in the input, your output timestamps MUST be within the range shown.",
+            "- If you cannot extract valid content, return an empty result (e.g., [] for JSON arrays).",
+            ""
+        ])
+
         # Add input data
         prompt_parts.extend([
             "## Input Data",
@@ -253,7 +283,7 @@ class ModelExecutor:
         task: TaskDefinition,
         input_data: str,
         usecase: Optional[Any] = None,
-        max_tokens: int = 2000,
+        max_tokens: int = 4000,
         temperature: float = 0.7,
         chunk_mode: bool = False,
         chunk_chars: int = 20000,
@@ -310,9 +340,13 @@ class ModelExecutor:
                 for idx, chunk in enumerate(raw_chunks, 1):
                     chunk_header = (
                         f"### Chunk {idx}/{len(raw_chunks)}\n"
-                        "Process ONLY the content in this chunk. "
-                        "Do not invent or summarize content beyond this chunk. "
-                        "Return a JSON array of concepts for this chunk.\n\n"
+                        "**CRITICAL RULES FOR THIS CHUNK:**\n"
+                        "1. Process ONLY the content visible in this chunk.\n"
+                        "2. DO NOT invent, fabricate, or hallucinate ANY timestamps, topics, or content.\n"
+                        "3. Use ONLY timestamps that appear explicitly in this chunk's text.\n"
+                        "4. If the chunk shows timestamps like '22:14', convert to 'HH:MM:SS' format (e.g., '00:22:14').\n"
+                        "5. Your start_time and end_time MUST be within the timestamp range visible in this chunk.\n"
+                        "6. Return a JSON array of concepts for this chunk. If no valid concepts, return [].\n\n"
                     )
                     chunk_prompt = self.build_prompt(
                         task,
@@ -355,7 +389,17 @@ class ModelExecutor:
             aggregated_items: List[Any] = []
             for r in responses:
                 try:
-                    chunk_data = json.loads(r.content)
+                    # Strip markdown code blocks if present
+                    content = r.content.strip()
+                    if content.startswith("```json"):
+                        content = content[7:]  # Remove ```json
+                    elif content.startswith("```"):
+                        content = content[3:]  # Remove ```
+                    if content.endswith("```"):
+                        content = content[:-3]  # Remove trailing ```
+                    content = content.strip()
+
+                    chunk_data = json.loads(content)
                     if isinstance(chunk_data, list):
                         aggregated_items.extend(chunk_data)
                     else:
@@ -423,7 +467,7 @@ class ModelExecutor:
         task: TaskDefinition,
         input_data: str,
         usecase: Optional[Any] = None,
-        max_tokens: int = 2000,
+        max_tokens: int = 4000,
         temperature: float = 0.7,
         chunk_mode: bool = False,
         chunk_chars: int = 20000,

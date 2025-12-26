@@ -8,7 +8,8 @@ including scoring, violation detection, and comparison logic.
 import json
 import logging
 import os
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from rich.console import Console
 from rich.table import Table
@@ -19,6 +20,41 @@ from taskbench.evaluation.comparison import ModelComparison
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+# Load configurable defaults from environment
+DEFAULT_JUDGE_MAX_TOKENS = int(os.getenv("TASKBENCH_JUDGE_MAX_TOKENS", "2000"))
+DEFAULT_INPUT_PREVIEW_LEN = int(os.getenv("TASKBENCH_INPUT_PREVIEW_LEN", "5000"))
+
+
+def extract_timestamp_range(text: str) -> Optional[Tuple[str, str]]:
+    """
+    Extract the first and last timestamps from transcript text.
+
+    Looks for patterns like [00:22:14], [22:14], 00:22:14, 22:14
+
+    Returns:
+        Tuple of (first_timestamp, last_timestamp) or None if no timestamps found
+    """
+    # Match timestamps in various formats: [HH:MM:SS], [MM:SS], HH:MM:SS, MM:SS
+    pattern = r'\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?'
+    matches = re.findall(pattern, text)
+
+    if not matches:
+        return None
+
+    # Normalize to HH:MM:SS format
+    def normalize_ts(ts: str) -> str:
+        parts = ts.split(':')
+        if len(parts) == 2:
+            return f"00:{parts[0].zfill(2)}:{parts[1]}"
+        elif len(parts) == 3:
+            return f"{parts[0].zfill(2)}:{parts[1]}:{parts[2]}"
+        return ts
+
+    first_ts = normalize_ts(matches[0])
+    last_ts = normalize_ts(matches[-1])
+
+    return (first_ts, last_ts)
 
 
 class LLMJudge:
@@ -84,8 +120,17 @@ class LLMJudge:
             f"**Task**: {task.name}",
             f"**Description**: {task.description}",
             "",
-            "# Evaluation Criteria",
         ]
+
+        # Include input format hints (critical for evaluating timestamp handling)
+        if task.input_format_hint:
+            prompt_parts.extend([
+                "# Input Format Rules (the model should have followed these)",
+                task.input_format_hint,
+                "",
+            ])
+
+        prompt_parts.append("# Evaluation Criteria")
 
         for criterion in task.evaluation_criteria:
             prompt_parts.append(f"- {criterion}")
@@ -117,11 +162,39 @@ class LLMJudge:
                 for note in usecase.notes:
                     prompt_parts.append(f"- {note}")
 
+        # Extract timestamp range from input for validation
+        ts_range = extract_timestamp_range(input_data)
+        input_len = len(input_data)
+        input_preview_len = DEFAULT_INPUT_PREVIEW_LEN
+        is_truncated = input_len > input_preview_len
+
         prompt_parts.extend([
             "",
-            "# Input Data (for context)",
+            "# Input Data Context",
+        ])
+
+        if ts_range:
+            prompt_parts.extend([
+                f"**VALID TIMESTAMP RANGE**: {ts_range[0]} to {ts_range[1]}",
+                f"**Input Length**: {input_len:,} characters",
+            ])
+            if is_truncated:
+                prompt_parts.extend([
+                    "",
+                    f"**NOTE**: The input below is a PREVIEW (first {input_preview_len:,} chars). The full transcript is {input_len:,} chars.",
+                    f"The model processed the FULL transcript spanning {ts_range[0]} to {ts_range[1]}.",
+                    "Do NOT assume content beyond the preview is fabricated - only flag timestamps OUTSIDE the valid range.",
+                    "",
+                ])
+            else:
+                prompt_parts.extend([
+                    "Any timestamps in the model's output OUTSIDE this range are FABRICATED and should be marked as violations.",
+                    "",
+                ])
+
+        prompt_parts.extend([
             "```",
-            input_data[:2000] + ("..." if len(input_data) > 2000 else ""),
+            input_data[:input_preview_len] + ("..." if is_truncated else ""),
             "```",
             "",
             "# Model Output to Evaluate",
@@ -132,6 +205,17 @@ class LLMJudge:
             "# Your Evaluation Task",
             "",
             task.judge_instructions,
+        ])
+
+        if ts_range:
+            prompt_parts.extend([
+                "",
+                f"**CRITICAL**: Timestamps must fall within {ts_range[0]} to {ts_range[1]}.",
+            ])
+            if is_truncated:
+                prompt_parts.append("Since the input preview is truncated, focus on timestamp range validity, format compliance, and duration constraints rather than content verification.")
+
+        prompt_parts.extend([
             "",
             "# Response Format",
             "You MUST respond with ONLY valid JSON in this exact format:",
@@ -181,7 +265,7 @@ class LLMJudge:
         response = await self.api_client.complete_with_json(
             model=self.judge_model,
             prompt=prompt,
-            max_tokens=2000,
+            max_tokens=DEFAULT_JUDGE_MAX_TOKENS,
             temperature=0.3  # Lower temperature for more consistent judging
         )
 

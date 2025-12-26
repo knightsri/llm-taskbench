@@ -8,10 +8,15 @@ and rate limiting when making API requests.
 import asyncio
 import functools
 import logging
+import os
 import time
 from typing import Callable, Optional, Set, Type
 
 logger = logging.getLogger(__name__)
+
+# Load default values from environment
+DEFAULT_RATE_LIMIT = int(os.getenv("TASKBENCH_RATE_LIMIT", "60"))
+DEFAULT_RETRY_MAX_DELAY = float(os.getenv("TASKBENCH_RETRY_MAX_DELAY", "60.0"))
 
 
 class RateLimiter:
@@ -29,14 +34,15 @@ class RateLimiter:
         ```
     """
 
-    def __init__(self, max_requests_per_minute: int = 60):
+    def __init__(self, max_requests_per_minute: int = None):
         """
         Initialize the rate limiter.
 
         Args:
             max_requests_per_minute: Maximum requests allowed per minute
+                                      (default: from TASKBENCH_RATE_LIMIT env or 60)
         """
-        self.max_requests = max_requests_per_minute
+        self.max_requests = max_requests_per_minute or DEFAULT_RATE_LIMIT
         self.requests: list[float] = []
         self.lock = asyncio.Lock()
 
@@ -74,7 +80,7 @@ class RateLimiter:
 def retry_with_backoff(
     max_retries: int = 3,
     base_delay: float = 1.0,
-    max_delay: float = 60.0,
+    max_delay: float = None,
     retryable_exceptions: Optional[Set[Type[Exception]]] = None,
     non_retryable_exceptions: Optional[Set[Type[Exception]]] = None
 ) -> Callable:
@@ -127,6 +133,9 @@ def retry_with_backoff(
             TypeError,
         }
 
+    # Use default from environment if not specified
+    actual_max_delay = max_delay if max_delay is not None else DEFAULT_RETRY_MAX_DELAY
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -159,7 +168,7 @@ def retry_with_backoff(
                         raise
 
                     # Calculate delay with exponential backoff
-                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    delay = min(base_delay * (2 ** attempt), actual_max_delay)
 
                     logger.warning(
                         f"Retry {attempt + 1}/{max_retries} for {func.__name__} "

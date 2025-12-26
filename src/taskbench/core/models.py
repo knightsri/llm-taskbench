@@ -37,6 +37,10 @@ class TaskDefinition(BaseModel):
     description: str = Field(..., description="Human-readable task description")
     input_type: str = Field(..., description="Type of input data (transcript, text, csv, json)")
     output_format: str = Field(..., description="Expected output format (csv, json, markdown)")
+    input_format_hint: Optional[str] = Field(
+        default=None,
+        description="Hints about input format (e.g., timestamp conventions, structure)"
+    )
     evaluation_criteria: List[str] = Field(
         ...,
         description="List of criteria used to evaluate model outputs"

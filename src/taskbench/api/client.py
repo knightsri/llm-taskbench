@@ -7,6 +7,7 @@ supporting both standard and JSON mode completions.
 
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, Optional
 
@@ -60,7 +61,7 @@ class OpenRouterClient:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        timeout: float = 120.0,
+        timeout: float = None,
         limiter: Optional[RateLimiter] = None
     ):
         """
@@ -69,17 +70,17 @@ class OpenRouterClient:
         Args:
             api_key: OpenRouter API key
             base_url: Base URL for OpenRouter API (default: official endpoint)
-            timeout: Request timeout in seconds (default: 120s)
+            timeout: Request timeout in seconds (default: from TASKBENCH_TIMEOUT env or 120s)
             limiter: Optional RateLimiter to guard outbound requests
         """
         self.api_key = api_key
         self.base_url = base_url
-        self.timeout = timeout
+        self.timeout = timeout or float(os.getenv("TASKBENCH_TIMEOUT", "120.0"))
         self.limiter = limiter
 
         # Initialize async HTTP client
         self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout),
+            timeout=httpx.Timeout(self.timeout),
             headers=self._get_default_headers()
         )
 
