@@ -1,14 +1,35 @@
 # LLM TaskBench
 
-Task-first LLM evaluation with folder-based use cases, automatic prompt generation, LLM-as-judge, and cost-aware recommendations.
+**Task-first LLM evaluation framework** for domain experts to benchmark models on real use cases—not generic metrics.
 
-## What it does
-- Define use cases in human-friendly Markdown (USE-CASE.md)
-- Automatically derive prompts from use case analysis + ground truth
-- Run multiple LLMs in parallel on the same task
-- Judge outputs against ground truth for accuracy, format, and compliance
-- Compare and recommend best overall and best value models
-- Track all costs with inline and billed cost tracking
+[![Status](https://img.shields.io/badge/status-MVP%20Complete-green)]()
+[![Python](https://img.shields.io/badge/python-3.11+-blue)]()
+[![License](https://img.shields.io/badge/license-MIT-blue)]()
+
+## The Problem
+
+Existing LLM evaluation tools (DeepEval, Promptfoo, Eleuther AI) focus on generic benchmarks and are built for AI engineers. When a domain expert needs to know "which LLM best extracts action items from meeting notes" or "the most cost-effective model for bug triage," generic BLEU/ROUGE scores don't help.
+
+## The Solution
+
+LLM TaskBench shifts from **metric-first to task-first** evaluation:
+
+- **Define use cases in Markdown** - Human-readable USE-CASE.md with goals and edge cases
+- **Auto-generate prompts** - Framework analyzes ground truth to create optimal prompts
+- **LLM-as-judge scoring** - Claude/GPT-4 evaluates outputs against your criteria
+- **Cost-aware recommendations** - Not just "best" but "best for your budget"
+
+## Key Insight
+
+Based on testing 42+ production LLMs:
+
+| Conventional Wisdom | Reality |
+|---------------------|---------|
+| Bigger models = better | 405B didn't beat 72B on our tasks |
+| "Reasoning-optimized" = better reasoning | Sometimes performed *worse* |
+| Higher price = higher quality | Zero correlation found |
+
+**What actually matters:** Task-specific evaluation reveals which models excel at *your* use case.
 
 ## Quick start
 
@@ -180,14 +201,61 @@ results/
 
 ## Sample Use Cases & Benchmark Results
 
-| # | Use Case | Difficulty | Claude Sonnet 4 | GPT-4o-mini |
-|---|----------|------------|-----------------|-------------|
-| 00 | Lecture Concept Extraction | Moderate-Hard | 93/100 | 35/100 |
-| 01 | Meeting Action Items | Moderate | 82/100 | 66/100 |
-| 02 | Bug Report Triage | Moderate-Hard | 86/100 | 75/100 |
-| 03 | Regex Generation | Hard | 97/100 | 0/100 |
-| 04 | Data Cleaning Rules | Moderate-Hard | 88/100 | 76/100 |
+| # | Use Case | Claude Sonnet 4 | GPT-4o-mini | Key Finding |
+|---|----------|-----------------|-------------|-------------|
+| 00 | [Lecture Concepts](sample-usecases/00-lecture-concept-extraction/) | **93**/100 | 35/100 | GPT ignores duration constraints |
+| 01 | [Meeting Actions](sample-usecases/01-meeting-action-items/) | **82**/100 | 66/100 | GPT misses implicit tasks |
+| 02 | [Bug Triage](sample-usecases/02-bug-report-triage/) | **86**/100 | 75/100 | Both usable |
+| 03 | [Regex Generation](sample-usecases/03-regex-generation/) | **97**/100 | 0/100 | GPT fails entirely |
+| 04 | [Data Cleaning](sample-usecases/04-data-cleaning-rules/) | **88**/100 | 76/100 | Both usable |
 
-## Status
+See detailed results in each use case's `taskbench-results.md`.
 
-Folder-based use cases, automatic prompt generation, parallel executor, judge integration, cost tracking, and UI are implemented. Legacy YAML-based tasks still supported.
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLI: taskbench run/list-usecases         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────┐
+│               Folder-Based Use Case Processing              │
+│  UseCaseParser → DataAnalyzer → PromptGenerator (LLM)       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────┐
+│                    Core Evaluation                          │
+│  Executor (parallel) → Judge (LLM scoring) → CostTracker    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────┐
+│                    OpenRouter API                           │
+│          100+ LLM models (Claude, GPT-4, Gemini, etc.)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Key Components
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| Use Case Parser | Parse USE-CASE.md folders | `src/taskbench/usecase_parser.py` |
+| Prompt Generator | LLM-driven prompt creation | `src/taskbench/prompt_generator.py` |
+| Executor | Parallel model execution | `src/taskbench/evaluation/executor.py` |
+| Judge | LLM-as-judge scoring | `src/taskbench/evaluation/judge.py` |
+| Cost Tracker | Token/cost tracking | `src/taskbench/evaluation/cost.py` |
+| CLI | Command interface | `src/taskbench/cli/main.py` |
+
+## Documentation
+
+- **[USAGE.md](USAGE.md)** - Full user guide with examples
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical architecture
+- **[docs/API.md](docs/API.md)** - API reference
+- **[sample-usecases/](sample-usecases/)** - Example use cases with results
+
+## License
+
+MIT
+
+## Author
+
+**Sri Bolisetty** ([@KnightSri](https://github.com/KnightSri))
