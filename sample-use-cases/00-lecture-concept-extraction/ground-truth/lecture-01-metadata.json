@@ -1,0 +1,63 @@
+{
+  "lecture_id": "lecture-01-python-basics",
+  "title": "Python Basics - Variables, Data Types, and Control Flow",
+  "instructor": "Dr. Sarah Chen",
+  "duration_minutes": 27,
+  "complexity": "easy",
+  "expected_concepts": 8,
+  "notes": {
+    "structure": "Linear progression, well-organized, clear transitions",
+    "challenges": "Few - straightforward lecture with minimal tangents",
+    "qa_sections": "Brief Q&A at end (25:40-26:50), can be separate or merged with summary"
+  },
+  "concept_rationale": [
+    {
+      "concept": "01_Introduction_and_Variables_Overview",
+      "duration_min": 2.7,
+      "rationale": "Opening context plus complete coverage of variables and naming conventions"
+    },
+    {
+      "concept": "02_Data_Types_Numbers_and_Strings",
+      "duration_min": 4.55,
+      "rationale": "Covers all basic data types with examples - natural grouping"
+    },
+    {
+      "concept": "03_Type_Checking_and_Conversion",
+      "duration_min": 2.83,
+      "rationale": "type() function and conversion between types - distinct topic"
+    },
+    {
+      "concept": "04_Arithmetic_and_Comparison_Operators",
+      "duration_min": 3.38,
+      "rationale": "All operators including logical operators - builds to control flow"
+    },
+    {
+      "concept": "05_If_Elif_Else_Conditional_Statements",
+      "duration_min": 3.67,
+      "rationale": "Complete coverage of conditionals including nesting"
+    },
+    {
+      "concept": "06_For_Loops_and_Range_Function",
+      "duration_min": 3.12,
+      "rationale": "For loops, while loops, break and continue - could split but flows well together"
+    },
+    {
+      "concept": "07_Practical_Example_Number_Guessing_Game",
+      "duration_min": 3.25,
+      "rationale": "Integrative example showing all concepts together"
+    },
+    {
+      "concept": "08_Summary_and_Homework_Assignment",
+      "duration_min": 3.53,
+      "rationale": "Recap, common pitfalls, homework, and brief Q&A"
+    }
+  ],
+  "statistics": {
+    "total_concepts": 8,
+    "avg_duration_min": 3.38,
+    "min_duration_min": 2.7,
+    "max_duration_min": 4.55,
+    "violations_under_2min": 0,
+    "violations_over_7min": 0
+  }
+}

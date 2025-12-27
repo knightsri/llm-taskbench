@@ -1,0 +1,9 @@
+concept,start_time,end_time
+01_Introduction_and_Variables_Overview,00:00:00,00:02:42
+02_Data_Types_Numbers_and_Strings,00:02:42,00:07:15
+03_Type_Checking_and_Conversion,00:07:15,00:10:05
+04_Arithmetic_and_Comparison_Operators,00:10:05,00:13:28
+05_If_Elif_Else_Conditional_Statements,00:13:28,00:17:08
+06_For_Loops_and_Range_Function,00:17:08,00:20:15
+07_Practical_Example_Number_Guessing_Game,00:20:15,00:23:30
+08_Summary_and_Homework_Assignment,00:23:30,00:27:02

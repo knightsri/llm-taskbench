@@ -1,0 +1,245 @@
+{
+  "meeting_id": "meeting-04-strategy",
+  "meeting_date": "2025-01-09",
+  "action_items": [
+    {
+      "id": "AI-001",
+      "action": "Provide mobile conversion rate data to Tom for financial analysis",
+      "owner": "Rachel",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-15",
+      "deadline_type": "explicit",
+      "deadline_raw": "by Wednesday",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I can get you the data by Wednesday and you can run your models",
+      "status": "new"
+    },
+    {
+      "id": "AI-002",
+      "action": "Complete financial analysis of mobile app revenue impact",
+      "owner": "Tom",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-17",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of next week",
+      "priority": "high",
+      "dependencies": ["AI-001"],
+      "context": "we can have something by... end of next week",
+      "status": "new"
+    },
+    {
+      "id": "AI-003",
+      "action": "Own hiring process for 3 senior engineers",
+      "owner": "Marcus",
+      "owner_confidence": "explicit",
+      "deadline": "2025-03-31",
+      "deadline_type": "relative",
+      "deadline_raw": "end of Q1",
+      "priority": "critical",
+      "dependencies": [],
+      "context": "Marcus, can you own the hiring process?... Yeah. I'll sync with HR and get job postings up this week",
+      "status": "new"
+    },
+    {
+      "id": "AI-004",
+      "action": "Sync with HR and post job listings",
+      "owner": "Marcus",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "relative",
+      "deadline_raw": "this week",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I'll sync with HR and get job postings up this week",
+      "status": "new"
+    },
+    {
+      "id": "AI-005",
+      "action": "Help with technical interviews for engineering hires",
+      "owner": "David",
+      "owner_confidence": "explicit",
+      "deadline": "2025-03-31",
+      "deadline_type": "inferred",
+      "deadline_raw": "throughout Q1",
+      "priority": "high",
+      "dependencies": ["AI-004"],
+      "context": "David, I'll need you to help with the technical interviews... Of course",
+      "status": "new"
+    },
+    {
+      "id": "AI-006",
+      "action": "Reach out to data engineering consulting firm and get proposal with cost estimate",
+      "owner": "Marcus",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "explicit",
+      "deadline_raw": "by next Monday",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I know a firm that does data engineering consulting. Want me to reach out?... Get me a proposal and cost estimate by next Monday",
+      "status": "new"
+    },
+    {
+      "id": "AI-007",
+      "action": "Create realistic timeline for custom roles and permissions feature for sales team",
+      "owner": "Rachel",
+      "owner_confidence": "explicit",
+      "deadline": null,
+      "deadline_type": "none",
+      "deadline_raw": null,
+      "priority": "medium",
+      "dependencies": [],
+      "context": "Rachel, can you work with Marcus to get a realistic timeline that sales can use?... Yes, we'll put something together",
+      "status": "new"
+    },
+    {
+      "id": "AI-008",
+      "action": "Collaborate with Rachel on custom roles/permissions timeline",
+      "owner": "Marcus",
+      "owner_confidence": "explicit",
+      "deadline": null,
+      "deadline_type": "none",
+      "deadline_raw": null,
+      "priority": "medium",
+      "dependencies": [],
+      "context": "can you work with Marcus to get a realistic timeline",
+      "status": "new"
+    },
+    {
+      "id": "AI-009",
+      "action": "Assign platform engineer to scope Kubernetes migration",
+      "owner": "Marcus",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "inferred",
+      "deadline_raw": "soon",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I can ask one of the platform engineers to look into it",
+      "status": "new"
+    },
+    {
+      "id": "AI-010",
+      "action": "Complete Kubernetes migration scoping report",
+      "owner": "Marcus",
+      "owner_confidence": "inferred",
+      "deadline": "2025-02-28",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of February",
+      "priority": "medium",
+      "dependencies": ["AI-009"],
+      "context": "I want a report by end of February on what the migration would entail",
+      "status": "new"
+    },
+    {
+      "id": "AI-011",
+      "action": "Provide ballpark cost estimates for Q1 initiatives",
+      "owner": "David",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-17",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of next week",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Can everyone get me their expected costs by end of next week?",
+      "status": "new"
+    },
+    {
+      "id": "AI-012",
+      "action": "Provide ballpark cost estimates for Q1 initiatives",
+      "owner": "Marcus",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-17",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of next week",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Can everyone get me their expected costs by end of next week?",
+      "status": "new"
+    },
+    {
+      "id": "AI-013",
+      "action": "Provide ballpark cost estimates for Q1 initiatives",
+      "owner": "Rachel",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-17",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of next week",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Can everyone get me their expected costs by end of next week?",
+      "status": "new"
+    },
+    {
+      "id": "AI-014",
+      "action": "Draft company-wide update on Q1 priorities",
+      "owner": "Michelle",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "relative",
+      "deadline_raw": "by end of week",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I'll send out a company-wide update by end of week",
+      "status": "new"
+    },
+    {
+      "id": "AI-015",
+      "action": "Review Michelle's company-wide update draft before sending",
+      "owner": "David",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "relative",
+      "deadline_raw": "before end of week",
+      "priority": "medium",
+      "dependencies": ["AI-014"],
+      "context": "David, can you review it before I send?... Sure, send me a draft",
+      "status": "new"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Keep all three initiatives (enterprise, mobile, AI) pending mobile revenue analysis",
+      "context": "Will revisit after Rachel/Tom complete financial analysis",
+      "stakeholders": ["Michelle", "David", "Rachel"]
+    },
+    {
+      "decision": "Hire 3 senior engineers in Q1",
+      "context": "Within budget without board approval, one should focus on data engineering",
+      "stakeholders": ["Michelle", "Marcus", "Tom"]
+    },
+    {
+      "decision": "Explore contractor for data engineering as bridge solution",
+      "context": "Data pipeline blocking ML team, need interim solution while hiring",
+      "stakeholders": ["David", "Marcus", "Michelle"]
+    },
+    {
+      "decision": "Custom roles and permissions prioritized after SSO work",
+      "context": "Sales needs concrete timeline for prospects",
+      "stakeholders": ["Michelle", "Rachel", "Marcus"]
+    },
+    {
+      "decision": "Kubernetes migration treated as background research project",
+      "context": "Not urgent but needs planning to avoid crisis at mid-year scale",
+      "stakeholders": ["Michelle", "David", "Marcus"]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "Should mobile app rewrite be deprioritized?",
+      "raised_by": "David",
+      "assigned_to": "Pending Rachel/Tom analysis"
+    },
+    {
+      "question": "What is the actual revenue impact of low mobile conversion?",
+      "raised_by": "Tom",
+      "assigned_to": "Rachel"
+    },
+    {
+      "question": "What would Kubernetes migration entail?",
+      "raised_by": "David",
+      "assigned_to": "Platform engineer (TBD)"
+    }
+  ]
+}

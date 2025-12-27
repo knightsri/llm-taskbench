@@ -1,0 +1,103 @@
+MEETING TRANSCRIPT
+Type: Sprint Planning
+Date: January 7, 2025
+Duration: 45 minutes
+Attendees: Rachel (Product Manager), Dev (Tech Lead), Amy (Senior Dev), Carlos (Dev), Nina (Dev), Jason (Scrum Master)
+
+---
+
+[00:00] Jason: Alright, sprint planning for Sprint 23. Rachel, you want to walk us through the priorities?
+
+[00:08] Rachel: Thanks Jason. So this sprint we absolutely have to ship the new onboarding flow. It's been promised to the enterprise client and they're expecting it by the 20th. That's non-negotiable.
+
+[00:22] Dev: What's the scope? Are we talking about the full flow with SSO integration or just the basic email signup?
+
+[00:30] Rachel: The full thing. SSO with Okta and Azure AD, plus the regular email flow. I know it's ambitious but we committed to it in the contract.
+
+[00:42] Amy: That's a lot. We haven't even started the Azure AD piece. I did some research on it last sprint and the integration is more complex than Okta.
+
+[00:55] Dev: Yeah, I'm concerned about that timeline. Can we get any flexibility on the date?
+
+[01:02] Rachel: I can try to push back but I need to know by tomorrow what's realistic. Can someone put together a quick estimate?
+
+[01:12] Dev: Amy, you've looked at this most. Can you write up a rough estimate by end of day? Just high-level, not detailed story points.
+
+[01:20] Amy: Sure, I can do that. I'll need to sync with Carlos first though since he's done Okta integrations before. Carlos, you free this afternoon?
+
+[01:30] Carlos: I have a dentist appointment at 3, but I'm free until then. Let's do 1pm?
+
+[01:35] Amy: Works for me.
+
+[01:38] Jason: So we'll have the estimate by end of day tomorrow?
+
+[01:42] Amy: End of day today, actually. I'll send it to Rachel and Dev.
+
+[01:48] Rachel: Perfect. The other priority is the performance issues on the dashboard. We've been getting complaints from users about slow load times.
+
+[02:00] Nina: I've been looking into that. The main issue is we're making like 15 API calls on page load. We need to either batch them or implement some caching.
+
+[02:12] Dev: What's your recommendation?
+
+[02:15] Nina: Honestly, we should probably do both long-term. But for this sprint, I'd say we implement Redis caching for the most expensive queries. That should give us an 80% improvement.
+
+[02:28] Rachel: How long would that take?
+
+[02:30] Nina: If I can focus on it exclusively, maybe 3-4 days. But I'll need someone to review the caching strategy before I start implementing. Dev, can you spare an hour?
+
+[02:42] Dev: Let's do it tomorrow morning, 9am. I want to make sure we don't introduce cache invalidation bugs.
+
+[02:50] Jason: So Nina's blocked until tomorrow morning on the caching work?
+
+[02:55] Nina: I can start on the API batching analysis in the meantime. That'll inform the caching strategy anyway.
+
+[03:02] Dev: Good thinking.
+
+[03:05] Rachel: We also need to fix that checkout bug Tom found. The security one.
+
+[03:12] Dev: Oh yeah, I saw that ticket. It's bad - we're not properly invalidating sessions on password change. That needs to be fixed ASAP, probably before anything else.
+
+[03:25] Jason: Who should take that?
+
+[03:28] Dev: I'll handle it personally. It touches authentication code and I don't want to risk introducing new issues. Should be done by end of day today if I start right after this meeting.
+
+[03:40] Carlos: Do we need to notify users whose sessions might be affected?
+
+[03:45] Rachel: Good question. We should probably check with legal first. Can someone send an email to compliance@company.com explaining the issue?
+
+[03:55] Dev: I'll include that in my fix PR description and cc them. Actually, Amy, can you draft that email? You're better at explaining technical stuff to non-technical people.
+
+[04:08] Amy: Sure, I'll draft it and send it to you for review before sending to compliance.
+
+[04:15] Jason: What about the remaining items in the backlog? We have the notification preferences feature and the export functionality.
+
+[04:25] Rachel: Notifications can wait. But export is becoming a pain point - I'm getting asked about it in every customer call. Can we at least get a basic CSV export working?
+
+[04:38] Carlos: I can take that. It's not too complex if we just do CSV. When do you need it?
+
+[04:45] Rachel: Ideally by end of sprint, but if the onboarding stuff takes priority, I understand.
+
+[04:52] Carlos: Let me see how the SSO estimate looks. If Amy's estimate shows we have room, I'll commit to it. Otherwise it's a stretch goal.
+
+[05:02] Jason: Fair enough. Let's mark it as a stretch goal for now. Anything else?
+
+[05:08] Dev: One thing - we need to update our documentation. The API docs are out of date and it's causing support tickets. Can we allocate some time for that?
+
+[05:20] Rachel: Is it urgent?
+
+[05:22] Dev: Not sprint-critical, but if anyone finishes early, that's where I'd want them to go. Nina, since you're analyzing the APIs anyway, could you note down any doc discrepancies you find?
+
+[05:35] Nina: Yeah, I can keep a running list. We can batch the updates at the end of the sprint if there's time.
+
+[05:42] Jason: Great. Let me summarize the commitments...
+
+[05:48] Rachel: Oh wait, one more thing. We need someone to demo the onboarding flow to the client on the 19th. Dev, can you do it or should I find someone else?
+
+[05:58] Dev: I'd prefer not to - I'll probably be knee-deep in code review at that point. Amy, would you be comfortable doing it since you're leading the SSO work?
+
+[06:08] Amy: As long as we have a working version by the 17th to practice with, sure.
+
+[06:15] Rachel: I'll block time on the 17th for a dry run then. Amy, I'll send you a calendar invite.
+
+[06:22] Jason: Alright, I think we have a solid plan. I'll update Jira with the sprint commitments. Let's sync again at standup tomorrow.
+
+[END OF TRANSCRIPT]

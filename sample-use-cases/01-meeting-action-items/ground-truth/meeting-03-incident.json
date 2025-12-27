@@ -1,0 +1,235 @@
+{
+  "meeting_id": "meeting-03-incident",
+  "meeting_date": "2025-01-08",
+  "action_items": [
+    {
+      "id": "AI-001",
+      "action": "Spec out synthetic load tests for concurrent database access patterns",
+      "owner": "Dev",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-10",
+      "deadline_type": "explicit",
+      "deadline_raw": "by Friday",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Dev, can you own setting up those tests?... Yeah, I can spec it out",
+      "status": "new"
+    },
+    {
+      "id": "AI-002",
+      "action": "Assign someone from team to implement load tests",
+      "owner": "Sarah",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-08",
+      "deadline_type": "inferred",
+      "deadline_raw": "after this meeting",
+      "priority": "high",
+      "dependencies": ["AI-001"],
+      "context": "I can assign someone from my team. Let me talk to them after this meeting and figure out who has bandwidth",
+      "status": "new"
+    },
+    {
+      "id": "AI-003",
+      "action": "Research Statuspage.io pricing and send options",
+      "owner": "Alex",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "explicit",
+      "deadline_raw": "by Monday",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I'll get pricing... I'll send options to you by Monday",
+      "status": "new"
+    },
+    {
+      "id": "AI-004",
+      "action": "Write CI/CD pipeline improvement proposal for exec team",
+      "owner": "Dev",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-10",
+      "deadline_type": "explicit",
+      "deadline_raw": "by Friday",
+      "priority": "critical",
+      "dependencies": [],
+      "context": "Sarah and I can co-author something... Can you have a draft by Friday?... okay, we'll make it work",
+      "status": "new"
+    },
+    {
+      "id": "AI-005",
+      "action": "Co-author CI/CD pipeline improvement proposal",
+      "owner": "Sarah",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-10",
+      "deadline_type": "explicit",
+      "deadline_raw": "by Friday",
+      "priority": "critical",
+      "dependencies": [],
+      "context": "Sarah and I can co-author something",
+      "status": "new"
+    },
+    {
+      "id": "AI-006",
+      "action": "Draft customer communication template for outages",
+      "owner": "Jenny",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-22",
+      "deadline_type": "explicit",
+      "deadline_raw": "within two weeks",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "Jenny, you draft it, loop in legal and product. Let's have something we can use next time within two weeks",
+      "status": "new"
+    },
+    {
+      "id": "AI-007",
+      "action": "Get legal review on customer communication template",
+      "owner": "Jenny",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-22",
+      "deadline_type": "explicit",
+      "deadline_raw": "within two weeks",
+      "priority": "medium",
+      "dependencies": ["AI-006"],
+      "context": "loop in legal and product",
+      "status": "new"
+    },
+    {
+      "id": "AI-008",
+      "action": "Extract list of affected transaction IDs from logs",
+      "owner": "Alex",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-08",
+      "deadline_type": "explicit",
+      "deadline_raw": "today",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I can get you the list of affected transaction IDs today",
+      "status": "new"
+    },
+    {
+      "id": "AI-009",
+      "action": "Cross-reference affected transaction IDs with customer data",
+      "owner": "Jenny",
+      "owner_confidence": "explicit",
+      "deadline": null,
+      "deadline_type": "none",
+      "deadline_raw": null,
+      "priority": "high",
+      "dependencies": ["AI-008"],
+      "context": "We can pull the list but it'll take some time to cross-reference with the logs",
+      "status": "new"
+    },
+    {
+      "id": "AI-010",
+      "action": "Schedule two-week follow-up meeting and send invites",
+      "owner": "Sarah",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-08",
+      "deadline_type": "inferred",
+      "deadline_raw": "soon",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "Someone put that on the calendar... I'll set it up and send the invite",
+      "status": "new"
+    },
+    {
+      "id": "AI-011",
+      "action": "Submit status updates before two-week follow-up meeting",
+      "owner": "Dev",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-22",
+      "deadline_type": "relative",
+      "deadline_raw": "before follow-up meeting",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I want status updates from everyone involved before that meeting",
+      "status": "new"
+    },
+    {
+      "id": "AI-012",
+      "action": "Submit status updates before two-week follow-up meeting",
+      "owner": "Sarah",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-22",
+      "deadline_type": "relative",
+      "deadline_raw": "before follow-up meeting",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I want status updates from everyone involved before that meeting",
+      "status": "new"
+    },
+    {
+      "id": "AI-013",
+      "action": "Submit status updates before two-week follow-up meeting",
+      "owner": "Alex",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-22",
+      "deadline_type": "relative",
+      "deadline_raw": "before follow-up meeting",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I want status updates from everyone involved before that meeting",
+      "status": "new"
+    },
+    {
+      "id": "AI-014",
+      "action": "Submit status updates before two-week follow-up meeting",
+      "owner": "Jenny",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-22",
+      "deadline_type": "relative",
+      "deadline_raw": "before follow-up meeting",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I want status updates from everyone involved before that meeting",
+      "status": "new"
+    },
+    {
+      "id": "AI-015",
+      "action": "Issue credits to affected customers",
+      "owner": "Marcus",
+      "owner_confidence": "inferred",
+      "deadline": null,
+      "deadline_type": "none",
+      "deadline_raw": null,
+      "priority": "high",
+      "dependencies": ["AI-009"],
+      "context": "I've already talked to finance about that. We're going to issue credits to everyone who had a failed transaction",
+      "status": "in-progress"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Implement synthetic load tests for concurrent database access as first step (cheaper than production-mirror)",
+      "context": "Full production mirror too expensive, synthetic tests can be set up in 1-2 weeks",
+      "stakeholders": ["Dev", "Marcus", "Sarah"]
+    },
+    {
+      "decision": "Use third-party status page service (Statuspage.io) instead of building own",
+      "context": "Faster to implement, ops team doesn't have to maintain it",
+      "stakeholders": ["Alex", "Marcus"]
+    },
+    {
+      "decision": "Prioritize CI/CD pipeline improvements",
+      "context": "Current rollback process took 45 minutes, needs automation",
+      "stakeholders": ["Marcus", "Dev", "Sarah"]
+    },
+    {
+      "decision": "Issue credits to all customers with failed transactions",
+      "context": "Already approved by finance",
+      "stakeholders": ["Marcus", "Jenny"]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "What is the cost of Statuspage.io?",
+      "raised_by": "Marcus",
+      "assigned_to": "Alex"
+    },
+    {
+      "question": "Who from Sarah's team has bandwidth to implement load tests?",
+      "raised_by": "Dev",
+      "assigned_to": "Sarah"
+    }
+  ]
+}

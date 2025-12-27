@@ -1,0 +1,31 @@
+customer_id,first_name,last_name,email,phone,state,signup_date,subscription_tier,annual_spend
+1001,John,Smith,john.smith@email.com,555-123-4567,California,2023-01-15,premium,$1250.00
+1002,jane,DOE,jane.doe@email.com,(555) 234-5678,CA,01/20/2023,Premium,1100
+1003,Bob,Johnson,bob.johnson@email,555.345.6789,Calif.,2023-02-28,PREMIUM,$980.50
+1004,Alice,Williams,alice.w@email.com,5554567890,california,Feb 15, 2023,basic,500.00
+1005,Charlie,Brown,charlie.b@email.com,555-567-8901,TX,2023/03/10,Basic,$750
+1006,Diana,Miller,diana.miller@email.com,NULL,Texas,03-15-2023,gold,2500
+1007,Edward,Davis,edward.davis@email.com,555-678-9012,Tx,2023-03-20,Gold,$3000.00
+1008,Fiona,Garcia,fiona.g@email.com,555-789-0123,new york,20-Mar-2023,premium,1800
+1009,George,Martinez,george.martinez@email.com,(555)890-1234,NY,2023-04-01,Premum,$1500.00
+1010,Helen,Anderson,helen.a@email.com,N/A,N.Y.,04/05/2023,basic,NULL
+1011,Ivan,Taylor,ivan.taylor@email.com,555-901-2345,Florida,2023-04-10,Basic,$600.50
+1012,Julia,Thomas,JULIA.THOMAS@EMAIL.COM,555-012-3456,FL,April 15 2023,gold,$2200
+1013,Kevin,Jackson,kevin.j@email.com,-,Fla,2023-04-20,GOLD,2800.00
+1014,Laura,White,laura.white@email.com,555-123-4567,florida,2023/04/25,premium,$1400
+1015,Michael,Harris,,555-234-5678,WA,2023-05-01,Premium,1600.00
+1016,Nancy,Martin,nancy.martin@email.com,555-345-6789,Washington,05/10/2023,basic,$550
+1017,Oscar,Thompson,oscar.t@email.com,555-456-7890,Wash.,2023-05-15,Basic,475.00
+1018,Patricia,Garcia,patricia.g@email.com,555-567-8901,washington,May 20, 2023,gold,$2100
+1019,Quentin,Robinson,quentin.r@email.com,None,WA,2023-05-25,premium,none
+1020,Rachel,Clark,rachel.clark@email.com,555-678-9012,Oregon,2023-06-01,Premuim,$1350.00
+1021,Steven,Lewis,steven.l@email.com,555-789-0123,OR,06/05/2023,gold,2600
+1022,Tina,Lee,tina.lee@email.com,555-890-1234,Ore.,2023-06-10,BASIC,$400.00
+1023,Ulysses,Walker,ulysses.w@email.com,555-901-2345,oregon,June 15 2023,basic,350
+1024,Victoria,Hall,victoria.h@email.com,555-012-3456,AZ,2023/06/20,gld,$2000.00
+1025,William,Allen,william.allen@email.com,(555) 123-4567,Arizona,2023-06-25,Gold,2300.00
+1026,Xena,Young,xena.y@email.com,5551234567,Ariz.,06-30-2023,premium,$1550
+1027,Yolanda,King,yolanda.king@email.com,555-234-5678,arizona,2023-07-01,Premium,1700
+1028,Zachary,Wright,zachary.w@email.com,---,AZ,July 5, 2023,basc,$425.00
+1029,Amy,Scott,amy.scott@email.com,555-345-6789,Nevada,2023-07-10,gold,2400
+1030,Brian,Green,brian.g@email.com,555-456-7890,NV,07/15/2023,Gold,$2700.00

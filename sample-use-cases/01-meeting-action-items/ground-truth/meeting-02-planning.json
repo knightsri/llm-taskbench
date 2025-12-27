@@ -1,0 +1,227 @@
+{
+  "meeting_id": "meeting-02-planning",
+  "meeting_date": "2025-01-07",
+  "action_items": [
+    {
+      "id": "AI-001",
+      "action": "Write up rough estimate for SSO integration (Okta + Azure AD)",
+      "owner": "Amy",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of day today",
+      "priority": "critical",
+      "dependencies": ["AI-002"],
+      "context": "Can you write up a rough estimate by end of day?... End of day today, actually. I'll send it to Rachel and Dev",
+      "status": "new"
+    },
+    {
+      "id": "AI-002",
+      "action": "Sync with Amy about Okta integrations experience",
+      "owner": "Carlos",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07T13:00:00",
+      "deadline_type": "explicit",
+      "deadline_raw": "1pm today",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I'll need to sync with Carlos first... Let's do 1pm",
+      "status": "new"
+    },
+    {
+      "id": "AI-003",
+      "action": "Try to get flexibility on January 20th deadline with enterprise client",
+      "owner": "Rachel",
+      "owner_confidence": "inferred",
+      "deadline": "2025-01-08",
+      "deadline_type": "inferred",
+      "deadline_raw": "after receiving estimate",
+      "priority": "high",
+      "dependencies": ["AI-001"],
+      "context": "I can try to push back but I need to know by tomorrow what's realistic",
+      "status": "new"
+    },
+    {
+      "id": "AI-004",
+      "action": "Review Nina's caching strategy",
+      "owner": "Dev",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-08T09:00:00",
+      "deadline_type": "explicit",
+      "deadline_raw": "tomorrow morning, 9am",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Let's do it tomorrow morning, 9am. I want to make sure we don't introduce cache invalidation bugs",
+      "status": "new"
+    },
+    {
+      "id": "AI-005",
+      "action": "Start API batching analysis for dashboard performance",
+      "owner": "Nina",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-08",
+      "deadline_type": "inferred",
+      "deadline_raw": "before caching strategy review",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I can start on the API batching analysis in the meantime. That'll inform the caching strategy anyway",
+      "status": "new"
+    },
+    {
+      "id": "AI-006",
+      "action": "Implement Redis caching for expensive dashboard queries",
+      "owner": "Nina",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-13",
+      "deadline_type": "inferred",
+      "deadline_raw": "3-4 days after strategy review",
+      "priority": "high",
+      "dependencies": ["AI-004"],
+      "context": "If I can focus on it exclusively, maybe 3-4 days",
+      "status": "blocked"
+    },
+    {
+      "id": "AI-007",
+      "action": "Fix session invalidation security bug on password change",
+      "owner": "Dev",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "explicit",
+      "deadline_raw": "end of day today",
+      "priority": "critical",
+      "dependencies": [],
+      "context": "I'll handle it personally... Should be done by end of day today if I start right after this meeting",
+      "status": "new"
+    },
+    {
+      "id": "AI-008",
+      "action": "Draft email to compliance explaining session invalidation security issue",
+      "owner": "Amy",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "inferred",
+      "deadline_raw": "today, before fix is merged",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Amy, can you draft that email? You're better at explaining technical stuff to non-technical people... I'll draft it and send it to you for review before sending to compliance",
+      "status": "new"
+    },
+    {
+      "id": "AI-009",
+      "action": "Review Amy's compliance email draft",
+      "owner": "Dev",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "inferred",
+      "deadline_raw": "today, after Amy drafts",
+      "priority": "high",
+      "dependencies": ["AI-008"],
+      "context": "I'll draft it and send it to you for review before sending to compliance",
+      "status": "new"
+    },
+    {
+      "id": "AI-010",
+      "action": "Implement basic CSV export functionality (stretch goal)",
+      "owner": "Carlos",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-20",
+      "deadline_type": "relative",
+      "deadline_raw": "end of sprint",
+      "priority": "low",
+      "dependencies": ["AI-001"],
+      "context": "Let me see how the SSO estimate looks. If Amy's estimate shows we have room, I'll commit to it. Otherwise it's a stretch goal",
+      "status": "new"
+    },
+    {
+      "id": "AI-011",
+      "action": "Keep running list of API documentation discrepancies",
+      "owner": "Nina",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-20",
+      "deadline_type": "relative",
+      "deadline_raw": "throughout sprint",
+      "priority": "low",
+      "dependencies": [],
+      "context": "could you note down any doc discrepancies you find?... Yeah, I can keep a running list",
+      "status": "new"
+    },
+    {
+      "id": "AI-012",
+      "action": "Demo onboarding flow to enterprise client",
+      "owner": "Amy",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-19",
+      "deadline_type": "explicit",
+      "deadline_raw": "the 19th",
+      "priority": "high",
+      "dependencies": ["AI-013"],
+      "context": "Amy, would you be comfortable doing it since you're leading the SSO work?... As long as we have a working version by the 17th to practice with, sure",
+      "status": "new"
+    },
+    {
+      "id": "AI-013",
+      "action": "Schedule dry run for onboarding demo on January 17th",
+      "owner": "Rachel",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "inferred",
+      "deadline_raw": "soon",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I'll block time on the 17th for a dry run then. Amy, I'll send you a calendar invite",
+      "status": "new"
+    },
+    {
+      "id": "AI-014",
+      "action": "Update Jira with sprint commitments",
+      "owner": "Jason",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "inferred",
+      "deadline_raw": "after meeting",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I'll update Jira with the sprint commitments",
+      "status": "new"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Onboarding flow with full SSO (Okta + Azure AD) is the top sprint priority",
+      "context": "Committed to enterprise client for January 20th delivery",
+      "stakeholders": ["Rachel", "Dev", "Amy"]
+    },
+    {
+      "decision": "Implement Redis caching as first step for dashboard performance (before API batching)",
+      "context": "Expected 80% improvement, 3-4 days of work",
+      "stakeholders": ["Nina", "Dev"]
+    },
+    {
+      "decision": "Session invalidation security fix takes priority over new features",
+      "context": "Security issue with sessions not invalidating on password change",
+      "stakeholders": ["Dev", "Rachel"]
+    },
+    {
+      "decision": "CSV export marked as stretch goal",
+      "context": "Dependent on SSO estimate showing bandwidth",
+      "stakeholders": ["Carlos", "Rachel"]
+    },
+    {
+      "decision": "Amy will demo onboarding to client instead of Dev",
+      "context": "Dev will be busy with code review, Amy leading SSO work anyway",
+      "stakeholders": ["Amy", "Dev", "Rachel"]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "Do we need to notify users whose sessions might be affected by the security bug?",
+      "raised_by": "Carlos",
+      "assigned_to": "Legal/Compliance team"
+    },
+    {
+      "question": "Is the January 20th deadline flexible for full SSO implementation?",
+      "raised_by": "Dev",
+      "assigned_to": "Rachel"
+    }
+  ]
+}

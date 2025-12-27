@@ -1,0 +1,76 @@
+{
+  "lecture_id": "lecture-02-ml-fundamentals",
+  "title": "ML Fundamentals - Supervised Learning, Model Evaluation, and Overfitting",
+  "instructor": "Prof. James Rodriguez",
+  "duration_minutes": 58,
+  "actual_content_minutes": 53,
+  "complexity": "medium",
+  "expected_concepts": 9,
+  "notes": {
+    "structure": "Well-organized with clear sections, includes 5-minute break",
+    "challenges": "Must handle mid-lecture break (16:55-21:55), some concepts could be split or merged",
+    "qa_sections": "Brief Q&A at end (37:25-38:45), integrated into summary concept",
+    "break_handling": "Break from 16:55 to 21:55 should be excluded - concepts should skip this gap"
+  },
+  "concept_rationale": [
+    {
+      "concept": "01_What_Is_Machine_Learning",
+      "duration_min": 3.42,
+      "rationale": "Introduction and core definition, sets up paradigm shift from traditional programming"
+    },
+    {
+      "concept": "02_Supervised_Learning_Regression_vs_Classification",
+      "duration_min": 4.0,
+      "rationale": "Core distinction between problem types with house price example"
+    },
+    {
+      "concept": "03_Model_Training_and_Data_Splitting",
+      "duration_min": 3.67,
+      "rationale": "Training process, train-test split, linear regression example"
+    },
+    {
+      "concept": "04_Classification_Metrics_Precision_Recall_F1",
+      "duration_min": 3.75,
+      "rationale": "Evaluation metrics for classification, accuracy pitfalls, disease example"
+    },
+    {
+      "concept": "05_Understanding_Overfitting",
+      "duration_min": 2.08,
+      "rationale": "Shorter concept leading into break - introduces overfitting definition and analogy"
+    },
+    {
+      "concept": "06_Strategies_to_Prevent_Overfitting",
+      "duration_min": 4.5,
+      "rationale": "Post-break continuation: prevention strategies, validation sets, cross-validation"
+    },
+    {
+      "concept": "07_Bias_Variance_Tradeoff",
+      "duration_min": 4.45,
+      "rationale": "Fundamental tradeoff concept, target/arrow analogy, practical monitoring"
+    },
+    {
+      "concept": "08_Complete_ML_Workflow_Iris_Example",
+      "duration_min": 4.22,
+      "rationale": "Hands-on walkthrough tying concepts together, code examples"
+    },
+    {
+      "concept": "09_Summary_Key_Takeaways_and_QA",
+      "duration_min": 3.78,
+      "rationale": "Recap, homework, brief Q&A integrated"
+    }
+  ],
+  "break_info": {
+    "start_time": "00:16:55",
+    "end_time": "00:21:55",
+    "duration_minutes": 5,
+    "note": "Break should be excluded from concept extraction - no content during this period"
+  },
+  "statistics": {
+    "total_concepts": 9,
+    "avg_duration_min": 3.76,
+    "min_duration_min": 2.08,
+    "max_duration_min": 4.5,
+    "violations_under_2min": 0,
+    "violations_over_7min": 0
+  }
+}

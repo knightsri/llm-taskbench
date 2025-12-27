@@ -1,0 +1,263 @@
+LECTURE TRANSCRIPT
+Course: Introduction to Programming
+Topic: Python Basics - Variables, Data Types, and Control Flow
+Instructor: Dr. Sarah Chen
+Duration: 47 minutes
+Date: January 8, 2025
+
+---
+
+[00:00:00] Alright everyone, welcome to lecture three of Introduction to Programming. Today we're going to cover some fundamental building blocks of Python - variables, data types, and control flow. By the end of this lecture, you'll be able to write simple programs that can make decisions and store information.
+
+[00:00:25] Let's start with variables. What is a variable? Think of it as a labeled container that holds a value. Just like you might have a jar labeled "cookies" in your kitchen, in Python we have names that point to values stored in memory.
+
+[00:00:45] Let me show you the simplest example. If I write `name = "Alice"`, I've just created a variable called `name` and stored the text "Alice" in it. The equals sign here isn't like math class - it's the assignment operator. It means "store this value in this variable."
+
+[00:01:10] Now here's something important - Python is what we call dynamically typed. That means I don't have to declare what type of data the variable will hold ahead of time. I can write `x = 5` and Python figures out that x holds an integer. Then later I could write `x = "hello"` and now x holds a string. This is different from languages like Java or C++ where you have to specify the type upfront.
+
+[00:01:45] Let's talk about naming conventions. Variable names in Python should be descriptive. Instead of `x`, use `student_count` or `total_price`. The convention in Python is to use lowercase letters with underscores between words - this is called snake_case. So `myVariableName` would be written as `my_variable_name` in Python.
+
+[00:02:15] There are some rules too. Variable names must start with a letter or underscore, not a number. So `2fast` is invalid, but `fast2` is fine. And you can't use Python's reserved keywords like `if`, `for`, `while`, `class` as variable names.
+
+[00:02:42] Now let's move on to data types. Python has several built-in data types, and we'll cover the most common ones today.
+
+[00:02:55] First up: integers. These are whole numbers - positive, negative, or zero. Like `age = 25` or `temperature = -10`. Python can handle arbitrarily large integers, which is pretty cool. You can do `big_number = 10**100` and Python handles it just fine.
+
+[00:03:25] Next we have floats, which are decimal numbers. Like `price = 19.99` or `pi = 3.14159`. Be careful with floats though - due to how computers store decimal numbers, you might get tiny rounding errors. If you type `0.1 + 0.2` in Python, you might see `0.30000000000000004` instead of exactly `0.3`. For most applications this doesn't matter, but for financial calculations, there's a `Decimal` module that handles this better.
+
+[00:04:05] Strings are sequences of characters - text data. You can use single quotes or double quotes: `message = 'Hello'` or `message = "Hello"`. Both work the same way. If your string contains a quote, use the other type: `sentence = "It's a beautiful day"`.
+
+[00:04:35] Strings have lots of useful operations. You can concatenate them with plus: `"Hello" + " " + "World"` gives you `"Hello World"`. You can repeat them with multiplication: `"ha" * 3` gives `"hahaha"`. And you can access individual characters with indexing: if `word = "Python"`, then `word[0]` is `"P"` and `word[-1]` is `"n"`. Remember, Python uses zero-based indexing!
+
+[00:05:15] Finally, we have booleans - `True` and `False`. These are used for logical operations and conditions. Notice they're capitalized in Python. You'll use these constantly when we get to control flow in a few minutes.
+
+[00:05:38] Let me show you how to check the type of a variable. The `type()` function tells you what you're working with. So `type(42)` returns `<class 'int'>`, `type(3.14)` returns `<class 'float'>`, and so on. This is really useful for debugging when you're not sure what type of data you're dealing with.
+
+[00:06:10] Now, an important concept: type conversion. Sometimes you need to convert between types. Let's say you have `age = "25"` as a string, but you want to do math with it. You'd write `age_number = int(age)` to convert it to an integer. Similarly, `str(42)` converts the integer 42 to the string "42", and `float("3.14")` converts the string to a float.
+
+[00:06:48] Be careful with conversions though. If you try `int("hello")`, Python will raise a ValueError because "hello" isn't a valid number. Always validate your data before converting, especially when dealing with user input.
+
+[00:07:15] Let's do a quick practice. I want you to think about what types these values would be: `100`, `100.0`, `"100"`, `True`. Pause and think... The first is an integer, the second is a float even though it represents a whole number, the third is a string, and the fourth is a boolean.
+
+[00:07:45] Alright, let's shift gears to operators. We've already seen the assignment operator, equals. Now let's look at arithmetic operators.
+
+[00:07:58] Addition is plus, subtraction is minus, multiplication is asterisk, and division is forward slash. Pretty straightforward. But here's something that trips people up: in Python 3, regular division always gives you a float. So `5 / 2` is `2.5`, not `2`.
+
+[00:08:25] If you want integer division - where it rounds down to the nearest whole number - use double slash: `5 // 2` gives you `2`. And the modulo operator, percent sign, gives you the remainder: `5 % 2` is `1`.
+
+[00:08:50] For exponents, use double asterisk: `2 ** 3` is 8, meaning 2 to the power of 3. And there are compound assignment operators that combine arithmetic with assignment: `x += 5` is the same as `x = x + 5`. Same pattern for `-=`, `*=`, `/=`, and so on.
+
+[00:09:22] Now let's talk about comparison operators, because these lead directly into control flow. These operators compare two values and return a boolean - True or False.
+
+[00:09:38] We have `==` for equality - that's two equals signs. Don't confuse it with single equals which is assignment! Then `!=` for not equal, `<` for less than, `>` for greater than, `<=` for less than or equal, and `>=` for greater than or equal.
+
+[00:10:05] So `5 == 5` is `True`, `5 != 3` is `True`, `10 > 5` is `True`, and `3 >= 3` is also `True` because 3 is equal to 3.
+
+[00:10:25] We also have logical operators for combining boolean values: `and`, `or`, and `not`. These work exactly like you'd expect from English. `True and True` is `True`, but `True and False` is `False`. `True or False` is `True`. And `not True` is `False`.
+
+[00:10:55] Here's a practical example: say you want to check if someone is eligible for a discount. They need to be a student AND have a purchase over $50. You'd write: `is_eligible = is_student and purchase_amount > 50`.
+
+[00:11:20] Alright, now we're ready for the main event: control flow. This is where your programs start making decisions.
+
+[00:11:32] The most basic control structure is the if statement. It lets your code execute certain blocks only when a condition is true. The syntax is: `if condition:` followed by an indented block of code.
+
+[00:11:52] Here's a simple example:
+
+```python
+temperature = 75
+if temperature > 70:
+    print("It's warm outside!")
+```
+
+[00:12:05] Notice the colon after the condition and the indentation. In Python, indentation isn't just for readability - it's part of the syntax. The indented code is what runs when the condition is true. If temperature was 65, nothing would print because the condition is false.
+
+[00:12:32] What if we want to do something else when the condition is false? That's where `else` comes in:
+
+```python
+if temperature > 70:
+    print("It's warm!")
+else:
+    print("It's cool!")
+```
+
+[00:12:50] Now exactly one of those messages will print, depending on the temperature.
+
+[00:13:02] And for multiple conditions, we use `elif`, which is short for "else if":
+
+```python
+if temperature > 85:
+    print("It's hot!")
+elif temperature > 70:
+    print("It's warm!")
+elif temperature > 50:
+    print("It's cool!")
+else:
+    print("It's cold!")
+```
+
+[00:13:28] Python checks each condition in order. As soon as one is true, it runs that block and skips the rest. If none are true, it runs the else block. The else is optional - you can have just if and elif without an else.
+
+[00:13:52] Here's a common mistake: using multiple if statements when you should use elif. If you write separate if statements, they all get checked independently. With elif, once one matches, the others are skipped. This matters for both correctness and efficiency.
+
+[00:14:20] Let's look at nested if statements. You can put an if inside another if:
+
+```python
+if has_ticket:
+    if is_vip:
+        print("Welcome to the VIP section!")
+    else:
+        print("Welcome! General admission this way.")
+else:
+    print("Please purchase a ticket.")
+```
+
+[00:14:48] This is valid, but be careful with too much nesting - it can get hard to read. Sometimes you can simplify with `and`: `if has_ticket and is_vip:` is often cleaner than nested ifs.
+
+[00:15:10] Now let's move to loops. Loops let you repeat code multiple times without writing it over and over.
+
+[00:15:22] The `for` loop iterates over a sequence - like a list, string, or range of numbers. The syntax is `for item in sequence:` followed by an indented block.
+
+[00:15:40] The simplest example uses the `range()` function:
+
+```python
+for i in range(5):
+    print(i)
+```
+
+[00:15:52] This prints 0, 1, 2, 3, 4. Note that `range(5)` gives you 5 numbers starting from 0, so it goes up to but doesn't include 5. This is a common source of off-by-one errors, so remember: range is exclusive on the upper bound.
+
+[00:16:18] You can also specify a start: `range(1, 6)` gives you 1, 2, 3, 4, 5. And a step: `range(0, 10, 2)` gives you 0, 2, 4, 6, 8 - counting by twos.
+
+[00:16:42] For loops work with any iterable. Here's iterating over a string:
+
+```python
+for char in "Python":
+    print(char)
+```
+
+[00:16:55] This prints each character on its own line: P, y, t, h, o, n.
+
+[00:17:08] The other type of loop is the `while` loop. It keeps running as long as a condition is true:
+
+```python
+count = 0
+while count < 5:
+    print(count)
+    count += 1
+```
+
+[00:17:28] This does the same thing as our for loop - prints 0 through 4. But while loops are more flexible. They're useful when you don't know ahead of time how many iterations you'll need.
+
+[00:17:48] Here's a classic example - getting valid input from a user:
+
+```python
+password = ""
+while password != "secret123":
+    password = input("Enter password: ")
+print("Access granted!")
+```
+
+[00:18:08] This keeps asking for the password until the user enters the correct one. Be careful with while loops though - if your condition never becomes false, you get an infinite loop and your program hangs!
+
+[00:18:28] Speaking of controlling loops, let's talk about `break` and `continue`. These give you more control over loop execution.
+
+[00:18:42] `break` immediately exits the loop:
+
+```python
+for i in range(10):
+    if i == 5:
+        break
+    print(i)
+```
+
+[00:18:55] This prints 0, 1, 2, 3, 4 and then stops. When i equals 5, break kicks us out of the loop entirely.
+
+[00:19:10] `continue` skips the rest of the current iteration and moves to the next one:
+
+```python
+for i in range(5):
+    if i == 2:
+        continue
+    print(i)
+```
+
+[00:19:25] This prints 0, 1, 3, 4 - skipping 2. When i equals 2, continue jumps back to the top of the loop.
+
+[00:19:42] A common use of break is searching:
+
+```python
+numbers = [4, 7, 2, 9, 1, 5]
+target = 9
+for num in numbers:
+    if num == target:
+        print(f"Found {target}!")
+        break
+```
+
+[00:20:05] Once we find what we're looking for, no need to keep searching.
+
+[00:20:15] Let me show you a practical example that combines everything we've learned today. Let's write a simple number guessing game:
+
+```python
+import random
+secret = random.randint(1, 100)
+attempts = 0
+
+while True:
+    guess = int(input("Guess a number (1-100): "))
+    attempts += 1
+    
+    if guess < secret:
+        print("Too low!")
+    elif guess > secret:
+        print("Too high!")
+    else:
+        print(f"Correct! You got it in {attempts} attempts!")
+        break
+```
+
+[00:21:05] Let's break this down. We import random to generate a secret number between 1 and 100. We use a `while True` loop - this runs forever until we hit a break. We convert the input to an integer, increment our attempt counter, then use if-elif-else to give feedback. When they guess correctly, we print the success message and break out of the loop.
+
+[00:21:38] This little program uses variables, type conversion, a while loop, break, and conditional statements. That's all the building blocks working together!
+
+[00:21:55] Before we wrap up, let me mention a few common pitfalls I see with beginners.
+
+[00:22:05] First: forgetting the colon. Every if, elif, else, for, and while needs a colon at the end. If you get a syntax error, check for missing colons.
+
+[00:22:22] Second: indentation errors. Python is strict about indentation. Use 4 spaces consistently - don't mix tabs and spaces. Your editor should help with this.
+
+[00:22:40] Third: using `=` instead of `==` in conditions. `if x = 5` is an error. You need `if x == 5` to compare.
+
+[00:22:55] Fourth: infinite loops. Always make sure your while condition will eventually become false. A common mistake is forgetting to update the variable you're checking.
+
+[00:23:12] Fifth: off-by-one errors with range. Remember `range(5)` goes from 0 to 4, not 1 to 5. If you want 1 to 5, use `range(1, 6)`.
+
+[00:23:30] Alright, let's summarize what we covered today.
+
+[00:23:38] Variables are named containers for values. Python is dynamically typed. Use descriptive names in snake_case.
+
+[00:23:50] Data types include integers, floats, strings, and booleans. Use `type()` to check types and functions like `int()`, `str()`, `float()` to convert between them.
+
+[00:24:08] Operators: arithmetic for math, comparison for conditions, logical for combining booleans.
+
+[00:24:20] Control flow: if-elif-else for decisions, for loops for iterating over sequences, while loops for condition-based repetition, break and continue for loop control.
+
+[00:24:38] For homework, I want you to write three programs. First, a calculator that takes two numbers and an operator from the user and prints the result. Second, a program that prints all even numbers from 1 to 50. Third, extend our number guessing game to limit the player to 7 attempts.
+
+[00:25:05] These exercises will help cement what we covered today. Don't worry if you struggle a bit - that's part of learning. Come to office hours if you get stuck.
+
+[00:25:20] Next lecture, we'll cover lists and dictionaries - the data structures that let you store collections of values. These are incredibly powerful and you'll use them constantly.
+
+[00:25:35] Any questions before we wrap up?
+
+[00:25:40] [Student asks about the difference between for and while loops]
+
+[00:25:45] Great question. Use a for loop when you know how many iterations you need, or when you're iterating over something specific like a list or string. Use a while loop when you need to repeat until some condition changes, and you don't know ahead of time how many iterations that will take. The password example is perfect for while - you don't know how many wrong guesses the user will make.
+
+[00:26:20] [Student asks about nested loops]
+
+[00:26:25] Yes, you can nest loops! A common use is working with grids or matrices. We'll see more of that when we cover lists. For now, just know it's possible - a loop inside a loop. Each time the outer loop runs once, the inner loop runs completely.
+
+[00:26:50] Alright, that's all for today. Great questions. See you Thursday, and don't forget the homework is due before next class. Have a good one!
+
+[00:27:02] [END OF LECTURE]

@@ -1,0 +1,99 @@
+MEETING TRANSCRIPT
+Type: Q1 Strategy Session
+Date: January 9, 2025
+Duration: 55 minutes
+Attendees: Michelle (CEO), David (CTO), Rachel (Product), Marcus (VP Eng), Finance (Tom)
+
+---
+
+[00:00] Michelle: Thanks for making time everyone. I want to align on our Q1 priorities and make sure we're all rowing in the same direction. David, you mentioned some concerns about our technical roadmap?
+
+[00:15] David: Yeah, so we've been spreading ourselves thin. We've got three major initiatives running in parallel - the enterprise features, the mobile app rewrite, and the AI integration project. I don't think we can do all three well.
+
+[00:32] Michelle: What are you suggesting?
+
+[00:35] David: We need to pick one to deprioritize. My recommendation would be to pause the mobile rewrite. The current app works, it's just not pretty. The enterprise features are contractually committed and the AI stuff is our competitive moat.
+
+[00:52] Rachel: I'm not sure I agree. Our mobile conversion rate is 40% below desktop. That's a lot of revenue we're leaving on the table.
+
+[01:02] Tom: Can you quantify that? What's the actual dollar impact?
+
+[01:06] Rachel: I'd need to pull the exact numbers but we're probably talking... I don't know, maybe $2-3M annually?
+
+[01:15] Michelle: That's significant. Tom, can you work with Rachel to get a proper analysis? I'd want to see the numbers before we make a call.
+
+[01:25] Tom: Sure, we can have something by... end of next week? Rachel, does that work?
+
+[01:30] Rachel: Yeah, I can get you the data by Wednesday and you can run your models.
+
+[01:35] Michelle: Good. David, assuming we do keep all three initiatives, what would we need?
+
+[01:42] David: Honestly? More engineers. We're understaffed for what we're trying to do. I'd want at least 4-5 senior hires, ideally by end of Q1.
+
+[01:55] Marcus: That's aggressive. Hiring takes time. We could maybe get 2-3 if we start now and move fast.
+
+[02:02] Michelle: Tom, do we have budget for that?
+
+[02:05] Tom: We have some flexibility in the eng budget. We could probably absorb 3 hires without going back to the board. More than that and we'd need approval.
+
+[02:15] Michelle: Let's plan for 3 then. Marcus, can you own the hiring process?
+
+[02:20] Marcus: Yeah. I'll sync with HR and get job postings up this week. David, I'll need you to help with the technical interviews.
+
+[02:30] David: Of course.
+
+[02:32] Michelle: What about the AI integration? I've been getting questions from the board about timeline. Where are we?
+
+[02:40] David: We've made progress but we're blocked on the data pipeline. The ML team can't train models without clean data, and our data engineering is a mess.
+
+[02:52] Michelle: Is that a people problem or a technical problem?
+
+[02:55] David: Both, honestly. We need someone senior to own data engineering. Right now it's kind of everyone's job and no one's job.
+
+[03:05] Michelle: So one of those 3 hires should be a data engineering lead?
+
+[03:10] David: That would be ideal. Or we could bring in a contractor to get us unstuck while we search.
+
+[03:18] Marcus: I know a firm that does data engineering consulting. Want me to reach out?
+
+[03:22] Michelle: Yes, let's explore that as a bridge. Get me a proposal and cost estimate by next Monday.
+
+[03:30] Rachel: Can we talk about the enterprise features timeline? I'm getting pressure from sales to give them something concrete to tell prospects.
+
+[03:40] Marcus: We're committed to the SSO integration by the 20th. The audit logging feature is slated for end of February.
+
+[03:50] Rachel: What about the custom roles and permissions? That's been on the roadmap forever.
+
+[03:55] Marcus: That's a big one. Probably Q2 at the earliest unless we make it a priority.
+
+[04:02] Michelle: Let's make it a priority then, but after the SSO work. Rachel, can you work with Marcus to get a realistic timeline that sales can use?
+
+[04:12] Rachel: Yes, we'll put something together.
+
+[04:15] David: One thing I want to flag - if we're serious about all this, we need to invest in our infrastructure. We're going to hit scaling issues by mid-year at our current growth rate. Someone should start thinking about what a migration to Kubernetes would look like.
+
+[04:32] Michelle: Is that urgent?
+
+[04:35] David: Not urgent urgent, but if we don't start planning now, we'll be in crisis mode later. I'd want someone to do a scoping exercise. Maybe 2-3 weeks of dedicated time to understand what we're dealing with.
+
+[04:48] Marcus: I can ask one of the platform engineers to look into it. We've got some breathing room now that the incident fixes are wrapping up.
+
+[04:58] Michelle: Good. Let's treat it as a background research project for now. But I want a report by end of February on what the migration would entail.
+
+[05:10] Tom: Can we circle back to budget for a second? If we're doing 3 hires, contractors, and potentially a Kubernetes migration, I need to reforecast. Can everyone get me their expected costs by end of next week?
+
+[05:25] David: You mean just ballpark or detailed?
+
+[05:28] Tom: Ballpark is fine for now. We can refine later.
+
+[05:32] Michelle: Alright, I think we have a good sense of direction. Let's summarize: we're keeping all three initiatives for now pending Rachel's mobile analysis, we're hiring 3 engineers with one focused on data, we're exploring contractors for data engineering, and we're starting to think about infrastructure scaling. Anything else?
+
+[05:55] Rachel: One small thing - we should probably tell the team about these priorities. There's been some confusion about what we're focusing on.
+
+[06:02] Michelle: Good point. I'll send out a company-wide update by end of week. David, can you review it before I send?
+
+[06:10] David: Sure, send me a draft.
+
+[06:13] Michelle: Thanks everyone. Let's reconvene in two weeks to check progress.
+
+[END OF TRANSCRIPT]

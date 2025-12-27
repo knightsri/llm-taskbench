@@ -1,0 +1,26 @@
+bug_id,title,description,reporter,reported_date
+BUG-001,App won't load,"When I try to open the app, it just shows a white screen and then crashes. This started happening after the latest update. I've tried reinstalling but same issue. iPhone 14, iOS 17.2.",user_jane,2025-01-06
+BUG-002,Payment failed but money taken,"I tried to purchase the premium plan and got an error message saying payment failed. But my credit card was charged $49.99! This is unacceptable. I need a refund immediately.",user_mike,2025-01-06
+BUG-003,Slow dashboard,"The dashboard takes forever to load. Sometimes 30+ seconds. It used to be fast.",user_sarah,2025-01-05
+BUG-004,Can't reset password,"Clicked forgot password, entered my email, but never received the reset link. Checked spam folder too. Email is definitely correct: john@example.com",user_john,2025-01-07
+BUG-005,Button color wrong,"The 'Submit' button on the contact form is blue but according to the design specs it should be green. Not urgent but wanted to report.",user_design_team,2025-01-04
+BUG-006,URGENT: All user data gone!!!,"Logged in this morning and ALL my projects are missing! 3 years of work just GONE. This is a DISASTER. I need this fixed NOW.",user_alex,2025-01-07
+BUG-007,Export to PDF not working,"When I try to export my report to PDF, I get a 500 error. Console shows: 'TypeError: Cannot read property of undefined'. Happens every time on Chrome.",user_dev_bob,2025-01-06
+BUG-008,Would be nice to have dark mode,"Not sure if this is the right place, but it would be really nice if you could add dark mode. My eyes hurt when using the app at night.",user_night_owl,2025-01-03
+BUG-009,Login loop,"After entering correct credentials, I get redirected back to the login page. Happens on both Chrome and Firefox. Started after I enabled 2FA.",user_tech_sam,2025-01-07
+BUG-010,API returns 401 randomly,"Our integration with your API randomly gets 401 errors even with valid tokens. Happens maybe 5% of the time. Token is definitely not expired.",partner_dev,2025-01-05
+BUG-011,Typo on homepage,"The word 'recieve' should be 'receive' in the hero section.",user_grammar,2025-01-02
+BUG-012,Can't upload files over 10MB,"Trying to upload a 15MB video and getting 'file too large' error. The docs say limit is 50MB. Is this a bug or did the limit change?",user_content,2025-01-06
+BUG-013,Charts not rendering on mobile,"The analytics charts just show blank space on my Android phone. Works fine on desktop. Pixel 7, Chrome mobile.",user_mobile,2025-01-05
+BUG-014,Duplicate charges on subscription,"I was charged twice for my January subscription. Transaction IDs: TXN-8847 and TXN-8849. Both for $29.99. Please refund one.",user_billing,2025-01-07
+BUG-015,Search is broken,"Search doesn't find anything anymore. I type in keywords that I know exist in my documents but get 'no results found'.",user_searcher,2025-01-06
+BUG-016,Notifications not working,"I'm not getting any email notifications even though they're enabled in settings. Push notifications work fine though.",user_notify,2025-01-04
+BUG-017,SSO login fails silently,"When using Okta SSO, clicking login does nothing. No error message, just stays on the same page. Regular email login works.",enterprise_user,2025-01-07
+BUG-018,Data export shows wrong dates,"Exported my data and all the dates are off by one day. Created on Jan 5 shows as Jan 4 in the export.",user_dates,2025-01-06
+BUG-019,Memory leak in long sessions,"App gets progressively slower the longer I use it. After about 2 hours, it becomes unusable. Have to refresh the page.",user_marathon,2025-01-05
+BUG-020,Feature request: bulk delete,Please add ability to select multiple items and delete them at once. Currently have to delete one by one which is tedious.,user_feature,2025-01-03
+BUG-021,API rate limit too low,"Getting rate limited after only 100 requests per minute. Our previous limit was 500/min. Was this changed intentionally?",partner_api,2025-01-07
+BUG-022,Cannot reproduce user report,"A user reported they can't save forms, but I tested extensively and everything works fine. Might be user error?",support_team,2025-01-06
+BUG-023,Accessibility: missing alt text,"Screen reader users report that product images don't have alt text. This is a WCAG violation.",user_a11y,2025-01-04
+BUG-024,prod db connection timeout,"Getting intermittent 'connection timeout' errors on prod database. Happens during peak hours around 2-3pm EST. Check connection pooling?",ops_alert,2025-01-07
+BUG-025,App crashes on file preview,"Whenever I try to preview a .docx file, the app crashes. PDF files work fine. Started happening this week.",user_preview,2025-01-06

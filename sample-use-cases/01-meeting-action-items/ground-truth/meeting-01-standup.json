@@ -1,0 +1,142 @@
+{
+  "meeting_id": "meeting-01-standup",
+  "meeting_date": "2025-01-06",
+  "action_items": [
+    {
+      "id": "AI-001",
+      "action": "Start working on database migration script for user table changes",
+      "owner": "Sarah",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-06",
+      "deadline_type": "inferred",
+      "deadline_raw": "today",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "Today I'm going to start on the database migration script for the user table changes",
+      "status": "new"
+    },
+    {
+      "id": "AI-002",
+      "action": "Review Mike's PR for the cart service",
+      "owner": "Sarah",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-06",
+      "deadline_type": "relative",
+      "deadline_raw": "this morning",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I can review that this morning, Mike",
+      "status": "new"
+    },
+    {
+      "id": "AI-003",
+      "action": "Figure out Stripe webhook validation for test mode",
+      "owner": "Mike",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-06",
+      "deadline_type": "explicit",
+      "deadline_raw": "by end of day",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I should have it figured out by end of day",
+      "status": "in-progress"
+    },
+    {
+      "id": "AI-004",
+      "action": "Follow up with design team on mobile responsive specs",
+      "owner": "Lisa",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-07",
+      "deadline_type": "explicit",
+      "deadline_raw": "by tomorrow end of day",
+      "priority": "high",
+      "dependencies": [],
+      "context": "I'll follow up with the design team today... I'll make sure you have them by tomorrow end of day",
+      "status": "new"
+    },
+    {
+      "id": "AI-005",
+      "action": "Integrate dashboard components with API endpoints",
+      "owner": "Priya",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-10",
+      "deadline_type": "inferred",
+      "deadline_raw": "Friday deadline",
+      "priority": "high",
+      "dependencies": ["AI-004"],
+      "context": "Today I'm integrating them with the API endpoints... I'll need those specs by Wednesday at the latest to hit our Friday deadline",
+      "status": "new"
+    },
+    {
+      "id": "AI-006",
+      "action": "Send security issue ticket number to Sarah",
+      "owner": "Tom",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-06",
+      "deadline_type": "inferred",
+      "deadline_raw": "immediately after standup",
+      "priority": "high",
+      "dependencies": [],
+      "context": "Can you send me the ticket number? I'll look at it right after standup. Will do.",
+      "status": "new"
+    },
+    {
+      "id": "AI-007",
+      "action": "Review security issue with session handling",
+      "owner": "Sarah",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-06",
+      "deadline_type": "relative",
+      "deadline_raw": "right after standup",
+      "priority": "critical",
+      "dependencies": ["AI-006"],
+      "context": "that second one might need your eyes on it urgently... I'll look at it right after standup",
+      "status": "new"
+    },
+    {
+      "id": "AI-008",
+      "action": "Add Tom to Stripe test environment",
+      "owner": "Mike",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-06",
+      "deadline_type": "relative",
+      "deadline_raw": "right after this call",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I'll send you the invite right after this call",
+      "status": "new"
+    },
+    {
+      "id": "AI-009",
+      "action": "Schedule DevOps sync with James about deployment pipeline",
+      "owner": "Lisa",
+      "owner_confidence": "explicit",
+      "deadline": "2025-01-09",
+      "deadline_type": "explicit",
+      "deadline_raw": "Thursday afternoon",
+      "priority": "medium",
+      "dependencies": [],
+      "context": "I'll set that up. Let's aim for Thursday afternoon. I'll send a calendar invite",
+      "status": "new"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Priya will work on desktop integration first while waiting for mobile specs",
+      "context": "Workaround for blocked mobile responsive design specs",
+      "stakeholders": ["Priya", "Lisa"]
+    },
+    {
+      "decision": "DevOps sync scheduled for Thursday afternoon",
+      "context": "Need to discuss deployment pipeline for new microservices architecture",
+      "stakeholders": ["Lisa", "Sarah", "James"]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "How will current deployment pipeline handle new microservices architecture?",
+      "raised_by": "Sarah",
+      "assigned_to": "James"
+    }
+  ]
+}

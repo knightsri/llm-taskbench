@@ -1,0 +1,87 @@
+MEETING TRANSCRIPT
+Type: Incident Review (Post-Mortem)
+Date: January 8, 2025
+Duration: 35 minutes
+Attendees: Marcus (VP Engineering), Dev (Tech Lead), Sarah (Engineering Lead), Operations (Alex), Support (Jenny)
+
+---
+
+[00:00] Marcus: Let's get started. We had a significant outage yesterday, about 4 hours of degraded service. I want to understand what happened and make sure it doesn't happen again. Alex, can you walk us through the timeline?
+
+[00:18] Alex: Sure. At 2:15 PM, our monitoring picked up elevated error rates on the payment service. By 2:20, we were seeing 50% of transactions failing. I paged Dev and Sarah immediately.
+
+[00:35] Dev: Yeah, I was in a meeting but dropped everything. When I looked at the logs, it was clear the database was the bottleneck. Connections were maxed out.
+
+[00:48] Marcus: Why were connections maxed out?
+
+[00:52] Dev: Turned out the new recommendation engine we deployed that morning was holding connections open way longer than expected. It was supposed to be a read-only service but it was locking tables.
+
+[01:08] Sarah: We missed that in code review. The query patterns looked fine in isolation but under production load, they created deadlocks.
+
+[01:20] Marcus: So we need better load testing. Who's owning that?
+
+[01:25] Sarah: I mean, we have load tests, but they don't simulate the full production data set. We'd need to... I don't know, probably spin up a production-mirror environment?
+
+[01:38] Marcus: That sounds expensive. Dev, is there a cheaper alternative?
+
+[01:42] Dev: We could start with synthetic load tests that specifically target concurrent database access patterns. That would have caught this. It's not as comprehensive but it's something we could set up in a week or two.
+
+[01:58] Marcus: Let's do that. Dev, can you own setting up those tests?
+
+[02:02] Dev: Yeah, I can spec it out. But I'll need someone to actually implement it. Maybe one of the junior devs?
+
+[02:10] Sarah: I can assign someone from my team. Let me talk to them after this meeting and figure out who has bandwidth.
+
+[02:18] Marcus: Good. I want a concrete plan by Friday. Now, what about the response time? Four hours feels long.
+
+[02:28] Alex: Part of the problem was we didn't have clear runbooks for database connection issues. I was trying to figure out the right course of action while the site was down.
+
+[02:40] Jenny: From support's side, we were completely in the dark. Customers were calling and we had no idea what to tell them. Someone needs to... can we get some kind of automated status page update when things go wrong?
+
+[02:55] Marcus: That's a good point. Alex, is that something ops can set up?
+
+[03:00] Alex: Technically yes, but it needs buy-in from engineering to integrate with the monitoring. And honestly, we should probably just use a service like Statuspage.io instead of building our own.
+
+[03:12] Marcus: Fine, look into that. What would it cost?
+
+[03:15] Alex: I'll get pricing. Probably a few hundred a month. I'll send options to you by Monday.
+
+[03:22] Marcus: Do it. What else do we need to fix?
+
+[03:26] Dev: The rollback took too long. We need better deployment automation. Right now, rolling back requires manual intervention and it took us 45 minutes just to get back to the previous version.
+
+[03:40] Sarah: We've been asking for investment in our CI/CD pipeline for months. This is exactly why.
+
+[03:48] Marcus: Okay, I hear you. Let's actually prioritize that. Can someone put together a proposal?
+
+[03:55] Dev: Sarah and I can co-author something. We've already got ideas. Give us a week?
+
+[04:02] Marcus: A week is too long. I need something to take to the exec team on Monday. Can you have a draft by Friday?
+
+[04:10] Sarah: That's tight but... okay, we'll make it work.
+
+[04:15] Jenny: Can I just add - we really need a customer communication template for outages. I was writing emails on the fly and I'm sure I said things I shouldn't have.
+
+[04:28] Marcus: Good catch. Who should own that?
+
+[04:32] Jenny: I can draft something but I'll need legal to review it. And product should probably weigh in on the tone.
+
+[04:40] Marcus: Okay Jenny, you draft it, loop in legal and product. Let's have something we can use next time within two weeks.
+
+[04:50] Alex: One more thing - we should probably compensate affected customers somehow. A bunch of transactions failed and people are upset.
+
+[04:58] Marcus: Yeah, I've already talked to finance about that. We're going to issue credits to everyone who had a failed transaction. Jenny, can your team handle identifying those customers?
+
+[05:10] Jenny: We can pull the list but it'll take some time to cross-reference with the logs. Maybe Alex can help with the log analysis?
+
+[05:18] Alex: Sure, let's sync after this. I can get you the list of affected transaction IDs today.
+
+[05:25] Marcus: Good. I think we have a clear set of actions. Let's make sure this doesn't happen again. Anything else?
+
+[05:32] Dev: We should probably schedule a follow-up in two weeks to check progress on all these items.
+
+[05:38] Marcus: Agreed. Someone put that on the calendar. I want status updates from everyone involved before that meeting.
+
+[05:45] Sarah: I'll set it up and send the invite.
+
+[END OF TRANSCRIPT]

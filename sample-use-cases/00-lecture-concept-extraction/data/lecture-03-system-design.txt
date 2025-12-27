@@ -1,0 +1,228 @@
+LECTURE TRANSCRIPT
+Course: Software Architecture and System Design
+Topic: Designing Scalable Systems - Load Balancing, Caching, and Database Scaling
+Instructor: Dr. Maria Santos
+Duration: 72 minutes
+Date: January 12, 2025
+
+---
+
+[00:00:00] Hey everyone, welcome back. So last week we covered basic web architecture - clients, servers, HTTP, REST APIs. Today we're going to tackle something that trips up a lot of people in system design interviews: scaling. How do you take a system that works for a hundred users and make it work for a million?
+
+[00:00:25] But before we dive in, quick reminder - your design document for the Twitter-like system is due next Friday. I'm seeing a lot of questions about that in office hours, so let me clarify: you don't need working code. I want to see your architecture diagram, your data model, and your rationale for key decisions. Three to five pages max.
+
+[00:00:52] Alright, let's talk about scaling. There are fundamentally two ways to scale: vertical and horizontal.
+
+[00:01:00] Vertical scaling, or "scaling up," means getting a bigger, more powerful machine. More CPU, more RAM, faster disk. It's simple - you don't have to change your code at all. Just move to a beefier server. That's the appeal.
+
+[00:01:20] But there are hard limits. Eventually you hit the biggest machine money can buy, and you can't go higher. Plus, those top-tier machines are disproportionately expensive. A server with twice the RAM might cost four times as much. You're also putting all your eggs in one basket - if that machine fails, everything goes down.
+
+[00:01:45] Horizontal scaling, or "scaling out," means adding more machines. Instead of one powerful server, you have ten or a hundred or a thousand smaller ones working together. This is how the big tech companies operate. Google doesn't have one super-computer; they have millions of commodity machines.
+
+[00:02:10] Horizontal scaling is more complex - your code needs to handle distributed systems concerns - but it's also more powerful and cost-effective at scale. And it gives you redundancy: if one machine dies, the others pick up the slack.
+
+[00:02:30] Now, I want to tell you a quick story from my time at a startup. This was maybe fifteen years ago. We launched our product and it went viral - got featured on TechCrunch. Traffic spiked 100x overnight. Our single web server melted. Complete outage. Users were getting timeout errors. It took us three days to stabilize things - manually spinning up servers, rewriting code that assumed a single database. It was chaos.
+
+[00:03:05] The lesson? Think about scale early, even if you don't need it yet. You don't have to implement everything upfront, but design with scale in mind. Make choices that won't paint you into a corner. That startup experience is why I'm so passionate about teaching this stuff properly.
+
+[00:03:28] Okay, let's get concrete. First topic: load balancing.
+
+[00:03:35] When you have multiple servers, you need something to distribute incoming requests across them. That's a load balancer. It sits in front of your server fleet, receives all incoming traffic, and forwards each request to one of the servers.
+
+[00:03:55] Without a load balancer, how would clients know which server to hit? You'd have to give out multiple IP addresses and hope clients distribute themselves evenly - which they won't. The load balancer gives you a single point of entry while spreading load across many backends.
+
+[00:04:18] There are several algorithms for how load balancers decide which server gets each request. The simplest is round-robin: server 1, server 2, server 3, server 1, server 2, server 3, and so on. Just cycles through the list.
+
+[00:04:38] Round-robin works if all your requests are roughly equal in cost and all your servers have equal capacity. But that's often not true. Some requests might be expensive (complex queries) and some cheap (serving static files). Some servers might be more powerful than others, or some might be busy with lingering slow requests.
+
+[00:05:02] So you have weighted round-robin, where more powerful servers get more requests. Least connections, where the load balancer sends to whichever server currently has the fewest active connections. Least response time, where it favors servers that have been responding fastest.
+
+[00:05:25] And there's a really important one: sticky sessions, also called session affinity. This sends requests from the same user to the same server. Why would you want that? If your server stores session data locally - like the user's shopping cart - you need their next request to hit the same server or they'll lose their cart.
+
+[00:05:52] But sticky sessions have downsides. They can lead to uneven load - what if all your power users happen to land on server 3? And they hurt fault tolerance - if server 3 dies, all those users lose their sessions.
+
+[00:06:12] The better approach is to externalize your session state - store it in a shared cache like Redis rather than on individual servers. Then any server can handle any request. We'll talk about caching in a bit.
+
+[00:06:30] [Student raises hand] Yes?
+
+[00:06:33] [Student asks about load balancer becoming a bottleneck]
+
+[00:06:38] Excellent question. Yes, the load balancer itself can become a bottleneck or single point of failure. In practice, you have multiple load balancers too. You can use DNS-based load balancing to distribute traffic across multiple load balancer instances. Or have active-passive pairs where a backup takes over if the primary fails.
+
+[00:07:05] At really large scale, companies use something called Anycast, where the same IP address is announced from multiple locations and network routing automatically sends users to the nearest one. But that's getting into advanced territory.
+
+[00:07:25] Let me show you what this looks like architecturally.
+
+[00:07:32] [Drawing on whiteboard]
+
+[00:07:35] Here's your users on the left. Their requests go to a load balancer - or a pair for redundancy. The load balancer forwards to one of N web servers. Each web server can handle the request independently. They might all talk to a shared database, or to a cache - we'll get there.
+
+[00:08:00] The key insight: web servers are stateless. They don't store anything permanently. Any request can be handled by any server. This is what makes horizontal scaling possible. State lives elsewhere - in databases, caches, object storage.
+
+[00:08:22] Any questions on load balancing before we move on? ...Okay, let's talk about caching.
+
+[00:08:32] Caching is probably the single most important technique for system performance. The idea is simple: store frequently accessed data in a faster location so you don't have to fetch it from the slow source every time.
+
+[00:08:50] Think about it. Your database might be on a hard drive that takes milliseconds to access. RAM takes nanoseconds - a million times faster. If you can serve a request from RAM instead of hitting the database, that's a massive speedup.
+
+[00:09:12] And it's not just about speed. Caching reduces load on your database. If 80% of requests can be served from cache, your database only handles 20% of the traffic. That might be the difference between needing one database server versus ten.
+
+[00:09:32] The most common caching layer for web applications is something like Redis or Memcached. These are in-memory key-value stores that sit between your application and your database.
+
+[00:09:48] The pattern goes like this: Application receives a request. First, check the cache: "Do I have this data already?" If yes, return it immediately - that's a cache hit. If no, query the database, store the result in cache for next time, then return it. That miss followed by population is how the cache warms up.
+
+[00:10:15] Let me give you a concrete example. Say you're building a user profile page, and you need to display the user's name, bio, and follower count. Without caching, every page view hits the database. With caching, you check Redis first: `GET user:12345:profile`. If it exists, you're done in microseconds. If not, you query MySQL, store the result in Redis with `SET user:12345:profile <data>`, and maybe set an expiration time.
+
+[00:10:52] That expiration time brings up cache invalidation, which is one of the two hard problems in computer science. The joke goes: "There are only two hard things in computer science: cache invalidation, naming things, and off-by-one errors."
+
+[00:11:12] When the underlying data changes, your cache becomes stale. If a user updates their bio, the cached profile now has the old bio. What do you do?
+
+[00:11:25] Option one: time-based expiration. Set a TTL - time to live - on cached items. After 5 minutes or an hour or whatever, the cache entry expires and the next request fetches fresh data. Simple, but you have a staleness window where users might see outdated data.
+
+[00:11:48] Option two: explicit invalidation. When the bio is updated, your code explicitly deletes or updates the cache entry. No staleness window, but now your code has to know about the cache everywhere data changes. If you forget to invalidate somewhere, you get bugs.
+
+[00:12:10] Option three: write-through caching. Every write goes to both the database and the cache atomically. The cache is always current. But this adds latency to writes since you're writing to two places.
+
+[00:12:28] In practice, most systems use a combination. Time-based expiration as a safety net, explicit invalidation for critical paths where staleness matters.
+
+[00:12:42] Now, there's another dimension: what to cache and at what level.
+
+[00:12:50] You can cache at the database query level: "What's the result of SELECT * FROM users WHERE id=12345?" But query-level caching is fragile. If the query changes slightly, you get a cache miss.
+
+[00:13:08] Better is object-level caching: cache the user object after you've fetched and assembled it. Even if the underlying queries change, the object stays the same shape.
+
+[00:13:22] And there's page-level caching: cache the entire rendered HTML page. If the page is the same for all users - like a blog post - this is super effective. But it doesn't work for personalized pages.
+
+[00:13:40] CDNs - Content Delivery Networks - are essentially caches at the edge. They cache static assets like images, CSS, and JavaScript close to users geographically. Instead of every image request going back to your origin server, the CDN serves it from a nearby location. Huge for performance and bandwidth costs.
+
+[00:14:05] Alright, quick break, let me check the time... yeah let's take 5 minutes. Stretch, grab water, and we'll dive into database scaling which is where things get really interesting.
+
+[00:14:20] [BREAK]
+
+[00:19:20] Okay, we're back. Database scaling. This is where a lot of systems hit a wall, because databases are inherently harder to scale than stateless web servers.
+
+[00:19:35] The challenge: databases store state. They have to maintain consistency, handle transactions, ensure data isn't lost. You can't just spin up more database servers and have them all share the data trivially.
+
+[00:19:52] Let's start with the simplest approach: read replicas.
+
+[00:20:00] In most applications, reads vastly outnumber writes. Maybe 90% reads, 10% writes. A read replica is a copy of your database that only handles read queries. Writes still go to the primary database, and changes are replicated to the replicas.
+
+[00:20:22] So now you might have one primary that handles all writes and three replicas that handle reads. You've essentially quadrupled your read capacity. Your application needs to be smart about where to send queries - writes to primary, reads to replicas.
+
+[00:20:45] But there's a catch: replication lag. When you write to the primary, there's a delay before that change appears on the replicas. It might be milliseconds, but it's not zero. So a user updates their profile, and if their next read hits a replica that hasn't caught up yet, they see the old data. "I just updated my bio, where is it?!"
+
+[00:21:12] This is called read-after-write consistency, and there are patterns to handle it. One approach: after a write, read from the primary for a short window. Another: track what the user modified and route those specific reads to the primary.
+
+[00:21:32] [Student interrupts with question about replica lag monitoring]
+
+[00:21:38] Yes, absolutely monitor replication lag. Most databases expose metrics for this. If lag grows too high - say, more than a few seconds - that's a red flag. Could mean your primary is overloaded, network issues, or the replica is underpowered. Set up alerts for this.
+
+[00:22:02] Okay, read replicas help with read scaling. What about write scaling?
+
+[00:22:10] This is where it gets hard. You can't just have multiple primaries accepting writes - they'd conflict with each other. Well, you can with multi-primary setups, but they're complex and limited in how they resolve conflicts.
+
+[00:22:28] The main strategy for write scaling is sharding, also called horizontal partitioning.
+
+[00:22:38] The idea: split your data across multiple databases, each handling a subset. Each database is called a shard. If you're storing users, maybe users with IDs 1-1000000 go to shard 1, users 1000001-2000000 go to shard 2, and so on.
+
+[00:22:58] Now writes are distributed too. A write for user 500000 goes to shard 1. A write for user 1500000 goes to shard 2. Each shard handles a fraction of the total write load.
+
+[00:23:15] But sharding introduces enormous complexity. Let me walk through some of the challenges.
+
+[00:23:25] First: you need a sharding key - the column you use to decide which shard holds a row. For users, user_id is natural. But what about tweets? Do you shard by tweet_id or by user_id? If by tweet_id, fetching all tweets from a user requires querying every shard. If by user_id, all of a user's tweets are together, but popular users create hotspots.
+
+[00:23:55] Second: joins become problematic. In a single database, you can join users and tweets easily. With sharding, those tables might be on different machines. Cross-shard joins are expensive - sometimes you have to fetch data from multiple shards and join in the application layer.
+
+[00:24:18] Third: resharding is painful. Say you started with 4 shards and now you need 8. How do you redistribute the data? You either do a massive migration - taking the system down or running in degraded mode - or you use consistent hashing which makes adding shards less disruptive.
+
+[00:24:42] Fourth: some operations become hard. "Give me the 10 most recent tweets across all users" now means querying every shard, sorting the results, and merging. What was one query is now N queries.
+
+[00:25:00] I'll be honest - sharding is a last resort. It adds so much complexity that you should exhaust other options first. Optimize your queries, add indices, use caching aggressively, buy bigger machines, add read replicas. Only when all that isn't enough should you shard.
+
+[00:25:22] A colleague of mine likes to say: "Sharding is like getting divorced. It's complicated, expensive, and you should try everything else first."
+
+[00:25:35] Let me briefly mention another approach: NoSQL databases. Systems like Cassandra, MongoDB, DynamoDB are designed for horizontal scaling from the ground up. They make different tradeoffs than traditional SQL databases - often relaxing consistency guarantees in exchange for scalability and availability.
+
+[00:26:00] For example, Cassandra uses a peer-to-peer architecture where any node can accept writes. It's eventually consistent - after a write, different nodes might temporarily have different views of the data. For many applications - logging, analytics, certain types of content - that's fine. For banking transactions, probably not.
+
+[00:26:28] The CAP theorem formalizes this tradeoff. You can have at most two of three properties: Consistency (all nodes see the same data), Availability (every request gets a response), and Partition tolerance (the system works despite network failures). Since network partitions do happen, you're really choosing between consistency and availability.
+
+[00:26:58] Traditional databases like MySQL and Postgres choose consistency - they'll reject requests rather than return stale data. NoSQL systems often choose availability - they'll return potentially stale data rather than failing.
+
+[00:27:18] Neither is universally better. It depends on your use case. That's a key lesson in system design: understand the tradeoffs and choose based on your requirements.
+
+[00:27:32] Let me pull this all together with an example architecture. Say we're designing a social media feed - something like Instagram.
+
+[00:27:45] Users upload photos, follow other users, and see a feed of photos from people they follow. Let's think about how to make this scale.
+
+[00:28:00] First layer: CDN for static content. All those photos don't come from our servers directly - they're cached at edge locations worldwide. User uploads a photo, we store it in object storage like S3, and the CDN caches it. Huge bandwidth savings.
+
+[00:28:22] Web servers behind a load balancer handle the application logic - the APIs for uploading, following, fetching feeds. These are stateless and can scale horizontally.
+
+[00:28:38] Caching layer: Redis cluster for hot data. User profiles, follower counts, recent activity - stuff that's accessed constantly. A cache hit means we never touch the database.
+
+[00:28:55] Database layer: this is where it gets interesting. User data might be in a sharded MySQL cluster, partitioned by user_id. The follow graph - who follows whom - is denormalized into a graph database or a heavily indexed table.
+
+[00:29:15] The feed itself - this is the tricky part. Generating a feed means finding all the accounts a user follows, fetching recent posts from each, and sorting by time. If a user follows 1000 accounts, that's a lot of lookups.
+
+[00:29:35] One approach: fan-out on write. When a user posts, we push that post to the feed cache of every follower. The feed is pre-computed. Reading is fast - just fetch the cached list. But write amplification is huge - celebrities with millions of followers cause millions of cache writes per post.
+
+[00:30:00] Another approach: fan-out on read. We don't pre-compute feeds. When you load your feed, we fetch recent posts from everyone you follow in real time, merge and sort. Write is cheap, read is expensive.
+
+[00:30:18] In practice, hybrid approaches work best. Pre-compute feeds for most users (fan-out on write), but for users who follow celebrities, fetch celebrity posts on read (fan-out on read for specific cases).
+
+[00:30:38] This is the kind of nuance that separates good system design from naive design. There's no single right answer - it depends on your access patterns, your constraints, your willingness to accept complexity.
+
+[00:30:55] Let me share one more war story. At a previous company, we had a feed system that worked fine... until we signed a celebrity with 20 million followers. One post from them caused so much write amplification that we essentially DDOSed ourselves. Feed generation queues backed up for hours. We had to emergency implement the hybrid approach I just described.
+
+[00:31:25] The lesson: think about your outliers. The average case might be a user with 200 followers. But what happens with 20 million? Design for the worst case, or at least have a plan for it.
+
+[00:31:42] Alright, let me check the time... we've got about 10 minutes. Let me do a quick summary and then open it up for questions.
+
+[00:31:55] Key takeaways from today:
+
+[00:32:00] Vertical scaling has hard limits; horizontal scaling is more complex but more powerful.
+
+[00:32:08] Load balancers distribute traffic across servers. Keep servers stateless so any server can handle any request.
+
+[00:32:18] Caching is critical for performance. Cache at multiple levels - object, query, page, CDN. But think carefully about invalidation.
+
+[00:32:32] Database scaling is the hardest part. Start with read replicas. Shard only when you must.
+
+[00:32:42] Understand the CAP theorem - you're trading off between consistency and availability.
+
+[00:32:52] Design for the outliers, not just the average case.
+
+[00:33:00] For the homework on your design document, I want to see evidence of this kind of thinking. Show me where you'd put caches. How would your system handle a 10x traffic spike? What happens if a database goes down? You don't need all the answers, but show me you're asking the right questions.
+
+[00:33:25] Questions?
+
+[00:33:28] [Student asks about cloud services like AWS handling scaling]
+
+[00:33:35] Great question. Yes, cloud providers offer managed services that handle a lot of this for you. AWS has Application Load Balancer, ElastiCache for caching, RDS with read replicas, DynamoDB that scales automatically. These are fantastic for most use cases.
+
+[00:33:58] But understanding the fundamentals matters even if you're using managed services. First, so you can make good choices about which services to use. Second, because there are still architectural decisions you have to make - how to structure your data, what to cache, how to handle consistency. Third, because managed services have limits and costs, and at some scale you might need to go lower-level.
+
+[00:34:28] [Student asks about testing scalability]
+
+[00:34:32] Load testing! Use tools like Apache JMeter, Gatling, or Locust to simulate traffic. Start with your expected load, then ramp up to find the breaking point. Where does performance degrade? What fails first? This reveals bottlenecks you wouldn't find otherwise.
+
+[00:34:55] Also, chaos engineering - intentionally killing servers, introducing latency, simulating failures - to see how your system responds. Netflix famously runs "Chaos Monkey" in production, randomly terminating instances. If your system survives that, it's resilient.
+
+[00:35:18] [Student asks about when to start thinking about scale]
+
+[00:35:22] This is a balance. Premature optimization is bad - you don't want to spend months building complex distributed systems if you're not sure anyone will use your product. But designing yourself into a corner is also bad.
+
+[00:35:40] My advice: make good architectural choices from the start that don't cost you much but leave room to scale. Separate concerns, use caching abstractions, design stateless services. These are good practices anyway. Then scale when you have real traffic that demands it, guided by actual measurements rather than speculation.
+
+[00:36:05] One more question... yes?
+
+[00:36:08] [Student asks about microservices and scaling]
+
+[00:36:12] Microservices can help with scaling because each service can scale independently. If your image processing service is the bottleneck, scale just that service. But microservices add complexity - distributed systems are hard. I'd say start with a well-structured monolith. Split into microservices when you have clear boundaries and specific scaling or team organization needs. Don't do microservices just because it's trendy.
+
+[00:36:45] Alright, we're out of time. Next week we'll dive into message queues and asynchronous processing - another critical tool for handling scale. The reading is chapters 7 and 8.
+
+[00:37:00] Don't forget, design documents due Friday. Come to office hours if you're stuck. Have a good week!
+
+[00:37:10] [END OF LECTURE]

@@ -1,0 +1,301 @@
+{
+  "metadata": {
+    "labeled_by": "human_reviewer",
+    "labeled_date": "2025-01-08",
+    "notes": "Ground truth for LLM evaluation"
+  },
+  "classifications": [
+    {
+      "bug_id": "BUG-001",
+      "severity": "high",
+      "severity_rationale": "App completely unusable for affected users, post-update regression",
+      "component": "mobile",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Mobile Team"
+    },
+    {
+      "bug_id": "BUG-002",
+      "severity": "critical",
+      "severity_rationale": "Payment taken without service delivered - financial/legal risk",
+      "component": "payments",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "unknown",
+      "potential_duplicates": ["BUG-014"],
+      "suggested_assignee_team": "Payments Team"
+    },
+    {
+      "bug_id": "BUG-003",
+      "severity": "medium",
+      "severity_rationale": "Performance degradation but service still functional",
+      "component": "backend",
+      "type": "bug",
+      "root_cause_category": "unknown",
+      "reproducibility": "always",
+      "potential_duplicates": ["BUG-019", "BUG-024"],
+      "suggested_assignee_team": "Backend Team"
+    },
+    {
+      "bug_id": "BUG-004",
+      "severity": "high",
+      "severity_rationale": "User locked out of account with no recovery option",
+      "component": "auth",
+      "type": "bug",
+      "root_cause_category": "unknown",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Auth Team"
+    },
+    {
+      "bug_id": "BUG-005",
+      "severity": "low",
+      "severity_rationale": "Cosmetic issue, no functional impact",
+      "component": "ui",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Frontend Team"
+    },
+    {
+      "bug_id": "BUG-006",
+      "severity": "critical",
+      "severity_rationale": "Potential data loss - highest priority even if user error possible",
+      "component": "database",
+      "type": "bug",
+      "root_cause_category": "unknown",
+      "reproducibility": "unknown",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Database Team"
+    },
+    {
+      "bug_id": "BUG-007",
+      "severity": "high",
+      "severity_rationale": "Core feature broken with no workaround",
+      "component": "backend",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Backend Team"
+    },
+    {
+      "bug_id": "BUG-008",
+      "severity": "low",
+      "severity_rationale": "Enhancement request, not a defect",
+      "component": "ui",
+      "type": "feature_request",
+      "root_cause_category": "unknown",
+      "reproducibility": "unknown",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Product Team"
+    },
+    {
+      "bug_id": "BUG-009",
+      "severity": "critical",
+      "severity_rationale": "Users completely locked out of service",
+      "component": "auth",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": ["BUG-017"],
+      "suggested_assignee_team": "Auth Team"
+    },
+    {
+      "bug_id": "BUG-010",
+      "severity": "high",
+      "severity_rationale": "API reliability issue affecting partners, intermittent",
+      "component": "api",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "sometimes",
+      "potential_duplicates": ["BUG-024"],
+      "suggested_assignee_team": "API Team"
+    },
+    {
+      "bug_id": "BUG-011",
+      "severity": "low",
+      "severity_rationale": "Typo with no functional impact",
+      "component": "ui",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Frontend Team"
+    },
+    {
+      "bug_id": "BUG-012",
+      "severity": "medium",
+      "severity_rationale": "Could be documentation issue or config, needs investigation",
+      "component": "backend",
+      "type": "question",
+      "root_cause_category": "configuration",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Backend Team"
+    },
+    {
+      "bug_id": "BUG-013",
+      "severity": "high",
+      "severity_rationale": "Feature completely broken on mobile platform",
+      "component": "mobile",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Mobile Team"
+    },
+    {
+      "bug_id": "BUG-014",
+      "severity": "critical",
+      "severity_rationale": "Duplicate billing - financial/legal risk",
+      "component": "payments",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "unknown",
+      "potential_duplicates": ["BUG-002"],
+      "suggested_assignee_team": "Payments Team"
+    },
+    {
+      "bug_id": "BUG-015",
+      "severity": "high",
+      "severity_rationale": "Core feature completely broken",
+      "component": "backend",
+      "type": "bug",
+      "root_cause_category": "unknown",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Search Team"
+    },
+    {
+      "bug_id": "BUG-016",
+      "severity": "medium",
+      "severity_rationale": "Partial notification system failure, push still works",
+      "component": "backend",
+      "type": "bug",
+      "root_cause_category": "unknown",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Notifications Team"
+    },
+    {
+      "bug_id": "BUG-017",
+      "severity": "critical",
+      "severity_rationale": "Enterprise SSO broken - affects entire organizations",
+      "component": "auth",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": ["BUG-009"],
+      "suggested_assignee_team": "Auth Team"
+    },
+    {
+      "bug_id": "BUG-018",
+      "severity": "medium",
+      "severity_rationale": "Data integrity issue but not loss, likely timezone bug",
+      "component": "backend",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Backend Team"
+    },
+    {
+      "bug_id": "BUG-019",
+      "severity": "high",
+      "severity_rationale": "Memory leak causing service degradation",
+      "component": "ui",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": ["BUG-003"],
+      "suggested_assignee_team": "Frontend Team"
+    },
+    {
+      "bug_id": "BUG-020",
+      "severity": "low",
+      "severity_rationale": "Feature enhancement request, not a defect",
+      "component": "ui",
+      "type": "feature_request",
+      "root_cause_category": "unknown",
+      "reproducibility": "unknown",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Product Team"
+    },
+    {
+      "bug_id": "BUG-021",
+      "severity": "high",
+      "severity_rationale": "Breaking change for partners, might be intentional config",
+      "component": "api",
+      "type": "question",
+      "root_cause_category": "configuration",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "API Team"
+    },
+    {
+      "bug_id": "BUG-022",
+      "severity": "low",
+      "severity_rationale": "Cannot reproduce, likely user error",
+      "component": "ui",
+      "type": "bug",
+      "root_cause_category": "user_error",
+      "reproducibility": "cannot_reproduce",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Support Team"
+    },
+    {
+      "bug_id": "BUG-023",
+      "severity": "medium",
+      "severity_rationale": "Accessibility compliance issue, legal risk but not urgent",
+      "component": "ui",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Frontend Team"
+    },
+    {
+      "bug_id": "BUG-024",
+      "severity": "critical",
+      "severity_rationale": "Production database issues during peak - potential outage",
+      "component": "infrastructure",
+      "type": "bug",
+      "root_cause_category": "configuration",
+      "reproducibility": "sometimes",
+      "potential_duplicates": ["BUG-003", "BUG-010"],
+      "suggested_assignee_team": "Infrastructure Team"
+    },
+    {
+      "bug_id": "BUG-025",
+      "severity": "high",
+      "severity_rationale": "App crash on common file type, no workaround",
+      "component": "backend",
+      "type": "bug",
+      "root_cause_category": "code_defect",
+      "reproducibility": "always",
+      "potential_duplicates": [],
+      "suggested_assignee_team": "Backend Team"
+    }
+  ],
+  "duplicate_groups": [
+    {
+      "group_id": "DUP-001",
+      "description": "Payment/billing issues with charges",
+      "bug_ids": ["BUG-002", "BUG-014"]
+    },
+    {
+      "group_id": "DUP-002",
+      "description": "Authentication/login failures",
+      "bug_ids": ["BUG-009", "BUG-017"]
+    },
+    {
+      "group_id": "DUP-003",
+      "description": "Performance/timeout issues potentially related",
+      "bug_ids": ["BUG-003", "BUG-019", "BUG-024", "BUG-010"]
+    }
+  ]
+}

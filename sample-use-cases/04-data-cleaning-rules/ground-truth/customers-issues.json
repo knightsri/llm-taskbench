@@ -1,0 +1,236 @@
+{
+  "dataset_id": "customers-messy",
+  "total_rows": 30,
+  "issues_summary": {
+    "total_issues": 47,
+    "critical": 3,
+    "high": 12,
+    "medium": 22,
+    "low": 10
+  },
+  "column_issues": {
+    "first_name": {
+      "issues": [
+        {
+          "type": "inconsistent_case",
+          "severity": "low",
+          "affected_rows": [2, 4],
+          "examples": ["jane", "charlie"],
+          "rule": "Capitalize first letter, lowercase rest"
+        }
+      ]
+    },
+    "last_name": {
+      "issues": [
+        {
+          "type": "inconsistent_case",
+          "severity": "low",
+          "affected_rows": [2],
+          "examples": ["DOE"],
+          "rule": "Capitalize first letter, lowercase rest"
+        }
+      ]
+    },
+    "email": {
+      "issues": [
+        {
+          "type": "invalid_format",
+          "severity": "high",
+          "affected_rows": [3],
+          "examples": ["bob.johnson@email"],
+          "rule": "Flag emails without valid domain extension"
+        },
+        {
+          "type": "missing_value",
+          "severity": "high",
+          "affected_rows": [15],
+          "examples": [""],
+          "rule": "Flag missing emails for review"
+        },
+        {
+          "type": "inconsistent_case",
+          "severity": "low",
+          "affected_rows": [12],
+          "examples": ["JULIA.THOMAS@EMAIL.COM"],
+          "rule": "Lowercase all email addresses"
+        }
+      ]
+    },
+    "phone": {
+      "issues": [
+        {
+          "type": "inconsistent_format",
+          "severity": "medium",
+          "affected_rows": [2, 4, 9, 26],
+          "examples": ["(555) 234-5678", "5554567890", "(555)890-1234"],
+          "rule": "Standardize to XXX-XXX-XXXX format"
+        },
+        {
+          "type": "null_variation",
+          "severity": "medium",
+          "affected_rows": [6, 10, 13, 19, 28],
+          "examples": ["NULL", "N/A", "-", "None", "---"],
+          "rule": "Standardize all null indicators to empty string or NULL"
+        }
+      ]
+    },
+    "state": {
+      "issues": [
+        {
+          "type": "inconsistent_format",
+          "severity": "high",
+          "affected_rows": [1, 3, 4, 6, 8, 10, 11, 13, 14, 16, 17, 18, 22, 23, 26, 27],
+          "examples": ["California", "Calif.", "california", "CA", "ca"],
+          "rule": "Standardize to 2-letter state codes (uppercase)"
+        }
+      ]
+    },
+    "signup_date": {
+      "issues": [
+        {
+          "type": "inconsistent_format",
+          "severity": "high",
+          "affected_rows": [2, 4, 5, 6, 8, 10, 12, 16, 18, 23, 26, 28],
+          "examples": ["01/20/2023", "Feb 15, 2023", "2023/03/10", "03-15-2023", "20-Mar-2023"],
+          "rule": "Standardize all dates to YYYY-MM-DD format"
+        }
+      ]
+    },
+    "subscription_tier": {
+      "issues": [
+        {
+          "type": "inconsistent_case",
+          "severity": "medium",
+          "affected_rows": [2, 3, 4, 5, 7, 8, 9, 11, 12, 13, 14, 17, 18, 22, 27],
+          "examples": ["Premium", "PREMIUM", "basic", "Basic", "BASIC"],
+          "rule": "Standardize to lowercase (premium, basic, gold)"
+        },
+        {
+          "type": "typo",
+          "severity": "high",
+          "affected_rows": [9, 20, 24, 28],
+          "examples": ["Premum", "Premuim", "gld", "basc"],
+          "rule": "Correct typos: Premum/Premuim->premium, gld->gold, basc->basic"
+        }
+      ]
+    },
+    "annual_spend": {
+      "issues": [
+        {
+          "type": "inconsistent_format",
+          "severity": "medium",
+          "affected_rows": [1, 3, 5, 6, 7, 8, 10, 12, 14, 20, 22, 24, 26, 28],
+          "examples": ["$1250.00", "1100", "$980.50", "2500"],
+          "rule": "Remove $ prefix, ensure 2 decimal places"
+        },
+        {
+          "type": "null_variation",
+          "severity": "critical",
+          "affected_rows": [10, 19],
+          "examples": ["NULL", "none"],
+          "rule": "Standardize missing spend to NULL"
+        }
+      ]
+    }
+  },
+  "cleaning_rules": [
+    {
+      "rule_id": "RULE-001",
+      "priority": 1,
+      "column": "subscription_tier",
+      "severity": "high",
+      "description": "Fix typos in subscription tier",
+      "condition": "value IN ('Premum', 'Premuim', 'gld', 'basc')",
+      "transformation": "CASE WHEN value IN ('Premum', 'Premuim') THEN 'premium' WHEN value = 'gld' THEN 'gold' WHEN value = 'basc' THEN 'basic' END"
+    },
+    {
+      "rule_id": "RULE-002",
+      "priority": 2,
+      "column": "subscription_tier",
+      "severity": "medium",
+      "description": "Standardize subscription tier case",
+      "condition": "NOT NULL",
+      "transformation": "LOWER(value)"
+    },
+    {
+      "rule_id": "RULE-003",
+      "priority": 3,
+      "column": "state",
+      "severity": "high",
+      "description": "Standardize state to 2-letter code",
+      "condition": "NOT NULL",
+      "transformation": "Map to standard 2-letter codes: California/Calif./california -> CA, Texas/Tx -> TX, etc."
+    },
+    {
+      "rule_id": "RULE-004",
+      "priority": 4,
+      "column": "signup_date",
+      "severity": "high",
+      "description": "Standardize date format to YYYY-MM-DD",
+      "condition": "NOT NULL",
+      "transformation": "Parse various formats and convert to YYYY-MM-DD"
+    },
+    {
+      "rule_id": "RULE-005",
+      "priority": 5,
+      "column": "phone",
+      "severity": "medium",
+      "description": "Standardize null indicators in phone",
+      "condition": "value IN ('NULL', 'N/A', '-', 'None', '---', '')",
+      "transformation": "SET NULL"
+    },
+    {
+      "rule_id": "RULE-006",
+      "priority": 6,
+      "column": "phone",
+      "severity": "medium",
+      "description": "Standardize phone format to XXX-XXX-XXXX",
+      "condition": "NOT NULL AND contains digits",
+      "transformation": "Extract 10 digits and format as XXX-XXX-XXXX"
+    },
+    {
+      "rule_id": "RULE-007",
+      "priority": 7,
+      "column": "annual_spend",
+      "severity": "medium",
+      "description": "Remove currency symbol and standardize format",
+      "condition": "NOT NULL AND NOT IN ('NULL', 'none')",
+      "transformation": "Remove '$', ensure numeric, format to 2 decimal places"
+    },
+    {
+      "rule_id": "RULE-008",
+      "priority": 8,
+      "column": "annual_spend",
+      "severity": "critical",
+      "description": "Standardize null indicators in spend",
+      "condition": "value IN ('NULL', 'none', '')",
+      "transformation": "SET NULL"
+    },
+    {
+      "rule_id": "RULE-009",
+      "priority": 9,
+      "column": "email",
+      "severity": "low",
+      "description": "Lowercase email addresses",
+      "condition": "NOT NULL",
+      "transformation": "LOWER(value)"
+    },
+    {
+      "rule_id": "RULE-010",
+      "priority": 10,
+      "column": "first_name",
+      "severity": "low",
+      "description": "Proper case first name",
+      "condition": "NOT NULL",
+      "transformation": "UPPER(SUBSTRING(value, 1, 1)) + LOWER(SUBSTRING(value, 2))"
+    }
+  ],
+  "flagged_for_review": [
+    {
+      "column": "email",
+      "rows": [3, 15],
+      "reason": "Invalid or missing email - requires manual verification",
+      "values": ["bob.johnson@email", ""]
+    }
+  ]
+}

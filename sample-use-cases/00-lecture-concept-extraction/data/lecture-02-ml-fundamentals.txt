@@ -1,0 +1,275 @@
+LECTURE TRANSCRIPT
+Course: Introduction to Machine Learning
+Topic: ML Fundamentals - Supervised Learning, Model Evaluation, and Overfitting
+Instructor: Prof. James Rodriguez
+Duration: 58 minutes
+Date: January 10, 2025
+
+---
+
+[00:00:00] Good afternoon everyone. Today we're diving into machine learning fundamentals. This is going to be a foundational lecture - everything we cover today will come up again and again throughout this course. So pay close attention and don't hesitate to ask questions.
+
+[00:00:22] Let me start with a definition. What is machine learning? At its core, machine learning is about building systems that learn from data rather than being explicitly programmed. Instead of writing rules like "if email contains 'lottery' and 'winner', mark as spam", we show the system thousands of emails labeled as spam or not-spam, and it learns to recognize the patterns itself.
+
+[00:00:55] This is a fundamentally different paradigm from traditional programming. In traditional programming, you write rules and the computer follows them. In machine learning, you provide data and the computer discovers the rules. This is incredibly powerful for problems where the rules are too complex to write out explicitly - like recognizing faces, understanding speech, or predicting which products a customer might like.
+
+[00:01:30] Now, there are several types of machine learning, but today we're focusing on supervised learning, which is the most common and usually where beginners should start.
+
+[00:01:45] In supervised learning, we have labeled data. That means for each input, we know the correct output. For example, we might have thousands of house listings with features like square footage, number of bedrooms, location - and we know the actual sale price. Or we have images of handwritten digits, and each image is labeled with which digit it represents.
+
+[00:02:15] The "supervision" comes from these labels - they supervise the learning process by telling the model what the right answer should be for each training example.
+
+[00:02:30] Within supervised learning, we have two main categories: regression and classification.
+
+[00:02:40] Regression is when we're predicting a continuous number. House prices, stock prices, temperature forecasts, how many minutes until your food delivery arrives - these are all regression problems. The output can be any number in a range.
+
+[00:03:02] Classification is when we're predicting a category or class. Is this email spam or not spam? Is this tumor malignant or benign? What digit is in this image - 0 through 9? The output is one of a fixed set of possibilities.
+
+[00:03:25] Sometimes the line blurs. Predicting a star rating from 1 to 5 could be treated as regression or classification. But generally, if you're predicting "how much" it's regression, and if you're predicting "which one" it's classification.
+
+[00:03:45] Let's walk through a concrete example to make this tangible. Say we want to predict house prices - a classic regression problem.
+
+[00:03:58] First, we gather data. Each row in our dataset is one house, with columns for features like square footage, number of bedrooms, bathrooms, year built, and so on. And crucially, we have a column for the actual sale price - this is our label, our target variable.
+
+[00:04:22] We split this data into two sets: training data and test data. The training data is what we show the model during learning. The test data is held back - the model never sees it during training. We'll use it later to evaluate how well the model performs on new, unseen data.
+
+[00:04:48] A common split is 80% training, 20% test. The exact ratio isn't magical - 70/30 or 90/10 work too. The key is that the test set is truly held out and represents data the model hasn't seen.
+
+[00:05:10] Now we choose a model. For our house price example, let's start with linear regression - one of the simplest models. Linear regression assumes the output is a weighted sum of the inputs: price = w1 × sqft + w2 × bedrooms + w3 × bathrooms + ... + bias.
+
+[00:05:38] The model's job is to find the weights - w1, w2, w3, etc. - that best fit the training data. "Best fit" typically means minimizing the average squared error between predicted and actual prices.
+
+[00:05:58] Training is the process of adjusting these weights to minimize the error. There are various algorithms for this - gradient descent is the most common. We won't dive into the math today, but conceptually, it's like walking downhill on an error surface, taking steps in whatever direction reduces the error most.
+
+[00:06:25] Once training is complete, we have a fitted model with specific weight values. Now we can make predictions: give it features of a house it's never seen, and it outputs a predicted price.
+
+[00:06:42] But how do we know if the model is any good? This is where evaluation comes in, and it's absolutely critical to do this right.
+
+[00:06:55] The cardinal rule: never evaluate on training data. If you train on some data and then test on that same data, you're essentially checking if the model memorized the answers. Of course it did well - it saw those exact examples during training! This tells you nothing about how it will perform on new data.
+
+[00:07:25] This is why we held out that test set. After training, we use the model to predict prices for the test houses - houses it's never seen. Then we compare those predictions to the actual prices. This gives us a realistic estimate of how the model will perform in the real world.
+
+[00:07:50] For regression problems like house prices, common evaluation metrics include Mean Absolute Error - the average of the absolute differences between predicted and actual values. If MAE is $20,000, that means on average, our predictions are off by $20,000.
+
+[00:08:15] There's also Mean Squared Error, which squares the differences before averaging. This penalizes large errors more heavily. And R-squared, which tells you what fraction of the variance in prices your model explains - closer to 1 is better.
+
+[00:08:38] For classification problems, the metrics are different. Accuracy is the simplest - what percentage of predictions were correct? If we classified 950 out of 1000 emails correctly, that's 95% accuracy.
+
+[00:08:58] But accuracy can be misleading. Imagine a model for detecting a rare disease that affects 1% of patients. A model that just says "no disease" for everyone would be 99% accurate! But it would miss every actual case - completely useless for its intended purpose.
+
+[00:09:22] This is why we need precision and recall. Precision asks: of all the cases the model flagged as positive, how many actually were positive? Recall asks: of all the actual positive cases, how many did the model catch?
+
+[00:09:42] In the disease example, our "always negative" model has undefined precision (it never predicts positive) and 0% recall (it catches none of the actual cases). These metrics reveal its failure where accuracy hid it.
+
+[00:10:02] There's often a tradeoff between precision and recall. A very cautious model might only flag cases it's extremely confident about - high precision but low recall. An aggressive model might flag anything slightly suspicious - high recall but lower precision. The right balance depends on your use case.
+
+[00:10:28] The F1 score combines precision and recall into a single number - it's the harmonic mean of the two. Useful when you need one number to compare models, but understand that it's hiding the precision-recall tradeoff.
+
+[00:10:48] Alright, let me introduce one of the most important concepts in machine learning: overfitting. This is where things get really interesting, and where beginners most often go wrong.
+
+[00:11:05] Overfitting occurs when a model learns the training data too well - including its noise and idiosyncrasies - and fails to generalize to new data. The model memorizes rather than learns.
+
+[00:11:22] Here's an analogy. Imagine studying for a test by memorizing the exact questions and answers from practice exams. If the real test has those exact same questions, you'll ace it. But if the questions are slightly different, you'll struggle - you memorized instead of understanding the underlying concepts.
+
+[00:11:48] A classic visual: imagine plotting data points and fitting a curve. A simple line might not capture all the patterns - that's underfitting. But a crazy wiggly curve that passes through every single point is overfitting - it's fitting the noise, not the signal.
+
+[00:12:12] The telltale sign of overfitting: excellent performance on training data, poor performance on test data. If your model gets 99% accuracy on training but 60% on test, it's overfit.
+
+[00:12:30] Why does overfitting happen? Usually because the model is too complex relative to the amount of data. A model with millions of parameters trained on thousands of examples can essentially memorize each example. There's not enough data to force it to learn general patterns.
+
+[00:12:55] Think about it: if I give you 10 random data points, you could fit a 9th-degree polynomial that passes exactly through all of them. But that polynomial would be worthless for predicting new points - it's just connecting the dots, not learning any real pattern.
+
+[00:13:18] So how do we prevent overfitting? Several strategies.
+
+[00:13:25] First: get more data. More examples force the model to find general patterns rather than memorizing specifics. This is often the best solution but not always feasible.
+
+[00:13:40] Second: use a simpler model. Fewer parameters means less capacity to memorize. A linear model can't overfit as badly as a complex neural network - it doesn't have enough flexibility.
+
+[00:13:58] Third: regularization. This is a technique that penalizes model complexity during training. Even if a complex model could fit the training data perfectly, regularization discourages it from doing so. L1 and L2 regularization are the most common - we'll cover these in detail next week.
+
+[00:14:25] Fourth: early stopping. During training, monitor performance on a validation set (a subset held out from training, separate from the test set). When validation performance starts getting worse while training performance keeps improving, stop training - you're starting to overfit.
+
+[00:14:50] Let me explain that validation set concept more carefully because it's important.
+
+[00:15:00] We actually want three sets: training, validation, and test. Training is what the model learns from. Validation is used during the model development process - for tuning hyperparameters, deciding when to stop training, choosing between different models. Test is touched only once, at the very end, to get a final unbiased estimate of performance.
+
+[00:15:30] Why not just use the test set for validation? Because if you use test results to make decisions about your model, you're indirectly training on the test set. The test set should be a true held-out evaluation - no peeking!
+
+[00:15:52] A common approach is called cross-validation. Instead of one fixed validation set, we rotate through different subsets. In 5-fold cross-validation, we split the training data into 5 parts. We train on 4, validate on 1, then rotate which part is the validation set. This gives us 5 different estimates of performance, and we average them.
+
+[00:16:25] Cross-validation is especially useful when you don't have much data. Instead of losing 20% to a fixed validation set, every data point gets used for both training and validation at different times.
+
+[00:16:42] Let's take a quick 5-minute break. When we come back, we'll look at the bias-variance tradeoff and then do a hands-on example.
+
+[00:16:55] [BREAK]
+
+[00:21:55] Alright, welcome back. Let's continue with the bias-variance tradeoff. This is a fundamental concept that explains the tension between underfitting and overfitting.
+
+[00:22:12] Bias is the error from overly simplistic assumptions in the model. A high-bias model doesn't capture the true complexity of the data. Think of a linear model trying to fit data that's actually quadratic - it will systematically miss the pattern.
+
+[00:22:35] Variance is the error from sensitivity to small fluctuations in the training data. A high-variance model changes dramatically with different training sets. If you train the same complex model on slightly different data and get wildly different results, that's high variance.
+
+[00:23:00] Underfitting is a bias problem. The model is too simple to capture the patterns - it's biased toward simplicity.
+
+[00:23:12] Overfitting is a variance problem. The model is so sensitive to the training data that it's fitting noise, not signal. Small changes in training data cause big changes in the model.
+
+[00:23:28] The tradeoff: simpler models have higher bias but lower variance. Complex models have lower bias but higher variance. The goal is to find the sweet spot that minimizes total error.
+
+[00:23:48] Imagine you're trying to hit a target with arrows. High bias is like your aim being consistently off to the left - you're wrong in a systematic way. High variance is like your shots scattering all over the place - you're inconsistent. Ideally you want low bias (centered on target) and low variance (tightly clustered).
+
+[00:24:15] In practice, you monitor training and validation error as model complexity increases. At first, both decrease - you're reducing bias without much variance penalty. At some point, validation error starts increasing while training error keeps decreasing - that's where variance is hurting you. The sweet spot is just before that divergence.
+
+[00:24:45] Let's look at this in practice with a real example. I'm going to walk through a complete workflow using the famous Iris dataset. This is a classic classification problem - given measurements of iris flowers, predict which of three species they belong to.
+
+[00:25:08] The dataset has 150 samples, 4 features (sepal length, sepal width, petal length, petal width), and 3 classes (setosa, versicolor, virginica). It's included in scikit-learn, which makes it easy to load.
+
+[00:25:30] Step one: load the data and do a train-test split. We'll use 70% for training, 30% for test.
+
+```python
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+
+iris = load_iris()
+X_train, X_test, y_train, y_test = train_test_split(
+    iris.data, iris.target, test_size=0.3, random_state=42
+)
+```
+
+[00:26:00] Step two: choose and train a model. Let's use a decision tree classifier - a good middle-ground model that's easy to understand.
+
+```python
+from sklearn.tree import DecisionTreeClassifier
+
+model = DecisionTreeClassifier(max_depth=3)
+model.fit(X_train, y_train)
+```
+
+[00:26:25] Notice I set max_depth=3. This limits how complex the tree can get - it's a form of regularization to prevent overfitting.
+
+[00:26:40] Step three: evaluate on the test set.
+
+```python
+from sklearn.metrics import accuracy_score, classification_report
+
+predictions = model.predict(X_test)
+print(f"Accuracy: {accuracy_score(y_test, predictions):.2f}")
+print(classification_report(y_test, predictions))
+```
+
+[00:27:00] The classification report shows precision, recall, and F1 for each class. Let's say we get 95% accuracy. Not bad for such a simple model!
+
+[00:27:15] Step four: let's see if we're overfitting by checking training accuracy too.
+
+```python
+train_predictions = model.predict(X_train)
+print(f"Training accuracy: {accuracy_score(y_train, train_predictions):.2f}")
+```
+
+[00:27:35] If training accuracy is 97% and test accuracy is 95%, we're in good shape - only a small gap, suggesting minimal overfitting.
+
+[00:27:50] But what if we removed the max_depth limit?
+
+```python
+model_unrestricted = DecisionTreeClassifier()  # No depth limit
+model_unrestricted.fit(X_train, y_train)
+```
+
+[00:28:05] Now we might see training accuracy of 100% but test accuracy of only 91%. That's overfitting - the unrestricted model memorized the training data.
+
+[00:28:22] Step five: use cross-validation to get a more robust estimate.
+
+```python
+from sklearn.model_selection import cross_val_score
+
+scores = cross_val_score(model, iris.data, iris.target, cv=5)
+print(f"CV scores: {scores}")
+print(f"Mean: {scores.mean():.2f}, Std: {scores.std():.2f}")
+```
+
+[00:28:50] This runs 5-fold cross-validation and gives us 5 accuracy scores. The mean is our estimate of true performance, and the standard deviation tells us how much it varies across folds. Low standard deviation means our estimate is stable.
+
+[00:29:12] Now, let me address a question I often get: how do you choose between different models?
+
+[00:29:22] You could compare their cross-validation scores. Train several models - logistic regression, decision tree, random forest, support vector machine - and see which has the best mean CV score. But also consider:
+
+[00:29:40] Interpretability: can you explain why the model made a prediction? For medical diagnoses or loan approvals, interpretability might be legally required.
+
+[00:29:55] Training time: some models take minutes, others take days. For real-time applications or rapid iteration, training time matters.
+
+[00:30:08] Prediction time: how fast can the model make predictions? For real-time applications, a simpler model might be necessary even if a complex one is slightly more accurate.
+
+[00:30:25] Amount of data: some models need thousands of examples, others need millions. Deep learning typically needs much more data than traditional models.
+
+[00:30:40] There's no universally best model. The right choice depends on your specific problem, data, and constraints.
+
+[00:30:52] Let me briefly mention some common algorithms you'll encounter. We'll cover each in depth in future lectures.
+
+[00:31:02] Linear models: linear regression for regression, logistic regression for classification. Simple, fast, interpretable, but limited in the patterns they can learn.
+
+[00:31:18] Decision trees: learn if-then rules by splitting data on feature values. Easy to visualize and interpret, but prone to overfitting. 
+
+[00:31:32] Random forests: collections of many decision trees that vote together. Much better than single trees - one of the best "off the shelf" models.
+
+[00:31:48] Support vector machines: find optimal boundaries between classes. Work well in high dimensions, but less interpretable.
+
+[00:32:02] Neural networks: layers of connected nodes inspired by the brain. Can learn incredibly complex patterns, but need lots of data and are hard to interpret.
+
+[00:32:18] k-Nearest Neighbors: classify based on the labels of similar examples. Simple but doesn't scale well to large datasets.
+
+[00:32:32] Each has its strengths and weaknesses. Part of the art of machine learning is developing intuition for which approach fits which problem.
+
+[00:32:45] Before we wrap up, let me give you a mental framework for approaching ML problems.
+
+[00:32:55] Step 1: Understand the problem. What are you trying to predict? Is it regression or classification? What does success look like? What's the cost of different types of errors?
+
+[00:33:12] Step 2: Gather and explore data. Look at distributions, correlations, missing values. Visualization is crucial here. Often you'll discover issues that need addressing before modeling.
+
+[00:33:30] Step 3: Prepare the data. Handle missing values, encode categorical variables, potentially normalize or standardize features. This is called preprocessing and we'll have a whole lecture on it.
+
+[00:33:50] Step 4: Split into train/validation/test. Or set up cross-validation. Make sure your test set truly represents what you'll encounter in production.
+
+[00:34:05] Step 5: Start simple. Try a baseline model first - even just predicting the mean for regression or the most common class for classification. This gives you a floor to beat.
+
+[00:34:22] Step 6: Iterate. Try more sophisticated models, tune hyperparameters, engineer new features. But always monitor for overfitting.
+
+[00:34:38] Step 7: Final evaluation on test set. This gives you an unbiased estimate of real-world performance.
+
+[00:34:50] Step 8: Deploy and monitor. Real-world data might drift over time, so keep checking that your model is still performing well.
+
+[00:35:05] Alright, let me summarize the key takeaways from today.
+
+[00:35:12] Machine learning is about learning patterns from data rather than explicit programming.
+
+[00:35:22] Supervised learning uses labeled data - we know the right answer for each training example.
+
+[00:35:32] Regression predicts continuous values, classification predicts categories.
+
+[00:35:42] Always evaluate on held-out test data, never on training data.
+
+[00:35:50] For classification, accuracy can be misleading - consider precision, recall, and F1.
+
+[00:36:00] Overfitting is when the model memorizes training data instead of learning general patterns. Combat it with more data, simpler models, regularization, or early stopping.
+
+[00:36:18] Use validation sets or cross-validation for model selection and hyperparameter tuning.
+
+[00:36:28] The bias-variance tradeoff explains the tension between underfitting (too simple) and overfitting (too complex).
+
+[00:36:42] For homework, I want you to work through the Iris example yourself. Then try it with a different model - logistic regression or random forest. Compare the results. Write a short reflection on what you learned.
+
+[00:37:00] Also, read chapter 2 of our textbook which covers evaluation metrics in more detail.
+
+[00:37:10] Next week we'll dive into linear regression in depth - the math, the assumptions, and common pitfalls.
+
+[00:37:22] Any questions?
+
+[00:37:25] [Student asks about when to use classification vs regression]
+
+[00:37:30] Good question. The target variable determines it. If you're predicting a number that could be any value in a range - like price, temperature, or age - that's regression. If you're predicting a category from a fixed set - like spam/not-spam, species of flower, or type of customer - that's classification. Sometimes there's ambiguity, like predicting a star rating 1-5, and you could frame it either way. Try both and see what works better.
+
+[00:38:05] [Student asks about the relationship between dataset size and model complexity]
+
+[00:38:10] Great question. There's a rough guideline: you need more data as model complexity increases. A linear model with 10 features might need hundreds of examples. A deep neural network might need millions. The intuition is that complex models have more capacity to memorize, so they need more examples to force them to generalize. If you don't have much data, stick to simpler models - or use techniques like data augmentation which we'll cover later.
+
+[00:38:45] Alright, that's all for today. See you next week!
+
+[00:38:52] [END OF LECTURE]

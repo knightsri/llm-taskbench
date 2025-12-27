@@ -1,0 +1,9 @@
+concept,start_time,end_time
+01_Introduction_Vertical_vs_Horizontal_Scaling,00:00:00,00:03:28
+02_Load_Balancing_Algorithms_and_Strategies,00:03:28,00:08:22
+03_Caching_Fundamentals_and_Patterns,00:08:22,00:14:20
+04_Database_Scaling_Read_Replicas,00:19:20,00:24:18
+05_Database_Sharding_Strategies_and_Challenges,00:24:18,00:27:32
+06_CAP_Theorem_and_NoSQL_Tradeoffs,00:27:32,00:30:55
+07_Real_World_Example_Social_Media_Feed_Architecture,00:30:55,00:33:25
+08_Summary_and_QA_Session,00:33:25,00:37:10

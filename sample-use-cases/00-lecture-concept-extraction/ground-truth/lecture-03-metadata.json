@@ -1,0 +1,100 @@
+{
+  "lecture_id": "lecture-03-system-design",
+  "title": "Designing Scalable Systems - Load Balancing, Caching, and Database Scaling",
+  "instructor": "Dr. Maria Santos",
+  "duration_minutes": 72,
+  "actual_content_minutes": 67,
+  "complexity": "hard",
+  "expected_concepts": 8,
+  "notes": {
+    "structure": "Less linear than other lectures, includes personal stories, multiple student interruptions",
+    "challenges": "Multiple challenges: 5-min break (14:20-19:20), tangential stories, inline Q&A, homework reminder mid-lecture",
+    "tangent_handling": "Startup story (02:30-03:28) integrated into intro concept; celebrity story (30:55-31:42) integrated into feed architecture",
+    "qa_sections": "Multiple inline Q&A: 06:33-07:25, 21:32-22:02, 33:28-36:45. Final Q&A block merged with summary",
+    "break_handling": "Break from 14:20 to 19:20 should be excluded"
+  },
+  "concept_rationale": [
+    {
+      "concept": "01_Introduction_Vertical_vs_Horizontal_Scaling",
+      "duration_min": 3.47,
+      "rationale": "Sets up core distinction, includes relevant startup story as motivating example"
+    },
+    {
+      "concept": "02_Load_Balancing_Algorithms_and_Strategies",
+      "duration_min": 4.9,
+      "rationale": "Complete coverage of LB algorithms, includes student question about bottlenecks, whiteboard diagram"
+    },
+    {
+      "concept": "03_Caching_Fundamentals_and_Patterns",
+      "duration_min": 5.97,
+      "rationale": "Comprehensive caching section: patterns, invalidation, levels, CDNs. Natural break point before intermission"
+    },
+    {
+      "concept": "04_Database_Scaling_Read_Replicas",
+      "duration_min": 4.97,
+      "rationale": "Post-break content: read replicas, replication lag, consistency. Includes student question about monitoring"
+    },
+    {
+      "concept": "05_Database_Sharding_Strategies_and_Challenges",
+      "duration_min": 3.23,
+      "rationale": "Sharding deep dive: keys, joins, resharding. The 'divorce' analogy makes good segment boundary"
+    },
+    {
+      "concept": "06_CAP_Theorem_and_NoSQL_Tradeoffs",
+      "duration_min": 3.38,
+      "rationale": "CAP theorem and NoSQL context - distinct conceptual unit"
+    },
+    {
+      "concept": "07_Real_World_Example_Social_Media_Feed_Architecture",
+      "duration_min": 2.5,
+      "rationale": "Instagram-like example tying concepts together, includes celebrity war story"
+    },
+    {
+      "concept": "08_Summary_and_QA_Session",
+      "duration_min": 3.75,
+      "rationale": "Key takeaways plus extended Q&A on cloud services, testing, microservices"
+    }
+  ],
+  "break_info": {
+    "start_time": "00:14:20",
+    "end_time": "00:19:20",
+    "duration_minutes": 5,
+    "note": "Break should be excluded from concept extraction"
+  },
+  "inline_qa_info": [
+    {
+      "timestamp": "00:06:33",
+      "duration_seconds": 52,
+      "topic": "Load balancer as bottleneck",
+      "handling": "Integrated into load balancing concept"
+    },
+    {
+      "timestamp": "00:21:32",
+      "duration_seconds": 30,
+      "topic": "Replica lag monitoring",
+      "handling": "Integrated into read replicas concept"
+    }
+  ],
+  "tangents_and_stories": [
+    {
+      "timestamp": "00:02:30",
+      "duration_seconds": 58,
+      "description": "TechCrunch viral launch story",
+      "handling": "Integrated into intro - relevant motivating example"
+    },
+    {
+      "timestamp": "00:30:55",
+      "duration_seconds": 47,
+      "description": "Celebrity 20M followers story",
+      "handling": "Integrated into feed architecture - illustrates outlier problem"
+    }
+  ],
+  "statistics": {
+    "total_concepts": 8,
+    "avg_duration_min": 4.02,
+    "min_duration_min": 2.5,
+    "max_duration_min": 5.97,
+    "violations_under_2min": 0,
+    "violations_over_7min": 0
+  }
+}

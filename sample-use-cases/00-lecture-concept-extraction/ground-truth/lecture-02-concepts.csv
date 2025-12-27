@@ -1,0 +1,10 @@
+concept,start_time,end_time
+01_What_Is_Machine_Learning,00:00:00,00:03:25
+02_Supervised_Learning_Regression_vs_Classification,00:03:25,00:07:25
+03_Model_Training_and_Data_Splitting,00:07:25,00:11:05
+04_Classification_Metrics_Precision_Recall_F1,00:11:05,00:14:50
+05_Understanding_Overfitting,00:14:50,00:16:55
+06_Strategies_to_Prevent_Overfitting,00:21:55,00:26:25
+07_Bias_Variance_Tradeoff,00:26:25,00:30:52
+08_Complete_ML_Workflow_Iris_Example,00:30:52,00:35:05
+09_Summary_Key_Takeaways_and_QA,00:35:05,00:38:52
