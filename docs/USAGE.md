@@ -247,6 +247,105 @@ Naming convention: `{YYYY-MM-DD}_{HHMMSS}_{data-file-name}.json`
 
 Override with `--output` to specify a custom path.
 
+## Result File Format
+
+Each result JSON file contains comprehensive evaluation data:
+
+```json
+{
+  "usecase": {
+    "name": "Use Case Name",
+    "folder": "path/to/use-case",
+    "data_file": "path/to/input/data.txt",
+    "ground_truth_file": "path/to/ground-truth/expected.json"
+  },
+  "prompts": {
+    "analysis": {
+      "transformation_type": "Description of what the LLM is doing",
+      "key_fields": ["field1", "field2"],
+      "quality_indicators": ["What good output looks like"],
+      "comparison_strategy": "How to compare against ground truth"
+    },
+    "task_prompt": "The prompt sent to candidate models",
+    "judge_prompt": "The prompt sent to the judge model",
+    "rubric": {
+      "critical_requirements": [...],
+      "compliance_checks": [...],
+      "weights": {"accuracy": 40, "format": 20, "compliance": 40}
+    }
+  },
+  "results": [
+    {
+      "model_name": "provider/model-name",
+      "task_name": "task_identifier",
+      "output": "The model's raw output",
+      "input_tokens": 5450,
+      "output_tokens": 292,
+      "total_tokens": 5742,
+      "cost_usd": 0.0024,
+      "billed_cost_usd": 0.002365,
+      "latency_ms": 3125.32,
+      "timestamp": "2025-12-27 08:44:11.602350",
+      "generation_id": "gen-xxx",
+      "status": "success",
+      "error": null
+    }
+  ],
+  "scores": [
+    {
+      "model_evaluated": "provider/model-name",
+      "accuracy_score": 85,
+      "format_score": 95,
+      "compliance_score": 80,
+      "overall_score": 85,
+      "violations": ["List of specific issues found"],
+      "reasoning": "Judge's explanation of the scores"
+    }
+  ],
+  "statistics": {
+    "total_cost": 0.0024,
+    "total_tokens": 5742,
+    "total_input_tokens": 5450,
+    "total_output_tokens": 292,
+    "total_evaluations": 1,
+    "avg_cost_per_eval": 0.0024,
+    "avg_tokens_per_eval": 5742,
+    "cost_by_model": {
+      "google/gemini-2.5-flash": {
+        "cost": 0.0024,
+        "input_tokens": 5450,
+        "output_tokens": 292,
+        "evaluations": 1
+      }
+    }
+  }
+}
+```
+
+### Key Fields Explained
+
+| Section | Field | Description |
+|---------|-------|-------------|
+| `usecase` | `name` | Human-readable use case name |
+| `usecase` | `data_file` | Input data that was processed |
+| `usecase` | `ground_truth_file` | Reference output for comparison |
+| `prompts` | `task_prompt` | Exact prompt sent to models |
+| `prompts` | `rubric` | Scoring criteria with penalties |
+| `results[]` | `output` | Raw model response |
+| `results[]` | `cost_usd` | Calculated cost |
+| `results[]` | `billed_cost_usd` | Actual cost from OpenRouter |
+| `results[]` | `status` | "success" or "failed" |
+| `scores[]` | `overall_score` | 0-100 judge score |
+| `scores[]` | `violations` | Specific issues found |
+| `statistics` | `total_cost` | Sum of all evaluation costs |
+
+### Notes
+
+- `scores` array is empty when using `--skip-judge`
+- `billed_cost_usd` is the actual cost from OpenRouter (may differ from calculated)
+- `generation_id` can be used for cost auditing via OpenRouter API
+- Multi-model runs have multiple entries in `results[]` and `scores[]`
+
 ## Creating Your Own Use Case
 
 ### Step 1: Create Folder Structure
