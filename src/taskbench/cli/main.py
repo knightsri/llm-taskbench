@@ -157,7 +157,7 @@ async def _evaluate_async(
             try:
                 from taskbench.usecase import UseCase
                 usecase = UseCase.load(usecase_yaml)
-                console.print(f"[green]✔ Use case loaded: {usecase.name}[/green]")
+                console.print(f"[green]Use case loaded: {usecase.name}[/green]")
             except Exception as uc_err:
                 console.print(f"[yellow]Warning: failed to load use case {usecase_yaml}: {uc_err}[/yellow]")
 

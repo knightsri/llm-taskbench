@@ -17,6 +17,7 @@ from rich.table import Table
 from taskbench.api.client import OpenRouterClient
 from taskbench.core.models import EvaluationResult, JudgeScore, TaskDefinition
 from taskbench.evaluation.comparison import ModelComparison
+from taskbench.evaluation.rubric_generator import RubricGenerator
 from taskbench.usecase import UseCase
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,9 @@ class LLMJudge:
         self.api_client = api_client
         default_judge = os.getenv("GENERAL_TASK_LLM", "anthropic/claude-sonnet-4.5")
         self.judge_model = judge_model or default_judge
+        self.rubric_generator = RubricGenerator(api_client)
 
-    def build_judge_prompt(
+    async def build_judge_prompt(
         self,
         task: TaskDefinition,
         model_output: str,
@@ -241,6 +243,16 @@ class LLMJudge:
             task.judge_instructions,
         ])
 
+        # Add dynamic use-case-aware rubric if use case is provided
+        if usecase:
+            dynamic_rubric = await self.rubric_generator.generate_judge_prompt_section_async(usecase)
+            prompt_parts.extend([
+                "",
+                "# USE CASE SPECIFIC EVALUATION (CRITICAL)",
+                "",
+                dynamic_rubric,
+            ])
+
         if ts_range:
             prompt_parts.extend([
                 "",
@@ -263,6 +275,13 @@ class LLMJudge:
             '  "reasoning": "Detailed explanation of your scoring"',
             "}",
             "```",
+            "",
+            "**SCORING GUIDANCE:**",
+            "- compliance_score: Calculate based on ACTUAL violation count, not overall impression",
+            "- If multiple segments violate duration constraints, compliance_score MUST reflect this",
+            "- Example: 8 of 11 segments over max = (11-8)/11 * 100 = 27% compliance, NOT 75%",
+            "- overall_score should be weighted: accuracy*0.3 + format*0.2 + compliance*0.5",
+            "- A model with many compliance violations CANNOT score above 60 overall",
             "",
             "Provide ONLY the JSON, no other text."
         ])
@@ -292,8 +311,8 @@ class LLMJudge:
         """
         logger.info(f"Evaluating {result.model_name} output with judge {self.judge_model}")
 
-        # Build judge prompt
-        prompt = self.build_judge_prompt(task, result.output, input_data, usecase=usecase)
+        # Build judge prompt (async to allow LLM-based rubric generation)
+        prompt = await self.build_judge_prompt(task, result.output, input_data, usecase=usecase)
 
         # Get judge evaluation
         response = await self.api_client.complete_with_json(
