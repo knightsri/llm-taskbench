@@ -165,15 +165,28 @@ Example generated rubric:
 - Results store token counts, generation IDs, and per-model totals
 - Judge evaluation costs tracked separately
 
-## Sample Use Cases
+## Results Organization
 
-| # | Use Case | Difficulty | Capability |
-|---|----------|------------|------------|
-| 00 | Lecture Concept Extraction | Moderate-Hard | Reasoning + Structured Extraction |
-| 01 | Meeting Action Items | Moderate | Extraction + Inference |
-| 02 | Bug Report Triage | Moderate-Hard | Classification + Reasoning |
-| 03 | Regex Generation | Hard | Pattern Recognition + Logic |
-| 04 | Data Cleaning Rules | Moderate-Hard | Pattern Recognition |
+Results are automatically saved to `results/{usecase-name}/`:
+
+```
+results/
+├── 00-lecture-concept-extraction/
+│   └── 2025-12-26_233901_lecture-01-python-basics.json
+├── 01-meeting-action-items/
+│   └── 2025-12-26_234802_meeting-01-standup.json
+└── ...
+```
+
+## Sample Use Cases & Benchmark Results
+
+| # | Use Case | Difficulty | Claude Sonnet 4 | GPT-4o-mini |
+|---|----------|------------|-----------------|-------------|
+| 00 | Lecture Concept Extraction | Moderate-Hard | 93/100 | 35/100 |
+| 01 | Meeting Action Items | Moderate | 82/100 | 66/100 |
+| 02 | Bug Report Triage | Moderate-Hard | 86/100 | 75/100 |
+| 03 | Regex Generation | Hard | 97/100 | 0/100 |
+| 04 | Data Cleaning Rules | Moderate-Hard | 88/100 | 76/100 |
 
 ## Status
 

@@ -228,9 +228,132 @@ The web UI provides an interactive interface:
 - Rate limiting support
 - JSON mode enforced for judge calls
 
+## Results Organization
+
+Results are automatically organized by use case:
+
+```
+results/
+├── 00-lecture-concept-extraction/
+│   ├── 2025-12-26_233901_lecture-01-python-basics.json
+│   └── 2025-12-26_235012_lecture-02-ml-fundamentals.json
+├── 01-meeting-action-items/
+│   └── 2025-12-26_234802_meeting-01-standup.json
+└── _legacy/
+    └── (old YAML-based results)
+```
+
+Naming convention: `{YYYY-MM-DD}_{HHMMSS}_{data-file-name}.json`
+
+Override with `--output` to specify a custom path.
+
+## Creating Your Own Use Case
+
+### Step 1: Create Folder Structure
+
+```bash
+mkdir -p my-usecases/invoice-extraction/{data,ground-truth}
+```
+
+### Step 2: Write USE-CASE.md
+
+```markdown
+# Use Case: Invoice Data Extraction
+
+## Metadata
+- **Difficulty:** Moderate
+- **Primary Capability:** Structured Extraction
+
+## Goal
+Extract key fields from invoice PDFs/images: vendor name, invoice number,
+date, line items, subtotal, tax, and total.
+
+## LLM Evaluation Notes
+**What this tests:**
+- Structured data extraction from semi-structured documents
+- Numerical accuracy (amounts must match exactly)
+- Date format normalization
+
+**Edge cases to watch:**
+- Handwritten invoices
+- Multi-page invoices
+- Foreign currency
+
+## Expected Output Schema
+```json
+{
+  "vendor": "string",
+  "invoice_number": "string",
+  "date": "YYYY-MM-DD",
+  "line_items": [{"description": "string", "amount": number}],
+  "subtotal": number,
+  "tax": number,
+  "total": number
+}
+```
+
+## Quality Criteria
+**"Excellent" extraction:**
+- All amounts match exactly
+- Dates normalized to ISO format
+- No missing required fields
+```
+
+### Step 3: Add Data Files
+
+Place input files in `data/`:
+```
+my-usecases/invoice-extraction/data/
+├── invoice-001.txt
+├── invoice-002.txt
+└── invoice-003.txt
+```
+
+### Step 4: Add Ground Truth
+
+Place expected outputs in `ground-truth/` with matching names:
+```
+my-usecases/invoice-extraction/ground-truth/
+├── invoice-001.json
+├── invoice-002.json
+└── invoice-003.json
+```
+
+### Step 5: Generate Prompts
+
+```bash
+taskbench generate-prompts my-usecases/invoice-extraction
+```
+
+This analyzes your use case and creates optimized prompts.
+
+### Step 6: Run Evaluation
+
+```bash
+taskbench run my-usecases/invoice-extraction \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o-mini
+```
+
+## Sample Benchmark Results
+
+Results from running all sample use cases (Claude Sonnet 4 vs GPT-4o-mini):
+
+| Use Case | Claude Sonnet 4 | GPT-4o-mini | Cost Ratio |
+|----------|-----------------|-------------|------------|
+| 00-lecture-concept-extraction | 93/100 | 35/100 | 31x |
+| 01-meeting-action-items | 82/100 | 66/100 | 46x |
+| 02-bug-report-triage | 86/100 | 75/100 | 32x |
+| 03-regex-generation | 97/100 | 0/100 | 63x |
+| 04-data-cleaning-rules | 88/100 | 76/100 | 38x |
+
+Key observations:
+- Claude Sonnet 4 consistently outperforms on quality
+- GPT-4o-mini offers better value for simpler tasks
+- Regex generation shows largest capability gap
+
 ## Files
 
 - `sample-usecases/` - Use case folder collection
 - `config/models.yaml` - Model pricing catalog
-- `results/` - Evaluation results
+- `results/` - Evaluation results (organized by use case)
 - `docs/openrouter-cost-tracking-guide.md` - Cost API details
