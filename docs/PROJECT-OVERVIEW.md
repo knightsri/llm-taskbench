@@ -1,11 +1,9 @@
 # LLM TaskBench - Project Overview
 
-**Version:** 2.0 (MVP)  
-**Author:** Sri Bolisetty (@KnightSri)  
-**Last Updated:** November 2025  
-**Timeline:** 6-8 weeks  
-**Target Completion:** December 22, 2025  
-**Demo Day:** January 17, 2026
+**Version:** 2.0 (MVP Complete)
+**Author:** Sri Bolisetty (@KnightSri)
+**Last Updated:** December 2025
+**Status:** MVP Complete ✅
 
 ---
 
@@ -20,9 +18,10 @@ Existing LLM evaluation tools (DeepEval, Promptfoo, Eleuther AI) focus on generi
 **The Solution:**
 
 LLM TaskBench shifts evaluation from **metric-first to task-first**:
-- Define YOUR actual task in YAML
-- Evaluate 5+ models automatically  
-- Get cost-aware recommendations
+- Define use cases in human-readable Markdown (USE-CASE.md)
+- Framework auto-generates optimized prompts from ground truth analysis
+- Evaluate multiple models with LLM-as-judge scoring
+- Get cost-aware recommendations with detailed comparisons
 
 ---
 
@@ -232,38 +231,30 @@ Smart orchestration, not manual coordination:
 ## Example Usage
 
 ```bash
-# Define your task
-$ cat lecture_analysis.yaml
+# List available use cases
+$ taskbench list-usecases
 
-# Evaluate multiple models
-$ taskbench evaluate lecture_analysis.yaml \
-  --models claude-sonnet-4.5,gpt-4o,gemini-2.5-pro,llama-3.1-405b,qwen-2.5-72b
+# Run evaluation on a use case
+$ taskbench run sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o-mini
 
-# Results:
-Evaluating Claude Sonnet 4.5... ✓ (24 concepts, 0 violations, $0.36)
-Evaluating GPT-4o...           ✓ (23 concepts, 1 violation, $0.42)
-Evaluating Gemini 2.5 Pro...   ✓ (22 concepts, 2 violations, $0.38)
-Evaluating Llama 3.1 405B...   ✓ (20 concepts, 4 violations, $0.25)
-Evaluating Qwen 2.5 72B...     ✓ (21 concepts, 3 violations, $0.18)
-
-# Get recommendations
-$ taskbench recommend
-
-┌─────────────────────┬───────┬────────────┬──────────┬───────────┐
-│ Model               │ Score │ Violations │ Cost     │ Tier      │
-├─────────────────────┼───────┼────────────┼──────────┼───────────┤
-│ Claude Sonnet 4.5   │ 98    │ 0          │ $0.36    │ Excellent │
-│ GPT-4o              │ 95    │ 1          │ $0.42    │ Excellent │
-│ Gemini 2.5 Pro      │ 92    │ 2          │ $0.38    │ Excellent │
-│ Qwen 2.5 72B        │ 87    │ 3          │ $0.18    │ Good      │
-│ Llama 3.1 405B      │ 83    │ 4          │ $0.25    │ Good      │
-└─────────────────────┴───────┴────────────┴──────────┴───────────┘
-
-📊 Recommendations:
-  🏆 Best Overall: Claude Sonnet 4.5
-  💎 Best Value: Qwen 2.5 72B (87% as good, 50% cheaper)
-  💰 Budget Option: Qwen 2.5 72B
+# Results auto-saved to results/00-lecture-concept-extraction/
 ```
+
+### Sample Benchmark Results
+
+| Use Case | Claude Sonnet 4 | GPT-4o-mini | Winner |
+|----------|-----------------|-------------|--------|
+| 00-lecture-concept-extraction | 93/100 | 35/100 | Claude |
+| 01-meeting-action-items | 82/100 | 66/100 | Claude |
+| 02-bug-report-triage | 86/100 | 75/100 | Claude |
+| 03-regex-generation | 97/100 | 0/100 | Claude |
+| 04-data-cleaning-rules | 88/100 | 76/100 | Claude |
+
+**Key Findings:**
+- Claude Sonnet 4 consistently outperforms on quality
+- GPT-4o-mini offers better value for simpler tasks
+- Hard tasks (regex) show largest capability gap
 
 ---
 
@@ -276,10 +267,15 @@ llm-taskbench/
 │   ├── api/                 # OpenRouter client, retry logic
 │   ├── evaluation/          # Executor, judge, cost tracking
 │   ├── cli/                 # Command-line interface
-│   └── utils/               # Logging, validation
-├── tasks/                   # Built-in task definitions
-├── tests/                   # Unit and integration tests
-├── examples/                # Example tasks and outputs
+│   ├── usecase_parser.py    # Parse folder-based use cases
+│   └── prompt_generator.py  # LLM-driven prompt generation
+├── sample-usecases/         # Sample use cases (folder-based)
+│   ├── 00-lecture-concept-extraction/
+│   ├── 01-meeting-action-items/
+│   ├── 02-bug-report-triage/
+│   ├── 03-regex-generation/
+│   └── 04-data-cleaning-rules/
+├── results/                 # Evaluation results (by use case)
 ├── config/                  # Model pricing database
 ├── docs/                    # Documentation
 └── README.md               # Main documentation

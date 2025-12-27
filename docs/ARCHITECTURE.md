@@ -14,21 +14,26 @@
 LLM TaskBench is a task-specific LLM evaluation framework that enables developers and researchers to objectively compare language models on custom, domain-specific tasks. The framework combines agentic orchestration with LLM-as-judge evaluation to provide accurate, reproducible performance metrics.
 
 ### Recent Enhancements
-- Use-case layer: declarative use-case specs (goal, constraints, notes) that drive prompt/rubric generation for both executor and judge.
-- Model recommendations: orchestrator suggests models from OpenRouter based on use-case traits (e.g., long-context, cost priority) with env-driven defaults (e.g., `GENERAL_TASK_LLM`).
-- UI: FastAPI + Streamlit for selecting use-cases, inputs, recommended models, running evaluations, judging, and viewing recommendations.
-- Cost visibility: inline + generation lookup billing, per-run and per-use-case rollups displayed in CLI and UI.
-- Parallel execution by default with retry/backoff and rate limiting hooks.
-- Model-aware chunking: executor derives chunk sizes from selected models’ context windows (cached), with overlap for continuity; CLI/UI share the same chunked flow.
+- **Folder-based use cases**: Human-readable USE-CASE.md files with automatic prompt generation from ground truth analysis
+- **LLM-driven prompt generation**: Framework analyzes use case + ground truth to generate task prompts, judge prompts, and rubrics
+- **Results organization**: Auto-saved to `results/{usecase-name}/{timestamp}_{datafile}.json`
+- **Robust judge parsing**: Handles varied LLM response formats (floats, nested metrics, object violations)
+- **Timestamp range extraction**: Judge receives full context of input timestamp range for accurate evaluation
+- Model recommendations: orchestrator suggests models from OpenRouter based on use-case traits
+- Cost visibility: inline + generation lookup billing, per-run and per-use-case rollups
+- Parallel execution by default with retry/backoff and rate limiting hooks
+- Model-aware chunking: executor derives chunk sizes from selected models' context windows
 
 ### Key Features
 
-- **Task-Specific Evaluation**: Define custom tasks with YAML configuration
+- **Folder-Based Use Cases**: Define use cases in human-readable Markdown with automatic prompt generation
+- **Task-Specific Evaluation**: Custom tasks with YAML or folder-based configuration
 - **Multi-Model Support**: Evaluate multiple LLMs simultaneously via OpenRouter API
-- **LLM-as-Judge**: Automated evaluation using Claude Sonnet 4.5
+- **LLM-as-Judge**: Automated evaluation using Claude Sonnet 4.5 with robust response parsing
+- **Auto-Generated Prompts**: LLM analyzes use case and ground truth to derive optimal prompts and rubrics
 - **Cost Tracking**: Real-time cost calculation and tracking
 - **Rich CLI**: User-friendly command-line interface with progress indicators
-- **Extensible Design**: Easy to add new models, tasks, and evaluation criteria
+- **Results Organization**: Auto-organized by use case with timestamped filenames
 
 ### Design Philosophy
 
@@ -96,7 +101,10 @@ flowchart TD
 
 **Key Commands**:
 
-- `evaluate`: Run multi-model evaluation on a task
+- `run`: Run evaluation on a folder-based use case (primary command)
+- `list-usecases`: List available use cases in a folder
+- `generate-prompts`: Generate prompts from use case without running
+- `evaluate`: Run multi-model evaluation on a YAML task (legacy)
 - `models`: List available models and pricing
 - `validate`: Validate task definition YAML files
 
@@ -668,15 +676,86 @@ The architecture supports the core workflow: define tasks declaratively, execute
 
 **Design Pattern**: Strategy/filtering heuristics with env-driven defaults.
 
-### 11. Use-Case Layer (`usecases/*.yaml`)
+### 11. Folder-Based Use Case System
 
-**Purpose**: Capture intent/constraints beyond the task schema.
+The framework now supports a folder-based use case architecture that replaces YAML-based task definitions with human-readable Markdown and automatic prompt generation.
 
-**Fields (example)**:
-- name, goal, chunk_min/max, coverage_required, notes.
-- default_judge_model (can reference env, e.g., `${GENERAL_TASK_LLM:-anthropic/claude-sonnet-4.5}`).
-- default_candidate_models (seed list, not hard-wired).
+#### Use Case Parser (`taskbench/usecase_parser.py`)
 
-**Usage**:
-- Executor and Judge consume the use-case to build prompts/rubrics.
-- Orchestrator uses it to recommend models.
+**Purpose**: Parse folder-based use cases from USE-CASE.md files.
+
+**Responsibilities**:
+- Parse USE-CASE.md Markdown files
+- Extract goal, difficulty, evaluation notes, edge cases
+- Scan data/ and ground-truth/ folders
+- Match input files to expected outputs by naming patterns
+- Return structured ParsedUseCase object
+
+**Folder Structure**:
+```
+sample-usecases/00-lecture-concept-extraction/
+├── USE-CASE.md           # Human-readable description
+├── data/                 # Input files
+│   ├── lecture-01-python-basics.txt
+│   └── lecture-02-ml-fundamentals.txt
+├── ground-truth/         # Expected outputs
+│   ├── lecture-01-concepts.csv
+│   └── lecture-02-concepts.csv
+├── generated-prompts.json  # Cached prompts (auto-generated)
+└── prompts/              # Individual prompt files
+    ├── task-prompt.txt
+    ├── judge-prompt.txt
+    ├── rubric.json
+    └── analysis.json
+```
+
+#### Prompt Generator (`taskbench/prompt_generator.py`)
+
+**Purpose**: Generate task prompts, judge prompts, and rubrics using LLM analysis.
+
+**Responsibilities**:
+- Analyze USE-CASE.md content and ground truth samples
+- Generate task prompt optimized for the transformation
+- Generate judge prompt with evaluation criteria
+- Derive rubric with compliance checks and penalties
+- Cache generated prompts to avoid regeneration
+
+**Generation Flow**:
+1. Send use case content + ground truth sample to LLM
+2. LLM returns analysis of transformation type and key fields
+3. Generate task prompt with specific instructions
+4. Generate judge prompt with scoring rubric
+5. Save to generated-prompts.json and prompts/ folder
+
+#### Results Organization
+
+**Purpose**: Auto-organize evaluation results by use case.
+
+**Structure**:
+```
+results/
+├── 00-lecture-concept-extraction/
+│   ├── 2025-12-26_233901_lecture-01-python-basics.json
+│   └── 2025-12-26_235012_lecture-02-ml-fundamentals.json
+├── 01-meeting-action-items/
+│   └── 2025-12-26_234802_meeting-01-standup.json
+└── _legacy/
+    └── (old YAML-based results)
+```
+
+**Naming Convention**: `{YYYY-MM-DD}_{HHMMSS}_{data-file-name}.json`
+
+#### Judge Enhancements
+
+**Robust Response Parsing**:
+- Handles floats converted to ints for scores
+- Supports `summary` as fallback for `reasoning`
+- Supports `final_score` as fallback for `overall_score`
+- Handles scores nested in `metrics` dict
+- Converts object-based violations to strings
+
+**Timestamp Range Extraction**:
+- Extracts first and last timestamps from input data
+- Provides full timestamp range context to judge
+- Shows both beginning and ending of long inputs
+- Prevents false "fabrication" accusations for valid timestamps
