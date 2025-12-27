@@ -59,6 +59,239 @@ def extract_timestamp_range(text: str) -> Optional[Tuple[str, str]]:
     return (first_ts, last_ts)
 
 
+def timestamp_to_seconds(ts: str) -> int:
+    """Convert HH:MM:SS or MM:SS timestamp to seconds."""
+    parts = ts.split(':')
+    if len(parts) == 3:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    elif len(parts) == 2:
+        return int(parts[0]) * 60 + int(parts[1])
+    return 0
+
+
+def normalize_timestamp(ts: str) -> str:
+    """Normalize timestamp to HH:MM:SS format."""
+    parts = ts.split(':')
+    if len(parts) == 2:
+        return f"00:{parts[0].zfill(2)}:{parts[1].zfill(2)}"
+    elif len(parts) == 3:
+        return f"{parts[0].zfill(2)}:{parts[1].zfill(2)}:{parts[2].zfill(2)}"
+    return ts
+
+
+class ProgrammaticValidator:
+    """
+    Validates model outputs programmatically before/alongside LLM judge scoring.
+
+    Performs structural checks that don't require LLM interpretation:
+    - JSON parsing validation
+    - Timestamp range validation
+    - Duration constraint checking
+    - Required field presence
+
+    This helps catch clear errors (hallucinated timestamps, invalid JSON) that
+    might otherwise receive inconsistent scores from the LLM judge.
+    """
+
+    def __init__(self, input_data: str, constraints: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the validator.
+
+        Args:
+            input_data: The input data (used to extract valid timestamp range)
+            constraints: Task constraints (e.g., min/max duration)
+        """
+        self.input_data = input_data
+        self.constraints = constraints or {}
+        self.ts_range = extract_timestamp_range(input_data)
+        self.violations: List[str] = []
+
+    def validate_json(self, output: str) -> Tuple[bool, Optional[Any], List[str]]:
+        """
+        Validate that output is valid JSON.
+
+        Returns:
+            Tuple of (is_valid, parsed_data, violations)
+        """
+        violations = []
+        try:
+            # Strip markdown code blocks
+            content = output.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            elif content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+            parsed = json.loads(content)
+            return True, parsed, violations
+        except json.JSONDecodeError as e:
+            violations.append(f"Invalid JSON output: {str(e)[:100]}")
+            return False, None, violations
+
+    def validate_timestamp_range(
+        self,
+        parsed_data: Any,
+        start_field: str = "start_time",
+        end_field: str = "end_time"
+    ) -> List[str]:
+        """
+        Validate that all timestamps in output are within valid range.
+
+        Args:
+            parsed_data: Parsed JSON output (list of items)
+            start_field: Field name for start timestamp
+            end_field: Field name for end timestamp
+
+        Returns:
+            List of violation strings
+        """
+        violations = []
+
+        if not self.ts_range:
+            # Can't validate without knowing valid range
+            return violations
+
+        valid_start_secs = timestamp_to_seconds(self.ts_range[0])
+        valid_end_secs = timestamp_to_seconds(self.ts_range[1])
+
+        if not isinstance(parsed_data, list):
+            return violations
+
+        for i, item in enumerate(parsed_data):
+            if not isinstance(item, dict):
+                continue
+
+            start_ts = item.get(start_field, "")
+            end_ts = item.get(end_field, "")
+
+            if start_ts:
+                start_normalized = normalize_timestamp(str(start_ts))
+                start_secs = timestamp_to_seconds(start_normalized)
+                if start_secs < valid_start_secs - 60:  # 1 min tolerance
+                    violations.append(
+                        f"Item {i+1}: start_time '{start_ts}' is before valid input range ({self.ts_range[0]})"
+                    )
+                if start_secs > valid_end_secs + 60:
+                    violations.append(
+                        f"Item {i+1}: start_time '{start_ts}' is after valid input range ({self.ts_range[1]})"
+                    )
+
+            if end_ts:
+                end_normalized = normalize_timestamp(str(end_ts))
+                end_secs = timestamp_to_seconds(end_normalized)
+                if end_secs > valid_end_secs + 60:  # 1 min tolerance
+                    violations.append(
+                        f"Item {i+1}: end_time '{end_ts}' is after valid input range ({self.ts_range[1]})"
+                    )
+
+        return violations
+
+    def validate_duration_constraints(
+        self,
+        parsed_data: Any,
+        start_field: str = "start_time",
+        end_field: str = "end_time"
+    ) -> List[str]:
+        """
+        Validate that segment durations meet constraints.
+
+        Args:
+            parsed_data: Parsed JSON output (list of items)
+            start_field: Field name for start timestamp
+            end_field: Field name for end timestamp
+
+        Returns:
+            List of violation strings
+        """
+        violations = []
+
+        min_duration_mins = self.constraints.get("min_segment_duration_minutes") or \
+                           self.constraints.get("min_duration_minutes") or \
+                           self.constraints.get("chunk_min_minutes")
+        max_duration_mins = self.constraints.get("max_segment_duration_minutes") or \
+                           self.constraints.get("max_duration_minutes") or \
+                           self.constraints.get("chunk_max_minutes")
+
+        if not isinstance(parsed_data, list):
+            return violations
+
+        for i, item in enumerate(parsed_data):
+            if not isinstance(item, dict):
+                continue
+
+            start_ts = item.get(start_field, "")
+            end_ts = item.get(end_field, "")
+
+            if start_ts and end_ts:
+                try:
+                    start_secs = timestamp_to_seconds(normalize_timestamp(str(start_ts)))
+                    end_secs = timestamp_to_seconds(normalize_timestamp(str(end_ts)))
+                    duration_mins = (end_secs - start_secs) / 60
+
+                    if min_duration_mins and duration_mins < min_duration_mins:
+                        violations.append(
+                            f"Item {i+1}: duration {duration_mins:.1f}min < minimum {min_duration_mins}min"
+                        )
+                    if max_duration_mins and duration_mins > max_duration_mins:
+                        violations.append(
+                            f"Item {i+1}: duration {duration_mins:.1f}min > maximum {max_duration_mins}min"
+                        )
+                except Exception:
+                    pass  # Skip if we can't parse timestamps
+
+        return violations
+
+    def validate(
+        self,
+        output: str,
+        start_field: str = "start_time",
+        end_field: str = "end_time"
+    ) -> Dict[str, Any]:
+        """
+        Run all programmatic validations on model output.
+
+        Returns:
+            Dict with:
+                - is_valid_json: bool
+                - parsed_data: parsed JSON or None
+                - violations: list of all violations
+                - validation_score: 0-100 score based on violation count
+        """
+        all_violations = []
+
+        # JSON validation
+        is_valid_json, parsed_data, json_violations = self.validate_json(output)
+        all_violations.extend(json_violations)
+
+        if is_valid_json and parsed_data:
+            # Timestamp range validation
+            ts_violations = self.validate_timestamp_range(parsed_data, start_field, end_field)
+            all_violations.extend(ts_violations)
+
+            # Duration constraint validation
+            duration_violations = self.validate_duration_constraints(parsed_data, start_field, end_field)
+            all_violations.extend(duration_violations)
+
+        # Calculate a programmatic score (100 - penalty for violations)
+        if not is_valid_json:
+            validation_score = 0  # Invalid JSON = 0
+        else:
+            item_count = len(parsed_data) if isinstance(parsed_data, list) else 1
+            violation_penalty = min(len(all_violations) * 10, 100)
+            validation_score = max(0, 100 - violation_penalty)
+
+        return {
+            "is_valid_json": is_valid_json,
+            "parsed_data": parsed_data,
+            "violations": all_violations,
+            "validation_score": validation_score,
+            "item_count": len(parsed_data) if isinstance(parsed_data, list) else 0
+        }
+
+
 class LLMJudge:
     """
     Use an LLM to evaluate model outputs.
@@ -296,12 +529,19 @@ class LLMJudge:
         usecase: Any = None
     ) -> JudgeScore:
         """
-        Evaluate a model's output using LLM-as-judge.
+        Evaluate a model's output using LLM-as-judge with programmatic pre-validation.
+
+        The evaluation process:
+        1. Run programmatic validation (JSON parsing, timestamp range, duration constraints)
+        2. Call LLM judge for semantic evaluation
+        3. Merge programmatic violations with LLM-identified violations
+        4. Adjust scores if programmatic checks found issues LLM missed
 
         Args:
             task: TaskDefinition with evaluation criteria
             result: EvaluationResult to evaluate
             input_data: Original input data
+            usecase: Optional UseCase for additional context
 
         Returns:
             JudgeScore with scores and violations
@@ -310,6 +550,23 @@ class LLMJudge:
             Exception: If judge fails to return valid JSON
         """
         logger.info(f"Evaluating {result.model_name} output with judge {self.judge_model}")
+
+        # Step 1: Run programmatic validation first
+        constraints = dict(task.constraints) if task.constraints else {}
+        if usecase:
+            if hasattr(usecase, 'chunk_min_minutes') and usecase.chunk_min_minutes:
+                constraints['chunk_min_minutes'] = usecase.chunk_min_minutes
+            if hasattr(usecase, 'chunk_max_minutes') and usecase.chunk_max_minutes:
+                constraints['chunk_max_minutes'] = usecase.chunk_max_minutes
+
+        validator = ProgrammaticValidator(input_data, constraints)
+        prog_validation = validator.validate(result.output)
+
+        logger.info(
+            f"Programmatic validation for {result.model_name}: "
+            f"valid_json={prog_validation['is_valid_json']}, "
+            f"violations={len(prog_validation['violations'])}"
+        )
 
         # Build judge prompt (async to allow LLM-based rubric generation)
         prompt = await self.build_judge_prompt(task, result.output, input_data, usecase=usecase)
@@ -379,15 +636,61 @@ class LLMJudge:
                 else:
                     reasoning = "Evaluation complete."
 
+            # Step 3: Merge programmatic violations with LLM-identified violations
+            prog_violations = prog_validation.get("violations", [])
+            all_violations = list(violations)  # Start with LLM violations
+
+            # Add programmatic violations that aren't already identified
+            for pv in prog_violations:
+                # Check if this violation is already covered by LLM
+                already_covered = any(
+                    pv.lower() in v.lower() or v.lower() in pv.lower()
+                    for v in violations
+                )
+                if not already_covered:
+                    all_violations.append(f"[PROGRAMMATIC] {pv}")
+
+            # Step 4: Adjust scores if programmatic validation found issues
+            final_format_score = format_sc
+            final_compliance_score = compliance
+            final_overall = overall
+
+            if not prog_validation["is_valid_json"]:
+                # Invalid JSON should heavily penalize format score
+                final_format_score = min(format_sc, 20)
+                final_compliance_score = min(compliance, 30)
+                final_overall = min(overall, 25)
+                logger.warning(f"{result.model_name}: Invalid JSON output - scores adjusted")
+
+            elif prog_violations:
+                # If programmatic validation found violations, ensure scores reflect this
+                prog_violation_count = len(prog_violations)
+                if prog_violation_count > 3:
+                    # Many violations - cap compliance score
+                    max_compliance = max(30, 100 - (prog_violation_count * 8))
+                    if compliance > max_compliance:
+                        final_compliance_score = max_compliance
+                        # Recalculate overall
+                        final_overall = int(accuracy * 0.3 + format_sc * 0.2 + final_compliance_score * 0.5)
+                        logger.info(
+                            f"{result.model_name}: Compliance capped at {max_compliance} "
+                            f"due to {prog_violation_count} programmatic violations"
+                        )
+
+            # Append programmatic validation info to reasoning
+            prog_reasoning = ""
+            if prog_violations:
+                prog_reasoning = f" [Programmatic checks found {len(prog_violations)} additional violations]"
+
             # Create JudgeScore
             score = JudgeScore(
                 model_evaluated=result.model_name,
                 accuracy_score=accuracy,
-                format_score=format_sc,
-                compliance_score=compliance,
-                overall_score=overall,
-                violations=violations,
-                reasoning=reasoning
+                format_score=final_format_score,
+                compliance_score=final_compliance_score,
+                overall_score=final_overall,
+                violations=all_violations,
+                reasoning=reasoning + prog_reasoning
             )
 
             logger.info(

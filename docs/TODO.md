@@ -1,10 +1,23 @@
 # LLM TaskBench - TODO (Post-MVP Features)
 
-**Last Updated**: 2025-11-18  
-**Version**: 0.1.0-alpha  
-**Status**: MVP in progress (4-6 weeks)
+**Last Updated**: 2025-12-27
+**Version**: 0.1.0
+**Status**: MVP complete - folder-based use cases working
 
 This document tracks all features, enhancements, and improvements planned for **after MVP completion**.
+
+---
+
+## ✅ Recently Completed (2025-12-27)
+
+- [x] **Folder-based Use Case Architecture** - USE-CASE.md format with data/ground-truth folders
+- [x] **LLM-powered Model Selection** - Two-phase ModelSelector with task analysis + ranking
+- [x] **Programmatic Validation in Judge** - JSON parsing, timestamp range, duration constraint checks
+- [x] **Cost Accuracy via OpenRouter** - Inline usage tracking with billed_cost_usd from API
+- [x] **Model Catalog Caching** - 24-hour TTL cache in `.cache/openrouter_models.json`
+- [x] **Dynamic Orchestrator** - `select_models_dynamically()` integrates with ModelSelector
+- [x] **Docker Compose Polish** - Removed obsolete version, added sample-usecases volumes, usage docs
+- [x] **Anti-hallucination Guards** - Executor prompts include strict rules about timestamp ranges
 
 ---
 
@@ -162,6 +175,51 @@ This document tracks all features, enhancements, and improvements planned for **
   - Estimate fine-tuning ROI
   - Generate training data suggestions
   - **Why Deferred**: Advanced use case
+
+---
+
+## 🎯 Near-Term Improvements
+
+Items identified during development that would enhance the framework.
+
+### Chunking & Large Input Handling
+
+- [ ] **Auto-chunking for Large Inputs**
+  - **Problem**: Chunked mode is CLI opt-in (`--chunked` flag); long inputs run single-shot unless explicitly configured
+  - **Solution**: Detect input length vs model context window and auto-enable chunking when input exceeds 80% of available context
+  - **Implementation**: Add `auto_chunk` parameter to executor; estimate tokens via chars/4 heuristic; warn user when auto-chunking
+  - **Why Deferred**: Current chunking works well with explicit flags; auto-detection needs careful threshold tuning
+
+- [ ] **Token-aware Chunk Sizing**
+  - **Problem**: Dynamic chunking uses char-based estimation (4 chars/token) which varies significantly by content type and language
+  - **Solution**: Integrate provider-specific tokenizers (tiktoken for OpenAI, Claude tokenizer for Anthropic) for precise sizing
+  - **Implementation**: Add optional tokenizer dependency; use tokenizer when available, fall back to char heuristic
+  - **Why Deferred**: Char-based works well enough for English text; tokenizer adds dependency complexity
+
+### UI Completeness
+
+- [ ] **Chunking Controls in UI**
+  - **Problem**: UI does not expose chunked/dynamic chunk controls that CLI has
+  - **Solution**: Add chunking toggle and settings to API endpoints and React UI
+  - **Implementation**: Extend `/api/evaluate` endpoint with `chunk_mode`, `chunk_chars` params; add UI controls
+
+- [ ] **Run History with Judge Reruns**
+  - **Problem**: No way to view past runs or re-run judge on saved results
+  - **Solution**: Add run history view with ability to re-judge results with different models/prompts
+  - **Implementation**: Store runs in `/results` with metadata; add history API endpoint; add history component
+
+- [ ] **Cost Rollups and Totals**
+  - **Problem**: UI doesn't show cumulative costs across runs
+  - **Solution**: Display total cost per session, per use-case, and global
+  - **Implementation**: Use existing CostTracker.get_global_costs(); add cost dashboard component
+
+### Orchestrator Enhancements
+
+- [ ] **Use-Case Traits → Model Scoring → Selection Rationale**
+  - **Problem**: While ModelSelector does LLM-based analysis, the selection rationale could be richer
+  - **Solution**: Emit detailed trace of why each model was selected/rejected; include use-case trait matching
+  - **Implementation**: Extend ModelSelector to return `selection_trace` with per-model reasoning
+  - **Why Deferred**: Current implementation provides "why" field per model; full trace adds complexity
 
 ---
 

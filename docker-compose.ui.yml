@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   taskbench-api:
     build:
@@ -26,6 +24,9 @@ services:
       - ./config:/app/config
       - ./results:/app/results
       - ./tests/fixtures:/app/tests/fixtures
+      - ./sample-usecases:/app/sample-usecases
+      - ./usecases:/app/usecases
+      - ./.cache:/app/.cache
     working_dir: /app
     command: ["uvicorn", "taskbench.ui_api:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
@@ -42,9 +43,34 @@ services:
       - ./config:/app/config
       - ./results:/app/results
       - ./tests/fixtures:/app/tests/fixtures
+      - ./sample-usecases:/app/sample-usecases
+      - ./usecases:/app/usecases
     working_dir: /app
     command: ["streamlit", "run", "ui_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
     ports:
       - "8501:8501"
     depends_on:
       - taskbench-api
+
+# Usage:
+#
+#   Start both API and UI services:
+#     docker compose -f docker-compose.ui.yml up --build
+#
+#   Access points:
+#     - API:       http://localhost:8000
+#     - API Docs:  http://localhost:8000/docs
+#     - UI:        http://localhost:8501
+#
+#   Run in background:
+#     docker compose -f docker-compose.ui.yml up -d
+#
+#   View logs:
+#     docker compose -f docker-compose.ui.yml logs -f
+#
+#   Stop services:
+#     docker compose -f docker-compose.ui.yml down
+#
+# Environment Variables:
+#   Required: OPENROUTER_API_KEY (set in .env file)
+#   See CLAUDE.md for all configurable environment variables

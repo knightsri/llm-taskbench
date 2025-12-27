@@ -1,11 +1,14 @@
-﻿"""
+"""
 LLM Orchestrator for LLM TaskBench.
 
-Provides model selection heuristics and cost estimation.
+Provides intelligent model selection using either:
+1. Dynamic LLM-powered selection via ModelSelector (recommended)
+2. Heuristic-based selection for quick/offline scenarios
 """
 
 import logging
-from typing import List, Optional
+import os
+from typing import Any, Dict, List, Optional
 
 from taskbench.api.client import OpenRouterClient
 from taskbench.core.models import TaskDefinition
@@ -17,36 +20,103 @@ logger = logging.getLogger(__name__)
 class LLMOrchestrator:
     """
     Intelligent model selection orchestrator.
+
+    Supports two modes:
+    1. Dynamic mode (default): Uses ModelSelector for LLM-powered analysis
+    2. Heuristic mode: Uses predefined model lists for quick selection
+
+    Example:
+        ```python
+        orchestrator = LLMOrchestrator(api_client)
+
+        # Dynamic selection (recommended for production)
+        models = await orchestrator.select_models_dynamically(
+            use_case_description="Extract concepts from lectures",
+            tiers=["quality", "value", "budget"]
+        )
+
+        # Heuristic selection (quick/offline)
+        models = await orchestrator.create_evaluation_plan(task)
+        ```
     """
 
+    # Fallback model lists for heuristic mode (when dynamic selection unavailable)
     DEFAULT_MODELS = [
-        "anthropic/claude-sonnet-4.5",
+        "anthropic/claude-sonnet-4",
         "openai/gpt-4o",
-        "google/gemini-2.0-flash-exp",
+        "google/gemini-2.5-flash",
     ]
 
     LARGE_CONTEXT_MODELS = [
-        "anthropic/claude-sonnet-4.5",
-        "google/gemini-2.0-flash-exp",
+        "anthropic/claude-sonnet-4",
+        "google/gemini-2.5-flash",
         "openai/gpt-4-turbo",
     ]
 
     BUDGET_MODELS = [
-        "google/gemini-2.0-flash-exp",
-        "anthropic/claude-haiku-3.5",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-3.5-haiku",
         "openai/gpt-4o-mini",
     ]
 
     PREMIUM_MODELS = [
-        "anthropic/claude-sonnet-4.5",
+        "anthropic/claude-sonnet-4",
         "openai/gpt-4o",
-        "google/gemini-pro-1.5",
+        "google/gemini-2.5-pro",
     ]
 
     def __init__(self, api_client: OpenRouterClient):
         self.api_client = api_client
         self.cost_tracker = CostTracker()
+        self._model_selector = None  # Lazy-loaded
         logger.info("LLMOrchestrator initialized")
+
+    async def select_models_dynamically(
+        self,
+        use_case_description: str,
+        tiers: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Select models using LLM-powered analysis (recommended).
+
+        This method uses the ModelSelector to:
+        1. Analyze task requirements via LLM
+        2. Filter 350+ OpenRouter models programmatically
+        3. Rank candidates by tier via LLM
+
+        Args:
+            use_case_description: Description of the use case/task
+            tiers: List of tiers to include ["quality", "value", "budget", "speed"]
+                   Default: ["quality", "value", "budget"]
+
+        Returns:
+            Dict with:
+                - task_analysis: LLM's analysis of requirements
+                - models: Ranked list with costs and rationale
+                - suggested_test_order: Recommended evaluation order
+        """
+        from taskbench.evaluation.model_selector import ModelSelector
+
+        if self._model_selector is None:
+            self._model_selector = ModelSelector(self.api_client)
+
+        return await self._model_selector.recommend_models(use_case_description, tiers=tiers)
+
+    def get_recommended_model_ids(self, selection_result: Dict[str, Any]) -> List[str]:
+        """
+        Extract model IDs from a dynamic selection result.
+
+        Args:
+            selection_result: Result from select_models_dynamically()
+
+        Returns:
+            List of model IDs in suggested order
+        """
+        if "suggested_test_order" in selection_result:
+            return selection_result["suggested_test_order"]
+
+        models = selection_result.get("models", [])
+        return [m.get("model_id") for m in models if m.get("model_id")]
 
     async def create_evaluation_plan(
         self,
@@ -150,12 +220,48 @@ class LLMOrchestrator:
             "average": sum(costs) / len(costs)
         }
 
+    async def recommend_for_usecase_dynamic(
+        self,
+        usecase_goal: str,
+        prioritize_cost: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Recommend models for a use case using LLM-powered analysis (async).
+
+        This is the recommended method for production use. It analyzes the use case
+        description and selects optimal models from 350+ available on OpenRouter.
+
+        Args:
+            usecase_goal: Description of the use case goal
+            prioritize_cost: If True, prioritize budget/value tiers over quality
+
+        Returns:
+            Dict with task_analysis, models list, and suggested_test_order
+        """
+        tiers = ["budget", "value", "speed"] if prioritize_cost else ["quality", "value", "budget"]
+        return await self.select_models_dynamically(usecase_goal, tiers=tiers)
+
     def recommend_for_usecase(
         self,
         usecase_goal: str,
         require_large_context: bool = True,
         prioritize_cost: bool = False
     ) -> List[str]:
+        """
+        Recommend models using heuristic-based selection (sync, fallback).
+
+        Use recommend_for_usecase_dynamic() for production scenarios.
+        This method is provided for quick/offline scenarios where LLM-based
+        selection is not available or desired.
+
+        Args:
+            usecase_goal: Description of the use case (used for logging)
+            require_large_context: Filter to models with 120K+ context
+            prioritize_cost: Sort by cost (lowest first)
+
+        Returns:
+            List of recommended model IDs (max 5)
+        """
         tracker = CostTracker()
         models = tracker.list_models()
 
@@ -176,11 +282,12 @@ class LLMOrchestrator:
                 )
             )
         else:
+            # Updated fallback priority list (current frontier models)
             priority = [
-                "anthropic/claude-sonnet-4.5",
+                "anthropic/claude-sonnet-4",
                 "openai/gpt-4o",
-                "google/gemini-2.0-flash-exp",
-                "qwen/qwen-2.5-72b-instruct"
+                "google/gemini-2.5-flash",
+                "deepseek/deepseek-chat"
             ]
             ordered = [m for m in priority if m in candidates]
             ordered += [m for m in candidates if m not in ordered]
