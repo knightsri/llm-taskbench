@@ -1,6 +1,9 @@
 # Archive
 Archive/
 
+# Claude Code local settings
+.claude/
+
 # LLM TaskBench specific
 /*.yaml
 results/
