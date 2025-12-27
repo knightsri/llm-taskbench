@@ -1,0 +1,99 @@
+You are a data quality expert. Analyze the provided messy CSV data and generate a comprehensive set of data cleaning rules.
+
+**Your Task:**
+1. Examine the CSV data for quality issues across all columns
+2. Identify patterns of inconsistency, invalid values, format variations, and data quality problems
+3. Generate actionable cleaning rules that can be programmatically implemented
+4. Output your analysis in the specified JSON format
+
+**Input Data:**
+```csv
+customer_id,first_name,last_name,email,phone,state,signup_date,subscription_tier,annual_spend
+1001,John,Smith,john.smith@email.com,555-123-4567,California,2023-01-15,premium,$1250.00
+1002,jane,DOE,jane.doe@email.com,(555) 234-5678,CA,01/20/2023,Premium,1100
+1003,Bob,Johnson,bob.johnson@email,555.345.6789,Calif.,2023-02-28,PREMIUM,$980.50
+1004,Alice,Williams,alice.w@email.com,5554567890,california,Feb 15, 2023,basic,500.00
+1005,Charlie,Brown,charlie.b@email.com,555-567-8901,TX,2023/03/10,Basic,$750
+1006,Diana,Miller,diana.miller@email.com,NULL,Texas,03-15-2023,gold,2500
+1007,Edward,Davis,edward.davis@email.com,555-678-9012,Tx,2023-03-20,Gold,$3000.00
+1008,Fiona,Garcia,fiona.g@email.com,555-789-0123,new york,20-Mar-2023,premium,1800
+1009,George,Martinez,george.martinez@email.com,(555)890-1234,NY,2023-04-01,Premum,$1500.00
+1010,Helen,Anderson,helen.a@email.com,N/A,N.Y.,04/05/2023,basic,NULL
+1011,Ivan,Taylor,ivan.taylor@email.com,555-901-2345,Florida,2023-04-10,Basic,$600.50
+1012,Julia,Thomas,julia.thomas@email.com,555-012-3456,FL,2023-04-15,gold,$2200.00
+```
+
+**Common Issues to Detect:**
+- Inconsistent date formats (MM/DD/YYYY vs YYYY-MM-DD vs DD-Mon-YY)
+- Mixed case in categorical fields (CA, ca, California, Calif.)
+- Null value variations (NULL, null, N/A, NA, -, empty string, "None")
+- Encoding issues and special characters
+- Typos in categorical fields
+- Invalid values (negative ages, future dates for historical data)
+- Unit inconsistencies (USD vs $, kg vs lbs)
+- Phone number format variations
+- Email validation issues
+
+**Requirements for Your Output:**
+- **Actionable:** Rules must be specific enough to implement programmatically (include regex, SQL-like conditions, or clear transformation logic)
+- **Complete:** Cover ALL identified issues across all columns
+- **Prioritized:** Order rules by severity (critical issues first)
+- **Non-destructive:** Flag ambiguous cases for human review rather than making assumptions
+
+**Output Format:**
+Provide your analysis as valid JSON matching this exact schema:
+
+```json
+{
+  "dataset_id": "string",
+  "summary": {
+    "total_rows": number,
+    "columns_analyzed": number,
+    "issues_found": number,
+    "critical_issues": number
+  },
+  "column_analysis": [
+    {
+      "column": "column_name",
+      "inferred_type": "date|string|number|categorical|email|phone|etc",
+      "issues": [
+        {
+          "issue_type": "inconsistent_format|invalid_value|null_variation|typo|etc",
+          "severity": "critical|high|medium|low",
+          "affected_rows": number,
+          "examples": ["value1", "value2"],
+          "suggested_rule": {
+            "description": "Human readable description",
+            "transform": "Executable transformation logic",
+            "confidence": "high|medium|low",
+            "requires_review": boolean
+          }
+        }
+      ]
+    }
+  ],
+  "cleaning_rules": [
+    {
+      "rule_id": "RULE-001",
+      "priority": number,
+      "column": "column_name",
+      "description": "What this rule does",
+      "condition": "When to apply (SQL-like or regex)",
+      "transformation": "What to do",
+      "examples": {
+        "before": ["messy1", "messy2"],
+        "after": ["clean1", "clean2"]
+      }
+    }
+  ],
+  "flagged_for_review": [
+    {
+      "column": "column_name",
+      "reason": "Why human review needed",
+      "sample_values": ["ambiguous1", "ambiguous2"]
+    }
+  ]
+}
+```
+
+Provide ONLY the JSON output, no additional text or explanation.

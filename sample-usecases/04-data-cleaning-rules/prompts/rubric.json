@@ -1,0 +1,132 @@
+{
+  "critical_requirements": [
+    {
+      "name": "date_format_standardization_detected",
+      "description": "Must identify inconsistent date formats across the signup_date column (YYYY-MM-DD, MM/DD/YYYY, DD-Mon-YYYY, MM-DD-YYYY, etc.) and provide rule to standardize to YYYY-MM-DD",
+      "derived_from": "Ground truth shows all dates standardized to YYYY-MM-DD format from 5+ different input formats",
+      "penalty_per_violation": 8
+    },
+    {
+      "name": "state_normalization_detected",
+      "description": "Must identify state name variations (California, Calif., california, CA, Texas, Tx, new york, NY, N.Y., Florida, FL) and provide rule to standardize to 2-letter uppercase codes",
+      "derived_from": "Ground truth shows all state values converted to 2-letter uppercase codes (CA, TX, NY, FL, WA, OR, AZ, NV)",
+      "penalty_per_violation": 8
+    },
+    {
+      "name": "categorical_case_inconsistency_detected",
+      "description": "Must identify mixed case in subscription_tier (premium, Premium, PREMIUM, basic, Basic, gold, Gold) and provide rule to standardize to lowercase",
+      "derived_from": "Ground truth shows all subscription_tier values in lowercase",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "typo_detection",
+      "description": "Must identify typo 'Premum' in subscription_tier and provide correction rule to 'premium'",
+      "derived_from": "Ground truth shows row 1009 'Premum' corrected to 'premium'",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "phone_format_standardization_detected",
+      "description": "Must identify phone number format variations ((555) 234-5678, 555.345.6789, 5554567890, (555)890-1234, 555-123-4567) and provide rule to standardize to XXX-XXX-XXXX",
+      "derived_from": "Ground truth shows all phone numbers in XXX-XXX-XXXX format",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "currency_cleaning_detected",
+      "description": "Must identify currency format inconsistencies in annual_spend ($1250.00, 1100, $980.50, 500.00, $750) and provide rule to remove $ and standardize to decimal format",
+      "derived_from": "Ground truth shows all annual_spend values as decimals without $ symbol, with 2 decimal places",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "null_variation_handling",
+      "description": "Must identify null value variations (NULL, N/A) and provide rule to standardize to empty string",
+      "derived_from": "Ground truth shows NULL and N/A converted to empty strings",
+      "penalty_per_violation": 3
+    },
+    {
+      "name": "name_case_normalization",
+      "description": "Must identify case inconsistencies in first_name and last_name (jane, DOE) and provide rule to capitalize first letter, lowercase rest",
+      "derived_from": "Ground truth shows jane \u2192 Jane, DOE \u2192 Doe",
+      "penalty_per_violation": 3
+    }
+  ],
+  "compliance_checks": [
+    {
+      "check": "valid_json_structure",
+      "condition": "Output is not valid JSON or cannot be parsed",
+      "severity": "CRITICAL",
+      "penalty": 15
+    },
+    {
+      "check": "required_fields_present",
+      "condition": "Missing any of: dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review",
+      "severity": "CRITICAL",
+      "penalty": 10
+    },
+    {
+      "check": "summary_fields_complete",
+      "condition": "summary object missing total_rows, columns_analyzed, issues_found, or critical_issues",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "column_analysis_structure",
+      "condition": "column_analysis missing required fields: column, inferred_type, issues array",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "issues_detail_complete",
+      "condition": "Issues missing: issue_type, severity, affected_rows, examples, or suggested_rule",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "cleaning_rules_structure",
+      "condition": "cleaning_rules missing: rule_id, priority, column, description, condition, transformation, or examples",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "actionability_of_rules",
+      "condition": "Rules contain vague transformations like 'clean the data' or 'fix inconsistencies' without specific logic",
+      "severity": "HIGH",
+      "penalty": 8
+    },
+    {
+      "check": "rule_correctness",
+      "condition": "Suggested transformation would produce incorrect output or break valid data",
+      "severity": "CRITICAL",
+      "penalty": 10
+    },
+    {
+      "check": "examples_accuracy",
+      "condition": "Before/after examples don't match the actual transformations needed",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "severity_appropriate",
+      "condition": "Severity levels (critical/high/medium/low) don't match impact (e.g., date format marked as 'low')",
+      "severity": "MEDIUM",
+      "penalty": 2
+    },
+    {
+      "check": "false_positive_issues",
+      "condition": "Flags valid data as problematic (e.g., correctly formatted values marked as errors)",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "data_types_correct",
+      "condition": "Numeric fields (total_rows, affected_rows, priority) stored as strings instead of numbers",
+      "severity": "LOW",
+      "penalty": 2
+    }
+  ],
+  "weights": {
+    "accuracy": 40,
+    "format": 20,
+    "compliance": 40
+  },
+  "scoring_instructions": "Start with 100 points. Evaluate in three categories: (1) ACCURACY (40 pts): Deduct penalties for each missed critical requirement based on penalty_per_violation. Award partial credit for partial detection. (2) FORMAT (20 pts): Deduct penalties for JSON structure violations, missing fields, incorrect data types. (3) COMPLIANCE (40 pts): Deduct penalties for non-actionable rules, incorrect transformations, missing examples, inappropriate severity levels. Award bonus points (up to +10) for exceptional actionability (specific regex/SQL patterns), identifying additional valid issues, or appropriate use of flagged_for_review. Final score = max(0, min(110, calculated_score))."
+}

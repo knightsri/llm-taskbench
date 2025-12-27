@@ -1,0 +1,96 @@
+{
+  "critical_requirements": [
+    {
+      "name": "matches_all_positive_examples",
+      "description": "The generated regex must match 100% of provided positive examples",
+      "derived_from": "Core task requirement - regex must have perfect recall on training set",
+      "penalty_per_violation": 4
+    },
+    {
+      "name": "rejects_all_negative_examples",
+      "description": "The generated regex must reject 100% of provided negative examples",
+      "derived_from": "Core task requirement - regex must have perfect precision on training set",
+      "penalty_per_violation": 4
+    },
+    {
+      "name": "generalizes_to_held_out_positive",
+      "description": "The regex must match held-out positive examples not shown during generation",
+      "derived_from": "Ground truth includes held_out_positive field for generalization testing",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "generalizes_to_held_out_negative",
+      "description": "The regex must reject held-out negative examples not shown during generation",
+      "derived_from": "Ground truth includes held_out_negative field for generalization testing",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "syntactically_valid_regex",
+      "description": "The regex must be valid and executable in standard regex engines",
+      "derived_from": "Task requirement for working regular expression",
+      "penalty_per_violation": 15
+    }
+  ],
+  "compliance_checks": [
+    {
+      "check": "output_format_valid_json",
+      "condition": "Output is not valid JSON or missing required fields",
+      "severity": "CRITICAL",
+      "penalty": 10
+    },
+    {
+      "check": "challenge_id_matches",
+      "condition": "challenge_id in output does not match input challenge_id",
+      "severity": "HIGH",
+      "penalty": 2
+    },
+    {
+      "check": "regex_field_present",
+      "condition": "regex field is missing or not a string",
+      "severity": "CRITICAL",
+      "penalty": 15
+    },
+    {
+      "check": "explanation_present",
+      "condition": "explanation field is missing or empty",
+      "severity": "MEDIUM",
+      "penalty": 2
+    },
+    {
+      "check": "confidence_valid",
+      "condition": "confidence is not one of: high, medium, low",
+      "severity": "MEDIUM",
+      "penalty": 2
+    },
+    {
+      "check": "test_results_complete",
+      "condition": "test_results object missing or lacks required numeric fields",
+      "severity": "MEDIUM",
+      "penalty": 2
+    },
+    {
+      "check": "anchors_present",
+      "condition": "Regex missing ^ or $ anchors when ground truth includes them",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "overfitting_detected",
+      "condition": "Regex appears to be overfitted (e.g., OR-ing specific examples)",
+      "severity": "CRITICAL",
+      "penalty": 20
+    },
+    {
+      "check": "excessive_length",
+      "condition": "Regex is more than 200% longer than ground truth solution",
+      "severity": "MEDIUM",
+      "penalty": 5
+    }
+  ],
+  "weights": {
+    "accuracy": 40,
+    "format": 10,
+    "compliance": 50
+  },
+  "scoring_instructions": "Calculate total score out of 100 points:\n\n1. CORRECTNESS ON PROVIDED EXAMPLES (40 points max):\n   - Start with 40 points\n   - Subtract 4 points for each positive example that fails to match\n   - Subtract 4 points for each negative example that incorrectly matches\n   - Floor at 0 points\n\n2. GENERALIZATION TO HELD-OUT EXAMPLES (30 points max):\n   - Start with 30 points\n   - Subtract 5 points for each held-out positive that fails\n   - Subtract 5 points for each held-out negative that incorrectly matches\n   - Floor at 0 points\n\n3. REGEX VALIDITY (15 points max):\n   - 15 points if regex compiles and executes\n   - 0 points if syntax error\n   - Subtract 5 points if missing required anchors\n\n4. FORMAT COMPLIANCE (10 points max):\n   - 2 points for correct challenge_id\n   - 2 points for regex field present\n   - 2 points for explanation present\n   - 2 points for valid confidence value\n   - 2 points for complete test_results object\n\n5. CONCISENESS (5 points max):\n   - 5 points if within 50% of ground truth length\n   - 3 points if 50-100% longer\n   - 1 point if 100-200% longer\n   - 0 points if >200% longer\n   - 0 points if overfitting detected\n\n6. APPLY PENALTIES:\n   - Subtract 20 points if overfitting detected\n   - Apply any other compliance check penalties\n\n7. FINAL SCORE:\n   - Sum all component scores\n   - Subtract all penalties\n   - Floor at 0, cap at 100\n\nProvide detailed breakdown showing each component score and all penalties applied."
+}

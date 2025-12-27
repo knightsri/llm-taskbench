@@ -1,0 +1,19 @@
+{
+  "transformation_type": "Data quality analysis and cleaning rule generation - The LLM must analyze messy CSV data, identify data quality issues across multiple dimensions (format inconsistencies, null variations, typos, case inconsistencies), and generate structured, actionable cleaning rules in JSON format",
+  "key_fields": [
+    "dataset_id",
+    "summary (total_rows, columns_analyzed, issues_found, critical_issues)",
+    "column_analysis (column, inferred_type, issues array with issue_type, severity, affected_rows, examples, suggested_rule)",
+    "cleaning_rules (rule_id, priority, column, description, condition, transformation, examples with before/after)",
+    "flagged_for_review (column, reason, sample_values)"
+  ],
+  "quality_indicators": [
+    "Detection rate: Identifies all major issue types (date format inconsistencies, state abbreviation variations, case inconsistencies in categorical fields, null value variations, currency format issues, phone number format variations, typos like 'Premum')",
+    "Rule correctness: Generated rules would transform messy data to match ground truth (e.g., standardize dates to YYYY-MM-DD, states to 2-letter codes, subscription_tier to lowercase, phone to XXX-XXX-XXXX format, annual_spend to decimal without $ or currency symbols)",
+    "Actionability: Rules include specific transformations (regex patterns, standardization logic, normalization steps)",
+    "Completeness: Covers all 9 columns with issues identified",
+    "Non-destructive: Flags ambiguous cases for review rather than making destructive assumptions",
+    "Proper severity classification: Critical issues affect data integrity, high/medium affect consistency"
+  ],
+  "comparison_strategy": "Compare detected issues against known ground truth transformations. For each column, verify: (1) Issue types identified match actual transformations needed (date standardization, state normalization, case normalization, null handling, currency cleaning, phone formatting, typo detection), (2) Suggested rules would produce ground truth output, (3) Severity appropriately assigned, (4) Examples provided are accurate, (5) Ambiguous cases flagged for review, (6) JSON schema compliance, (7) Rule priority ordering is logical"
+}

@@ -1,0 +1,121 @@
+You are evaluating the quality of bug report triage classifications produced by an LLM against human-labeled ground truth.
+
+**YOUR TASK**:
+Compare the LLM output against the ground truth classification and score it based on accuracy, format compliance, and reasoning quality.
+
+**EVALUATION CRITERIA**:
+
+## 1. CRITICAL FIELD ACCURACY (40 points)
+These fields must match exactly or have strong justification for deviation:
+
+- **severity** (10 points): Exact match required. Severity misclassification has serious business consequences.
+  - Critical/High confusion: -5 points (moderate impact)
+  - Medium/Low confusion: -3 points (minor impact)
+  - Critical/Low or High/Low confusion: -10 points (severe misclassification)
+  
+- **component** (10 points): Exact match required. Wrong component = wrong team assignment.
+  - Incorrect component: -10 points
+  - Acceptable if multi-component issue and LLM chose a reasonable primary: -3 points
+
+- **type** (10 points): Exact match required. Bug vs feature request distinction is critical.
+  - Incorrect type: -10 points
+  - Bug/feature_request confusion: -8 points (most critical distinction)
+
+- **root_cause_category** (5 points): Some flexibility allowed as this is often uncertain.
+  - Incorrect when ground truth is definitive (not "unknown"): -5 points
+  - Marked as "unknown" when ground truth has specific category: -2 points
+
+- **reproducibility** (5 points): Should match ground truth assessment.
+  - Incorrect reproducibility: -5 points
+  - Marked as "unknown" when insufficient info in report: -0 points (acceptable)
+
+## 2. FORMAT COMPLIANCE (20 points)
+
+- **Valid JSON structure** (5 points): Must be parseable JSON
+  - Invalid JSON: -5 points
+  
+- **Schema adherence** (10 points): All required fields present with correct types
+  - Missing required field: -3 points per field
+  - Incorrect field type: -2 points per field
+  
+- **Enum value compliance** (5 points): All categorical fields use exact allowed values
+  - Invalid enum value: -2 points per violation
+
+## 3. DUPLICATE DETECTION (15 points)
+
+- **Precision** (7 points): Are identified duplicates actually duplicates?
+  - False positive duplicate: -3 points per false positive
+  
+- **Recall** (8 points): Are known duplicates detected?
+  - Missed duplicate from ground truth: -4 points per miss
+  - Partial credit if identified with "low" confidence: -2 points
+
+## 4. REASONING QUALITY (15 points)
+
+- **severity_rationale** (8 points): Should explain business impact clearly
+  - Missing or vague rationale: -4 points
+  - Rationale contradicts severity choice: -8 points
+  - Rationale focuses on user emotion rather than impact: -3 points
+  
+- **duplicate rationale** (4 points): Should explain symptom similarity
+  - Missing rationale for duplicates: -2 points per duplicate
+  
+- **missing_information** (3 points): Should identify reasonable diagnostic gaps
+  - Completely missing when report is vague: -3 points
+  - Unreasonable requests: -1 point
+
+## 5. TEAM ASSIGNMENT (10 points)
+
+- **suggested_assignee_team** (10 points): Should logically map to component
+  - Incorrect team for component: -10 points
+  - Reasonable alternative team name: -3 points
+
+**SCORING CALCULATION**:
+1. Start with 100 points
+2. Apply penalties for each violation
+3. Minimum score: 0
+4. Maximum score: 100
+
+**OUTPUT FORMAT**:
+Provide your evaluation as JSON:
+
+```json
+{
+  "bug_id": "BUG-XXX",
+  "total_score": 85,
+  "category_scores": {
+    "critical_field_accuracy": 35,
+    "format_compliance": 20,
+    "duplicate_detection": 12,
+    "reasoning_quality": 13,
+    "team_assignment": 10
+  },
+  "violations": [
+    {
+      "category": "critical_field_accuracy",
+      "field": "severity",
+      "issue": "Marked as 'medium' but ground truth is 'high'",
+      "penalty": 5
+    }
+  ],
+  "strengths": ["List positive aspects of the classification"],
+  "weaknesses": ["List areas for improvement"],
+  "overall_assessment": "Brief summary of quality"
+}
+```
+
+**COMPARISON INSTRUCTIONS**:
+1. Load both LLM output and ground truth for the same bug_id
+2. Compare each field systematically
+3. For categorical fields: exact string match required (case-insensitive)
+4. For arrays (potential_duplicates, missing_information): check overlap and reasonableness
+5. For rationale fields: assess logical consistency and relevance
+6. Apply penalties according to the rubric above
+7. Provide constructive feedback in strengths/weaknesses
+
+**SPECIAL CONSIDERATIONS**:
+- If report is genuinely ambiguous, accept reasonable alternative classifications with explanation
+- For multi-component issues, accept any reasonable primary component choice
+- "unknown" is acceptable for root_cause and reproducibility when report lacks details
+- Duplicate detection: focus on symptom matching, not keyword matching
+- Severity assessment: prioritize business impact over user sentiment

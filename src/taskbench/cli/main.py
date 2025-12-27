@@ -25,6 +25,7 @@ from taskbench.evaluation.judge import LLMJudge
 from taskbench.evaluation.comparison import ModelComparison
 from taskbench.evaluation.recommender import RecommendationEngine
 from taskbench.usecase import UseCase, get_usecase_status, list_usecases, UseCaseRun
+from taskbench.usecase_parser import load_usecase_from_folder, list_sample_usecases
 
 # Load environment variables
 load_dotenv()
@@ -992,6 +993,476 @@ default_candidate_models:
                     console.print()
                 except Exception as e:
                     console.print(f"[red]{uc_path}: Error loading - {e}[/red]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def run(
+    usecase_folder: str = typer.Argument(
+        ...,
+        help="Path to use case folder (e.g., sample-usecases/00-lecture-concept-extraction)"
+    ),
+    data_file: Optional[str] = typer.Option(
+        None,
+        "--data",
+        "-d",
+        help="Specific data file to use (defaults to first in data/ folder)"
+    ),
+    models: Optional[str] = typer.Option(
+        None,
+        "--models",
+        "-m",
+        help="Comma-separated list of model IDs (auto-selects if not specified)"
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file for results (defaults to use case folder)"
+    ),
+    regenerate_prompts: bool = typer.Option(
+        False,
+        "--regenerate-prompts",
+        help="Force regeneration of prompts even if they exist"
+    ),
+    skip_judge: bool = typer.Option(
+        False,
+        "--skip-judge",
+        help="Skip judge evaluation"
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Enable verbose logging"
+    )
+):
+    """
+    Run evaluation on a folder-based use case.
+
+    This command uses the new architecture where use cases are defined as folders
+    containing USE-CASE.md, data/, and ground-truth/ subdirectories.
+
+    Examples:
+        taskbench run sample-usecases/00-lecture-concept-extraction
+        taskbench run sample-usecases/01-meeting-action-items --models gpt-4o,claude-sonnet-4.5
+    """
+    asyncio.run(_run_usecase_async(
+        usecase_folder,
+        data_file,
+        models,
+        output,
+        regenerate_prompts,
+        skip_judge,
+        verbose
+    ))
+
+
+import re
+
+
+def _extract_timestamp_range(text: str) -> tuple[Optional[str], Optional[str]]:
+    """Extract the first and last timestamps from text.
+
+    Looks for timestamps in formats like [00:00:00], 00:00:00, HH:MM:SS, MM:SS
+    Returns (first_timestamp, last_timestamp) or (None, None) if none found.
+    """
+    # Match various timestamp formats
+    patterns = [
+        r'\[(\d{1,2}:\d{2}:\d{2})\]',  # [00:00:00]
+        r'\[(\d{1,2}:\d{2})\]',         # [00:00]
+        r'(?:^|\s)(\d{1,2}:\d{2}:\d{2})(?:\s|$)',  # 00:00:00
+        r'(?:^|\s)(\d{1,2}:\d{2})(?:\s|$)',         # 00:00
+    ]
+
+    all_timestamps = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.MULTILINE)
+        all_timestamps.extend(matches)
+
+    if not all_timestamps:
+        return None, None
+
+    # Normalize to comparable format and find first/last
+    def normalize_ts(ts: str) -> tuple[int, str]:
+        """Convert timestamp to seconds for comparison, return (seconds, original)."""
+        parts = ts.split(':')
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1]), ts
+        elif len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]), ts
+        return 0, ts
+
+    normalized = [normalize_ts(ts) for ts in all_timestamps]
+    normalized.sort(key=lambda x: x[0])
+
+    return normalized[0][1], normalized[-1][1]
+
+
+async def _run_usecase_async(
+    usecase_folder: str,
+    data_file: Optional[str],
+    models_str: Optional[str],
+    output: Optional[str],
+    regenerate_prompts: bool,
+    skip_judge: bool,
+    verbose: bool
+):
+    """Async implementation of run command."""
+    try:
+        # Get API key
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            console.print("[red]Error: OPENROUTER_API_KEY not set in environment[/red]")
+            raise typer.Exit(1)
+
+        # Load and parse use case
+        console.print(f"[cyan]Loading use case from {usecase_folder}...[/cyan]")
+        parsed = load_usecase_from_folder(usecase_folder)
+        console.print(f"[green]Use case: {parsed.name}[/green]")
+        console.print(f"  Difficulty: {parsed.difficulty}")
+        console.print(f"  Output format: {parsed.output_format}")
+        console.print(f"  Data files: {len(parsed.data_files)}")
+        console.print(f"  Ground truth files: {len(parsed.ground_truth_files)}")
+        console.print(f"  Matched pairs: {len(parsed.matched_pairs)}")
+
+        if not parsed.matched_pairs:
+            console.print("[red]No matched data/ground-truth pairs found[/red]")
+            raise typer.Exit(1)
+
+        # Generate or load prompts
+        console.print("\n[cyan]Loading/generating prompts...[/cyan]")
+        from taskbench.prompt_generator import generate_prompts_for_usecase
+        prompts = await generate_prompts_for_usecase(
+            usecase_folder,
+            api_key=api_key,
+            force_regenerate=regenerate_prompts
+        )
+
+        console.print(f"[green]Prompts ready[/green]")
+        console.print(f"  Transformation: {prompts['analysis'].get('transformation_type', 'unknown')}")
+        console.print(f"  Key fields: {', '.join(prompts['analysis'].get('key_fields', [])[:5])}")
+
+        # Select data file
+        if data_file:
+            selected_pair = None
+            for pair in parsed.matched_pairs:
+                if pair.data_file.name in data_file or data_file in str(pair.data_file.path):
+                    selected_pair = pair
+                    break
+            if not selected_pair:
+                console.print(f"[red]Data file not found: {data_file}[/red]")
+                raise typer.Exit(1)
+        else:
+            selected_pair = parsed.matched_pairs[0]
+
+        console.print(f"\n[cyan]Using data file: {selected_pair.data_file.name}[/cyan]")
+
+        # Load input data
+        input_data = selected_pair.data_file.path.read_text(encoding="utf-8")
+        console.print(f"  Size: {len(input_data):,} characters, {selected_pair.data_file.line_count} lines")
+
+        # Select models
+        if models_str:
+            model_ids = [m.strip() for m in models_str.split(",")]
+        else:
+            # Auto-select models based on use case
+            console.print("\n[cyan]Auto-selecting models for use case...[/cyan]")
+            from taskbench.evaluation.model_selector import select_models_for_task
+            try:
+                model_result = await select_models_for_task(parsed.goal)
+                model_ids = model_result.get("suggested_test_order", [])[:3]
+                if not model_ids:
+                    model_ids = ["google/gemini-2.5-flash", "openai/gpt-4o", "anthropic/claude-sonnet-4.5"]
+            except Exception as e:
+                console.print(f"[yellow]Model selection failed, using defaults: {e}[/yellow]")
+                model_ids = ["google/gemini-2.5-flash", "openai/gpt-4o", "anthropic/claude-sonnet-4.5"]
+
+        console.print(f"[green]Models: {', '.join(model_ids)}[/green]")
+
+        # Create a task definition with generated prompt as description
+        from taskbench.core.models import TaskDefinition
+        task = TaskDefinition(
+            name=parsed.name.replace(" ", "_").lower(),
+            description=prompts['task_prompt'],  # Use generated task prompt
+            input_type="text",
+            output_format=parsed.output_format,
+            evaluation_criteria=prompts['analysis'].get('quality_indicators', []),
+            constraints={},
+            examples=[],
+            judge_instructions=prompts['judge_prompt']
+        )
+
+        # Initialize components
+        async with OpenRouterClient(api_key) as client:
+            cost_tracker = CostTracker()
+            executor = ModelExecutor(client, cost_tracker)
+
+            # Run evaluation using evaluate_multiple
+            results = await executor.evaluate_multiple(
+                model_ids=model_ids,
+                task=task,
+                input_data=input_data,
+                max_tokens=4000,
+                temperature=0.7
+            )
+
+            # Run judge if requested
+            scores = []
+            if not skip_judge and results:
+                console.print("\n[bold cyan]Running LLM-as-judge evaluation...[/bold cyan]\n")
+                judge = LLMJudge(client)
+
+                # Load ground truth for comparison
+                gt_content = selected_pair.ground_truth_file.content
+                if isinstance(gt_content, (dict, list)):
+                    gt_str = json.dumps(gt_content, indent=2)
+                else:
+                    gt_str = str(gt_content)
+
+                # Extract timestamp range from input for judge context
+                first_ts, last_ts = _extract_timestamp_range(input_data)
+                timestamp_info = ""
+                if first_ts and last_ts:
+                    timestamp_info = f"\n**Input timestamp range: {first_ts} to {last_ts}**\n"
+
+                for result in results:
+                    if result.status == "success":
+                        try:
+                            # Create enhanced judge prompt with ground truth
+                            # Use full ground truth (usually small) and preview of input
+                            # Show both start AND end of input to give judge full timestamp range context
+                            input_len = len(input_data)
+                            preview_start_len = min(input_len, 5000)
+                            preview_end_len = min(input_len, 3000)
+
+                            # Build input preview section
+                            if input_len <= 8000:
+                                # Input is small enough to show entirely
+                                input_preview = input_data
+                            else:
+                                # Show first 5000 chars and last 3000 chars
+                                input_preview = f"""{input_data[:preview_start_len]}
+
+[... MIDDLE CONTENT OMITTED FOR BREVITY ...]
+
+{input_data[-preview_end_len:]}"""
+
+                            enhanced_input = f"""# EXPECTED OUTPUT (GROUND TRUTH)
+```{selected_pair.ground_truth_file.format_type}
+{gt_str}
+```
+
+# MODEL'S ACTUAL OUTPUT
+{result.output}
+
+# ORIGINAL INPUT DATA CONTEXT
+{timestamp_info}
+**IMPORTANT: The input spans the FULL timestamp range shown above. Trust the timestamp range, not just the preview below.**
+
+Input length: {input_len:,} characters
+
+**Input content (first and last portions shown):**
+{input_preview}
+"""
+                            score = await judge.evaluate(task, result, enhanced_input)
+                            scores.append(score)
+                            console.print(
+                                f"[green]{result.model_name}[/green]: "
+                                f"Score {score.overall_score}/100, "
+                                f"{len(score.violations)} violations"
+                            )
+                        except Exception as e:
+                            console.print(f"[red]Failed to judge {result.model_name}: {e}[/red]")
+                            scores.append(None)
+                    else:
+                        scores.append(None)
+
+                # Show comparison
+                valid_results = [r for r, s in zip(results, scores) if s is not None]
+                valid_scores = [s for s in scores if s is not None]
+
+                if valid_scores:
+                    console.print("\n")
+                    comp = ModelComparison()
+                    comparison = comp.compare_results(valid_results, valid_scores)
+                    table = comp.generate_comparison_table(comparison)
+                    console.print(table)
+
+                    console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
+                    engine = RecommendationEngine()
+                    recs = engine.generate_recommendations(comparison)
+                    console.print(engine.format_recommendations(recs))
+
+            # Save results - organize by use case folder
+            if output:
+                output_path = Path(output)
+            else:
+                # Extract use case folder name (e.g., "00-lecture-concept-extraction")
+                usecase_name = Path(usecase_folder).name
+
+                # Create timestamp for unique filename
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
+                # Build path: results/{usecase-name}/{timestamp}_{data-file}.json
+                results_dir = Path("results") / usecase_name
+                output_path = results_dir / f"{timestamp}_{selected_pair.data_file.name}.json"
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            output_data = {
+                "usecase": {
+                    "name": parsed.name,
+                    "folder": usecase_folder,
+                    "data_file": str(selected_pair.data_file.path),
+                    "ground_truth_file": str(selected_pair.ground_truth_file.path)
+                },
+                "prompts": prompts,
+                "results": [r.model_dump() for r in results],
+                "scores": [s.model_dump() if s else None for s in scores] if scores else [],
+                "statistics": cost_tracker.get_statistics()
+            }
+
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(output_data, f, indent=2, default=str)
+
+            console.print(f"\n[green]Results saved to {output_path}[/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        if verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(1)
+
+
+@app.command("list-usecases")
+def list_usecases_cmd(
+    folder: str = typer.Option(
+        "sample-usecases",
+        "--folder",
+        "-f",
+        help="Folder containing use cases"
+    )
+):
+    """
+    List available use cases from the sample-usecases folder.
+
+    Example:
+        taskbench list-usecases
+        taskbench list-usecases --folder my-usecases
+    """
+    try:
+        usecases = list_sample_usecases(folder)
+
+        if not usecases:
+            console.print(f"[yellow]No use cases found in {folder}[/yellow]")
+            raise typer.Exit(0)
+
+        console.print(f"\n[bold cyan]Available Use Cases ({folder})[/bold cyan]\n")
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("#", style="dim")
+        table.add_column("Name", style="cyan")
+        table.add_column("Difficulty")
+        table.add_column("Format")
+        table.add_column("Data", justify="right")
+        table.add_column("GT", justify="right")
+
+        for i, uc in enumerate(usecases, 1):
+            if "error" in uc:
+                table.add_row(
+                    str(i),
+                    uc["folder_name"],
+                    "[red]Error[/red]",
+                    "-",
+                    "-",
+                    "-"
+                )
+            else:
+                table.add_row(
+                    str(i),
+                    uc["name"][:40] + "..." if len(uc.get("name", "")) > 40 else uc.get("name", ""),
+                    uc.get("difficulty", "-"),
+                    uc.get("output_format", "-"),
+                    str(uc.get("data_files", 0)),
+                    str(uc.get("ground_truth_files", 0))
+                )
+
+        console.print(table)
+        console.print()
+        console.print("[dim]Run a use case with: taskbench run <folder-path>[/dim]")
+        console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("generate-prompts")
+def generate_prompts_cmd(
+    usecase_folder: str = typer.Argument(
+        ...,
+        help="Path to use case folder"
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force regeneration even if prompts exist"
+    )
+):
+    """
+    Generate prompts for a use case by analyzing its data and ground truth.
+
+    This command uses an LLM to analyze the use case and generate:
+    - Task prompt (what to send to models being evaluated)
+    - Judge prompt (how to evaluate outputs)
+    - Rubric (scoring criteria)
+
+    Example:
+        taskbench generate-prompts sample-usecases/00-lecture-concept-extraction
+    """
+    asyncio.run(_generate_prompts_async(usecase_folder, force))
+
+
+async def _generate_prompts_async(usecase_folder: str, force: bool):
+    """Async implementation of generate-prompts command."""
+    try:
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            console.print("[red]Error: OPENROUTER_API_KEY not set[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[cyan]Loading use case from {usecase_folder}...[/cyan]")
+        parsed = load_usecase_from_folder(usecase_folder)
+        console.print(f"[green]Use case: {parsed.name}[/green]")
+
+        console.print("\n[cyan]Generating prompts...[/cyan]")
+        from taskbench.prompt_generator import generate_prompts_for_usecase
+
+        prompts = await generate_prompts_for_usecase(
+            usecase_folder,
+            api_key=api_key,
+            force_regenerate=force
+        )
+
+        console.print("\n[bold green]Prompts generated successfully![/bold green]")
+        console.print(f"\n[bold]Analysis:[/bold]")
+        console.print(f"  Transformation type: {prompts['analysis'].get('transformation_type')}")
+        console.print(f"  Key fields: {', '.join(prompts['analysis'].get('key_fields', []))}")
+        console.print(f"  Comparison strategy: {prompts['analysis'].get('comparison_strategy')}")
+
+        console.print(f"\n[bold]Files saved to {usecase_folder}/prompts/:[/bold]")
+        console.print("  - task-prompt.txt")
+        console.print("  - judge-prompt.txt")
+        console.print("  - rubric.json")
+        console.print("  - analysis.json")
+        console.print(f"\n  Full prompts: {usecase_folder}/generated-prompts.json")
 
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")

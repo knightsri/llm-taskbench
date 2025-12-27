@@ -24,6 +24,94 @@ export interface Task {
   updated_at: string;
 }
 
+/**
+ * Folder-based use case types
+ */
+export interface DataFile {
+  path: string;
+  name: string;
+  extension: string;
+  content_preview: string;
+  size_bytes: number;
+  line_count: number;
+}
+
+export interface GroundTruthFile {
+  path: string;
+  name: string;
+  extension: string;
+  format_type: string;
+}
+
+export interface DataGroundTruthPair {
+  data_file: DataFile;
+  ground_truth_file: GroundTruthFile;
+  match_pattern: string;
+}
+
+export interface UseCase {
+  path: string;
+  folder_name: string;
+  name: string;
+  difficulty?: string;
+  capability?: string;
+  goal?: string;
+  llm_notes?: string;
+  output_format?: string;
+  data_files: number;
+  ground_truth_files: number;
+  matched_pairs: number;
+  error?: string;
+}
+
+export interface UseCaseDetail {
+  folder_path: string;
+  name: string;
+  goal: string;
+  difficulty: string;
+  primary_capability: string;
+  token_range: string;
+  llm_notes: string;
+  expected_output_schema: string;
+  output_format: string;
+  quality_criteria: string;
+  edge_cases: string[];
+  data_files: DataFile[];
+  ground_truth_files: GroundTruthFile[];
+  matched_pairs: DataGroundTruthPair[];
+}
+
+export interface GeneratedPrompts {
+  analysis: {
+    transformation_type: string;
+    key_fields: string[];
+    quality_indicators: string[];
+    comparison_strategy: string;
+  };
+  task_prompt: string;
+  judge_prompt: string;
+  rubric: {
+    critical_requirements: Array<{
+      name: string;
+      description: string;
+      derived_from: string;
+      penalty_per_violation: number;
+    }>;
+    compliance_checks: Array<{
+      check: string;
+      condition: string;
+      severity: string;
+      penalty: number;
+    }>;
+    weights: {
+      accuracy: number;
+      format: number;
+      compliance: number;
+    };
+    scoring_instructions: string;
+  };
+}
+
 export interface ModelConfig {
   id: string;
   endpoint: string;

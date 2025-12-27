@@ -326,15 +326,68 @@ class LLMJudge:
         try:
             eval_data = json.loads(response.content)
 
+            # Handle scores that might be nested in a 'metrics' dict
+            metrics = eval_data.get("metrics", {})
+
+            # Extract scores with fallbacks (handle floats, nested values)
+            def get_score(key: str, fallback_key: str = None) -> int:
+                """Get score as int, checking main dict and metrics dict."""
+                val = eval_data.get(key)
+                if val is None and fallback_key:
+                    val = eval_data.get(fallback_key)
+                if val is None:
+                    val = metrics.get(key)
+                if val is None and fallback_key:
+                    val = metrics.get(fallback_key)
+                if val is None:
+                    return 0
+                return int(round(float(val)))
+
+            accuracy = get_score("accuracy_score")
+            format_sc = get_score("format_score")
+            compliance = get_score("compliance_score")
+            overall = get_score("overall_score", "final_score")
+
+            # Handle violations that might be objects instead of strings
+            raw_violations = eval_data.get("violations", [])
+            violations = []
+            for v in raw_violations:
+                if isinstance(v, str):
+                    violations.append(v)
+                elif isinstance(v, dict):
+                    # Extract description or format as string
+                    desc = v.get("description", v.get("message", str(v)))
+                    severity = v.get("severity", "")
+                    if severity:
+                        violations.append(f"{severity}: {desc}")
+                    else:
+                        violations.append(desc)
+
+            # Get reasoning with fallbacks
+            reasoning = eval_data.get("reasoning") or eval_data.get("summary") or ""
+            if not reasoning:
+                # Try to construct from strengths/weaknesses
+                strengths = eval_data.get("strengths", [])
+                weaknesses = eval_data.get("weaknesses", [])
+                if strengths or weaknesses:
+                    parts = []
+                    if strengths:
+                        parts.append("Strengths: " + "; ".join(strengths[:3]))
+                    if weaknesses:
+                        parts.append("Weaknesses: " + "; ".join(weaknesses[:3]))
+                    reasoning = " | ".join(parts)
+                else:
+                    reasoning = "Evaluation complete."
+
             # Create JudgeScore
             score = JudgeScore(
                 model_evaluated=result.model_name,
-                accuracy_score=eval_data["accuracy_score"],
-                format_score=eval_data["format_score"],
-                compliance_score=eval_data["compliance_score"],
-                overall_score=eval_data["overall_score"],
-                violations=eval_data.get("violations", []),
-                reasoning=eval_data["reasoning"]
+                accuracy_score=accuracy,
+                format_score=format_sc,
+                compliance_score=compliance,
+                overall_score=overall,
+                violations=violations,
+                reasoning=reasoning
             )
 
             logger.info(

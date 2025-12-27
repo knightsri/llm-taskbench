@@ -1,0 +1,149 @@
+{
+  "analysis": {
+    "transformation_type": "Multi-label classification with structured output generation - transforming unstructured bug reports into standardized, machine-readable JSON with severity, component, type, root cause, reproducibility classifications, plus duplicate detection and missing information identification",
+    "key_fields": [
+      "severity (critical/high/medium/low)",
+      "severity_rationale",
+      "component (ui/backend/database/auth/payments/api/mobile/infrastructure)",
+      "type (bug/feature_request/question/documentation)",
+      "root_cause_category (code_defect/configuration/data_issue/third_party/user_error/unknown)",
+      "reproducibility (always/sometimes/rare/cannot_reproduce)",
+      "potential_duplicates (array with bug_id, confidence, rationale)",
+      "missing_information (array)",
+      "suggested_assignee_team"
+    ],
+    "quality_indicators": [
+      "Correct severity assessment matching business impact (financial/legal=critical, unusable=high, degraded=medium, cosmetic=low)",
+      "Accurate component identification from symptom description",
+      "Proper distinction between bugs vs feature requests vs user errors",
+      "Appropriate root cause categorization when determinable",
+      "Realistic reproducibility assessment from report details",
+      "Detection of duplicate patterns across different phrasings",
+      "Identification of missing diagnostic information",
+      "Logical team assignment based on component"
+    ],
+    "comparison_strategy": "Field-by-field exact match for categorical fields (severity, component, type, root_cause_category, reproducibility, suggested_assignee_team). Semantic similarity check for rationale fields. Array overlap analysis for potential_duplicates with tolerance for confidence levels. Partial credit for missing_information if reasonable alternatives identified."
+  },
+  "task_prompt": "You are a bug triage specialist. Your task is to analyze incoming bug reports and classify them with structured attributes for automated ticketing system ingestion.\n\nFor each bug report, you must classify:\n\n**SEVERITY** (choose one):\n- **critical**: Financial/legal risk, data loss, security breach, complete service outage\n- **high**: Core functionality broken, users locked out, no workaround available\n- **medium**: Degraded performance or partial functionality, workarounds exist\n- **low**: Cosmetic issues, minor inconveniences, enhancement requests\n\n**COMPONENT** (choose one):\nui, backend, database, auth, payments, api, mobile, infrastructure\n\n**TYPE** (choose one):\n- **bug**: Actual defect in existing functionality\n- **feature_request**: Request for new functionality or enhancement\n- **question**: User inquiry or clarification needed\n- **documentation**: Documentation issue\n\n**ROOT CAUSE CATEGORY** (choose one):\ncode_defect, configuration, data_issue, third_party, user_error, unknown\n\n**REPRODUCIBILITY** (choose one):\nalways, sometimes, rare, cannot_reproduce, unknown\n\n**IMPORTANT GUIDELINES**:\n1. Distinguish bugs from feature requests - if functionality never existed, it's likely a feature request\n2. Consider user error as a possibility when symptoms suggest misunderstanding\n3. Assess severity by business impact, not user emotion\n4. For vague reports, mark reproducibility as \"unknown\" and note missing information\n5. Identify potential duplicates by matching symptoms, not just keywords\n6. Multi-component issues should be assigned to the primary affected component\n\n**OUTPUT FORMAT**:\nReturn valid JSON matching this exact schema:\n\n```json\n{\n  \"bug_id\": \"BUG-XXX\",\n  \"classification\": {\n    \"severity\": \"critical|high|medium|low\",\n    \"severity_rationale\": \"Brief explanation of severity assessment\",\n    \"component\": \"ui|backend|database|auth|payments|api|mobile|infrastructure\",\n    \"type\": \"bug|feature_request|question|documentation\",\n    \"root_cause_category\": \"code_defect|configuration|data_issue|third_party|user_error|unknown\",\n    \"reproducibility\": \"always|sometimes|rare|cannot_reproduce|unknown\"\n  },\n  \"potential_duplicates\": [\n    {\n      \"bug_id\": \"BUG-YYY\",\n      \"confidence\": \"high|medium|low\",\n      \"rationale\": \"Why this might be a duplicate\"\n    }\n  ],\n  \"missing_information\": [\"List of information that would help triage\"],\n  \"suggested_assignee_team\": \"Team name based on component\"\n}\n```\n\n**INPUT DATA**:\nYou will receive bug reports with: bug_id, title, description, reporter, reported_date\n\nAnalyze each report and provide the classification in the exact JSON format specified above.",
+  "judge_prompt": "You are evaluating the quality of bug report triage classifications produced by an LLM against human-labeled ground truth.\n\n**YOUR TASK**:\nCompare the LLM output against the ground truth classification and score it based on accuracy, format compliance, and reasoning quality.\n\n**EVALUATION CRITERIA**:\n\n## 1. CRITICAL FIELD ACCURACY (40 points)\nThese fields must match exactly or have strong justification for deviation:\n\n- **severity** (10 points): Exact match required. Severity misclassification has serious business consequences.\n  - Critical/High confusion: -5 points (moderate impact)\n  - Medium/Low confusion: -3 points (minor impact)\n  - Critical/Low or High/Low confusion: -10 points (severe misclassification)\n  \n- **component** (10 points): Exact match required. Wrong component = wrong team assignment.\n  - Incorrect component: -10 points\n  - Acceptable if multi-component issue and LLM chose a reasonable primary: -3 points\n\n- **type** (10 points): Exact match required. Bug vs feature request distinction is critical.\n  - Incorrect type: -10 points\n  - Bug/feature_request confusion: -8 points (most critical distinction)\n\n- **root_cause_category** (5 points): Some flexibility allowed as this is often uncertain.\n  - Incorrect when ground truth is definitive (not \"unknown\"): -5 points\n  - Marked as \"unknown\" when ground truth has specific category: -2 points\n\n- **reproducibility** (5 points): Should match ground truth assessment.\n  - Incorrect reproducibility: -5 points\n  - Marked as \"unknown\" when insufficient info in report: -0 points (acceptable)\n\n## 2. FORMAT COMPLIANCE (20 points)\n\n- **Valid JSON structure** (5 points): Must be parseable JSON\n  - Invalid JSON: -5 points\n  \n- **Schema adherence** (10 points): All required fields present with correct types\n  - Missing required field: -3 points per field\n  - Incorrect field type: -2 points per field\n  \n- **Enum value compliance** (5 points): All categorical fields use exact allowed values\n  - Invalid enum value: -2 points per violation\n\n## 3. DUPLICATE DETECTION (15 points)\n\n- **Precision** (7 points): Are identified duplicates actually duplicates?\n  - False positive duplicate: -3 points per false positive\n  \n- **Recall** (8 points): Are known duplicates detected?\n  - Missed duplicate from ground truth: -4 points per miss\n  - Partial credit if identified with \"low\" confidence: -2 points\n\n## 4. REASONING QUALITY (15 points)\n\n- **severity_rationale** (8 points): Should explain business impact clearly\n  - Missing or vague rationale: -4 points\n  - Rationale contradicts severity choice: -8 points\n  - Rationale focuses on user emotion rather than impact: -3 points\n  \n- **duplicate rationale** (4 points): Should explain symptom similarity\n  - Missing rationale for duplicates: -2 points per duplicate\n  \n- **missing_information** (3 points): Should identify reasonable diagnostic gaps\n  - Completely missing when report is vague: -3 points\n  - Unreasonable requests: -1 point\n\n## 5. TEAM ASSIGNMENT (10 points)\n\n- **suggested_assignee_team** (10 points): Should logically map to component\n  - Incorrect team for component: -10 points\n  - Reasonable alternative team name: -3 points\n\n**SCORING CALCULATION**:\n1. Start with 100 points\n2. Apply penalties for each violation\n3. Minimum score: 0\n4. Maximum score: 100\n\n**OUTPUT FORMAT**:\nProvide your evaluation as JSON:\n\n```json\n{\n  \"bug_id\": \"BUG-XXX\",\n  \"total_score\": 85,\n  \"category_scores\": {\n    \"critical_field_accuracy\": 35,\n    \"format_compliance\": 20,\n    \"duplicate_detection\": 12,\n    \"reasoning_quality\": 13,\n    \"team_assignment\": 10\n  },\n  \"violations\": [\n    {\n      \"category\": \"critical_field_accuracy\",\n      \"field\": \"severity\",\n      \"issue\": \"Marked as 'medium' but ground truth is 'high'\",\n      \"penalty\": 5\n    }\n  ],\n  \"strengths\": [\"List positive aspects of the classification\"],\n  \"weaknesses\": [\"List areas for improvement\"],\n  \"overall_assessment\": \"Brief summary of quality\"\n}\n```\n\n**COMPARISON INSTRUCTIONS**:\n1. Load both LLM output and ground truth for the same bug_id\n2. Compare each field systematically\n3. For categorical fields: exact string match required (case-insensitive)\n4. For arrays (potential_duplicates, missing_information): check overlap and reasonableness\n5. For rationale fields: assess logical consistency and relevance\n6. Apply penalties according to the rubric above\n7. Provide constructive feedback in strengths/weaknesses\n\n**SPECIAL CONSIDERATIONS**:\n- If report is genuinely ambiguous, accept reasonable alternative classifications with explanation\n- For multi-component issues, accept any reasonable primary component choice\n- \"unknown\" is acceptable for root_cause and reproducibility when report lacks details\n- Duplicate detection: focus on symptom matching, not keyword matching\n- Severity assessment: prioritize business impact over user sentiment",
+  "rubric": {
+    "critical_requirements": [
+      {
+        "name": "severity_accuracy",
+        "description": "Severity classification must match ground truth as it drives prioritization and SLA commitments. Critical/high misclassification can lead to financial/legal exposure or customer churn.",
+        "derived_from": "Ground truth shows clear severity patterns: financial/legal issues=critical (BUG-002, BUG-006), unusable features=high (BUG-001, BUG-004), degraded performance=medium (BUG-003), cosmetic=low (BUG-005)",
+        "penalty_per_violation": 10
+      },
+      {
+        "name": "component_accuracy",
+        "description": "Component must be correctly identified to route to appropriate team. Incorrect routing causes delays and team thrash.",
+        "derived_from": "Ground truth maps symptoms to components: mobile crashes\u2192mobile, payment issues\u2192payments, dashboard performance\u2192backend, password reset\u2192auth, button styling\u2192ui, data deletion\u2192database",
+        "penalty_per_violation": 10
+      },
+      {
+        "name": "type_distinction",
+        "description": "Must correctly distinguish bugs from feature requests, questions, and documentation issues. Bug vs feature request is most critical as it affects backlog prioritization.",
+        "derived_from": "Ground truth shows BUG-008 classified as feature_request despite being reported as bug, indicating importance of this distinction",
+        "penalty_per_violation": 10
+      },
+      {
+        "name": "valid_json_output",
+        "description": "Output must be valid, parseable JSON matching the specified schema for automated system ingestion.",
+        "derived_from": "Use case explicitly states 'Output should be structured JSON suitable for automated ticketing system ingestion'",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "duplicate_detection_recall",
+        "description": "Must identify known duplicates to prevent duplicate work and maintain issue tracking integrity.",
+        "derived_from": "Ground truth shows specific duplicate relationships: BUG-002\u2194BUG-014, BUG-003\u2194BUG-019,BUG-024, indicating duplicate detection is expected capability",
+        "penalty_per_violation": 4
+      }
+    ],
+    "compliance_checks": [
+      {
+        "check": "severity_enum_values",
+        "condition": "severity field contains value other than: critical, high, medium, low",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "component_enum_values",
+        "condition": "component field contains value other than: ui, backend, database, auth, payments, api, mobile, infrastructure",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "type_enum_values",
+        "condition": "type field contains value other than: bug, feature_request, question, documentation",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "root_cause_enum_values",
+        "condition": "root_cause_category contains value other than: code_defect, configuration, data_issue, third_party, user_error, unknown",
+        "severity": "HIGH",
+        "penalty": 3
+      },
+      {
+        "check": "reproducibility_enum_values",
+        "condition": "reproducibility contains value other than: always, sometimes, rare, cannot_reproduce, unknown",
+        "severity": "HIGH",
+        "penalty": 3
+      },
+      {
+        "check": "required_fields_present",
+        "condition": "Any of these fields missing: bug_id, classification.severity, classification.component, classification.type, classification.root_cause_category, classification.reproducibility, potential_duplicates, missing_information, suggested_assignee_team",
+        "severity": "CRITICAL",
+        "penalty": 3
+      },
+      {
+        "check": "severity_rationale_present",
+        "condition": "severity_rationale field is missing or empty",
+        "severity": "HIGH",
+        "penalty": 4
+      },
+      {
+        "check": "duplicate_rationale_present",
+        "condition": "potential_duplicates array has entries but any entry lacks rationale field",
+        "severity": "MEDIUM",
+        "penalty": 2
+      },
+      {
+        "check": "severity_critical_justification",
+        "condition": "severity is 'critical' but rationale does not mention financial, legal, data loss, security, or complete outage",
+        "severity": "HIGH",
+        "penalty": 5
+      },
+      {
+        "check": "severity_low_for_feature_request",
+        "condition": "type is 'feature_request' but severity is 'critical' or 'high'",
+        "severity": "MEDIUM",
+        "penalty": 3
+      },
+      {
+        "check": "team_component_alignment",
+        "condition": "suggested_assignee_team does not logically correspond to the component (e.g., 'Backend Team' for component 'mobile')",
+        "severity": "HIGH",
+        "penalty": 8
+      },
+      {
+        "check": "false_positive_duplicates",
+        "condition": "potential_duplicates includes bug_ids that are not duplicates according to ground truth",
+        "severity": "MEDIUM",
+        "penalty": 3
+      },
+      {
+        "check": "missed_known_duplicates",
+        "condition": "ground truth shows duplicates but LLM output potential_duplicates array is empty or missing those bug_ids",
+        "severity": "HIGH",
+        "penalty": 4
+      }
+    ],
+    "weights": {
+      "accuracy": 40,
+      "format": 20,
+      "compliance": 40
+    },
+    "scoring_instructions": "Start with 100 points. For each bug report classification: (1) Verify JSON is valid and parseable (-5 if not). (2) Check all required fields are present (-3 per missing field). (3) Verify enum values are valid (-2 to -5 per invalid value based on severity). (4) Compare severity, component, type, root_cause_category, reproducibility against ground truth - apply penalties for mismatches based on business impact (severity/component/type mismatches: -10, root_cause: -5, reproducibility: -5). (5) Evaluate duplicate detection: -4 per missed duplicate, -3 per false positive. (6) Assess rationale quality: -4 for missing/vague severity rationale, -8 if contradictory. (7) Verify team assignment aligns with component (-10 if wrong). (8) Check for special compliance violations (critical severity without proper justification, feature requests marked high severity, etc.). Calculate final score as: 100 - sum(all_penalties), minimum 0. Weight distribution: Critical field accuracy (severity, component, type) = 40%, Format compliance = 20%, Duplicate detection + reasoning = 40%."
+  }
+}

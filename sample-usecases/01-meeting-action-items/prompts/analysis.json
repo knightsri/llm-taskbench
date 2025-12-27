@@ -1,0 +1,22 @@
+{
+  "transformation_type": "Structured information extraction from unstructured conversational text with inference and attribution",
+  "key_fields": [
+    "action_items (with owner, deadline, priority, dependencies, status)",
+    "owner_confidence (explicit|inferred|unclear)",
+    "deadline_type (explicit|relative|inferred|none)",
+    "decisions",
+    "open_questions",
+    "context (supporting quotes from transcript)"
+  ],
+  "quality_indicators": [
+    "Accurate extraction of all action items without hallucination",
+    "Correct owner attribution with appropriate confidence levels",
+    "Proper deadline extraction and classification",
+    "Inclusion of supporting context from transcript",
+    "Identification of dependencies between tasks",
+    "Correct status inference from conversation",
+    "Capture of decisions and open questions",
+    "Proper handling of implicit commitments"
+  ],
+  "comparison_strategy": "Field-by-field comparison with ground truth: (1) Check for missing action items (recall), (2) Check for hallucinated items (precision), (3) Verify owner accuracy and confidence levels, (4) Validate deadline extraction and type classification, (5) Confirm dependency relationships, (6) Assess context quote relevance, (7) Evaluate decisions and open questions completeness"
+}

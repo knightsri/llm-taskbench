@@ -1,0 +1,128 @@
+You are evaluating a regex pattern generation task. The model was given positive and negative string examples and asked to generate a regular expression that matches all positive examples and rejects all negative examples.
+
+# EVALUATION CRITERIA
+
+## 1. CORRECTNESS ON PROVIDED EXAMPLES (40 points)
+
+**Test the regex against all provided examples:**
+- Execute the regex against each positive example
+- Execute the regex against each negative example
+- Calculate match rates
+
+**Scoring:**
+- Perfect match (100% positive matched, 100% negative rejected): 40 points
+- For each positive example that fails to match: -4 points
+- For each negative example that incorrectly matches: -4 points
+- Minimum: 0 points
+
+## 2. GENERALIZATION TO HELD-OUT EXAMPLES (30 points)
+
+**Test against held-out test cases from ground truth:**
+- Test against `held_out_positive` examples
+- Test against `held_out_negative` examples
+
+**Scoring:**
+- Perfect generalization: 30 points
+- For each held-out positive that fails: -5 points
+- For each held-out negative that incorrectly matches: -5 points
+- Minimum: 0 points
+
+## 3. REGEX VALIDITY (15 points)
+
+**Check if regex is executable:**
+- Syntactically valid regex: 15 points
+- Invalid syntax or cannot be compiled: 0 points
+- Deduct 5 points if missing anchors (^ and $) when ground truth has them
+
+## 4. FORMAT COMPLIANCE (10 points)
+
+**Required fields present and correct type:**
+- `challenge_id` matches input: 2 points
+- `regex` is a string: 2 points
+- `explanation` is a non-empty string: 2 points
+- `confidence` is one of [high, medium, low]: 2 points
+- `test_results` object with all 4 numeric fields: 2 points
+
+## 5. CONCISENESS (5 points)
+
+**Evaluate regex complexity:**
+- Compare length to ground truth regex
+- If within 50% of ground truth length: 5 points
+- If 50-100% longer: 3 points
+- If 100-200% longer: 1 point
+- If >200% longer (likely overfitting): 0 points
+- Exception: If regex is just OR-ing all positive examples, automatic 0 points
+
+# COMPARISON PROCESS
+
+1. Load the candidate regex and ground truth regex
+2. Execute both against all test cases (provided + held-out)
+3. Compare results
+4. Check for overfitting patterns (e.g., `(example1|example2|example3)`)
+5. Validate syntax by attempting to compile the regex
+6. Calculate scores per criteria above
+7. Sum total score (max 100 points)
+
+# OVERFITTING DETECTION
+
+A regex is considered overfitted if:
+- It uses alternation to list out specific examples: `^(555-123-4567|123-456-7890|...)$`
+- It's significantly longer than necessary
+- It fails held-out test cases despite passing provided examples
+
+**Penalty for detected overfitting:** -20 points from total score
+
+# OUTPUT FORMAT
+
+Provide your evaluation as JSON:
+
+```json
+{
+  "challenge_id": "REGEX-XXX",
+  "scores": {
+    "correctness_provided": 40,
+    "generalization_held_out": 30,
+    "validity": 15,
+    "format_compliance": 10,
+    "conciseness": 5,
+    "overfitting_penalty": 0,
+    "total": 100
+  },
+  "test_results": {
+    "provided_positive_passed": 5,
+    "provided_positive_total": 5,
+    "provided_negative_passed": 5,
+    "provided_negative_total": 5,
+    "held_out_positive_passed": 2,
+    "held_out_positive_total": 2,
+    "held_out_negative_passed": 2,
+    "held_out_negative_total": 2
+  },
+  "violations": [
+    {
+      "type": "FAILED_POSITIVE_MATCH",
+      "severity": "CRITICAL",
+      "description": "Regex failed to match positive example: '555-123-4567'",
+      "penalty": 4
+    }
+  ],
+  "regex_comparison": {
+    "candidate_regex": "^\\d{3}-\\d{3}-\\d{4}$",
+    "ground_truth_regex": "^\\d{3}-\\d{3}-\\d{4}$",
+    "candidate_length": 20,
+    "ground_truth_length": 20,
+    "length_ratio": 1.0,
+    "is_overfitted": false
+  },
+  "overall_assessment": "Brief summary of performance"
+}
+```
+
+# GROUND TRUTH DATA
+
+You will be provided with:
+1. The original challenge (positive/negative examples)
+2. The ground truth solution (correct regex + held-out test cases)
+3. The candidate output to evaluate
+
+Execute the evaluation systematically and provide detailed scoring.

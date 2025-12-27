@@ -1,0 +1,19 @@
+{
+  "transformation_type": "Pattern recognition and regex generation - the LLM must analyze positive and negative string examples to infer the underlying pattern and express it as a valid regular expression",
+  "key_fields": [
+    "challenge_id",
+    "regex",
+    "explanation",
+    "confidence",
+    "test_results"
+  ],
+  "quality_indicators": [
+    "Regex matches ALL positive examples (100% recall on training set)",
+    "Regex rejects ALL negative examples (100% precision on training set)",
+    "Regex generalizes to held-out test cases not shown to model",
+    "Regex is syntactically valid and executable",
+    "Regex is reasonably concise (not just OR-ing all examples)",
+    "Explanation accurately describes what the pattern matches"
+  ],
+  "comparison_strategy": "Execute the generated regex against all positive/negative examples (both provided and held-out). Calculate match rates. Validate syntax. Compare regex complexity. Check for overfitting patterns like excessive alternation."
+}

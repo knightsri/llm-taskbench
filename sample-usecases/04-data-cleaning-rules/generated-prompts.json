@@ -1,0 +1,155 @@
+{
+  "analysis": {
+    "transformation_type": "Data quality analysis and cleaning rule generation - The LLM must analyze messy CSV data, identify data quality issues across multiple dimensions (format inconsistencies, null variations, typos, case inconsistencies), and generate structured, actionable cleaning rules in JSON format",
+    "key_fields": [
+      "dataset_id",
+      "summary (total_rows, columns_analyzed, issues_found, critical_issues)",
+      "column_analysis (column, inferred_type, issues array with issue_type, severity, affected_rows, examples, suggested_rule)",
+      "cleaning_rules (rule_id, priority, column, description, condition, transformation, examples with before/after)",
+      "flagged_for_review (column, reason, sample_values)"
+    ],
+    "quality_indicators": [
+      "Detection rate: Identifies all major issue types (date format inconsistencies, state abbreviation variations, case inconsistencies in categorical fields, null value variations, currency format issues, phone number format variations, typos like 'Premum')",
+      "Rule correctness: Generated rules would transform messy data to match ground truth (e.g., standardize dates to YYYY-MM-DD, states to 2-letter codes, subscription_tier to lowercase, phone to XXX-XXX-XXXX format, annual_spend to decimal without $ or currency symbols)",
+      "Actionability: Rules include specific transformations (regex patterns, standardization logic, normalization steps)",
+      "Completeness: Covers all 9 columns with issues identified",
+      "Non-destructive: Flags ambiguous cases for review rather than making destructive assumptions",
+      "Proper severity classification: Critical issues affect data integrity, high/medium affect consistency"
+    ],
+    "comparison_strategy": "Compare detected issues against known ground truth transformations. For each column, verify: (1) Issue types identified match actual transformations needed (date standardization, state normalization, case normalization, null handling, currency cleaning, phone formatting, typo detection), (2) Suggested rules would produce ground truth output, (3) Severity appropriately assigned, (4) Examples provided are accurate, (5) Ambiguous cases flagged for review, (6) JSON schema compliance, (7) Rule priority ordering is logical"
+  },
+  "task_prompt": "You are a data quality expert. Analyze the provided messy CSV data and generate a comprehensive set of data cleaning rules.\n\n**Your Task:**\n1. Examine the CSV data for quality issues across all columns\n2. Identify patterns of inconsistency, invalid values, format variations, and data quality problems\n3. Generate actionable cleaning rules that can be programmatically implemented\n4. Output your analysis in the specified JSON format\n\n**Input Data:**\n```csv\ncustomer_id,first_name,last_name,email,phone,state,signup_date,subscription_tier,annual_spend\n1001,John,Smith,john.smith@email.com,555-123-4567,California,2023-01-15,premium,$1250.00\n1002,jane,DOE,jane.doe@email.com,(555) 234-5678,CA,01/20/2023,Premium,1100\n1003,Bob,Johnson,bob.johnson@email,555.345.6789,Calif.,2023-02-28,PREMIUM,$980.50\n1004,Alice,Williams,alice.w@email.com,5554567890,california,Feb 15, 2023,basic,500.00\n1005,Charlie,Brown,charlie.b@email.com,555-567-8901,TX,2023/03/10,Basic,$750\n1006,Diana,Miller,diana.miller@email.com,NULL,Texas,03-15-2023,gold,2500\n1007,Edward,Davis,edward.davis@email.com,555-678-9012,Tx,2023-03-20,Gold,$3000.00\n1008,Fiona,Garcia,fiona.g@email.com,555-789-0123,new york,20-Mar-2023,premium,1800\n1009,George,Martinez,george.martinez@email.com,(555)890-1234,NY,2023-04-01,Premum,$1500.00\n1010,Helen,Anderson,helen.a@email.com,N/A,N.Y.,04/05/2023,basic,NULL\n1011,Ivan,Taylor,ivan.taylor@email.com,555-901-2345,Florida,2023-04-10,Basic,$600.50\n1012,Julia,Thomas,julia.thomas@email.com,555-012-3456,FL,2023-04-15,gold,$2200.00\n```\n\n**Common Issues to Detect:**\n- Inconsistent date formats (MM/DD/YYYY vs YYYY-MM-DD vs DD-Mon-YY)\n- Mixed case in categorical fields (CA, ca, California, Calif.)\n- Null value variations (NULL, null, N/A, NA, -, empty string, \"None\")\n- Encoding issues and special characters\n- Typos in categorical fields\n- Invalid values (negative ages, future dates for historical data)\n- Unit inconsistencies (USD vs $, kg vs lbs)\n- Phone number format variations\n- Email validation issues\n\n**Requirements for Your Output:**\n- **Actionable:** Rules must be specific enough to implement programmatically (include regex, SQL-like conditions, or clear transformation logic)\n- **Complete:** Cover ALL identified issues across all columns\n- **Prioritized:** Order rules by severity (critical issues first)\n- **Non-destructive:** Flag ambiguous cases for human review rather than making assumptions\n\n**Output Format:**\nProvide your analysis as valid JSON matching this exact schema:\n\n```json\n{\n  \"dataset_id\": \"string\",\n  \"summary\": {\n    \"total_rows\": number,\n    \"columns_analyzed\": number,\n    \"issues_found\": number,\n    \"critical_issues\": number\n  },\n  \"column_analysis\": [\n    {\n      \"column\": \"column_name\",\n      \"inferred_type\": \"date|string|number|categorical|email|phone|etc\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format|invalid_value|null_variation|typo|etc\",\n          \"severity\": \"critical|high|medium|low\",\n          \"affected_rows\": number,\n          \"examples\": [\"value1\", \"value2\"],\n          \"suggested_rule\": {\n            \"description\": \"Human readable description\",\n            \"transform\": \"Executable transformation logic\",\n            \"confidence\": \"high|medium|low\",\n            \"requires_review\": boolean\n          }\n        }\n      ]\n    }\n  ],\n  \"cleaning_rules\": [\n    {\n      \"rule_id\": \"RULE-001\",\n      \"priority\": number,\n      \"column\": \"column_name\",\n      \"description\": \"What this rule does\",\n      \"condition\": \"When to apply (SQL-like or regex)\",\n      \"transformation\": \"What to do\",\n      \"examples\": {\n        \"before\": [\"messy1\", \"messy2\"],\n        \"after\": [\"clean1\", \"clean2\"]\n      }\n    }\n  ],\n  \"flagged_for_review\": [\n    {\n      \"column\": \"column_name\",\n      \"reason\": \"Why human review needed\",\n      \"sample_values\": [\"ambiguous1\", \"ambiguous2\"]\n    }\n  ]\n}\n```\n\nProvide ONLY the JSON output, no additional text or explanation.",
+  "judge_prompt": "You are evaluating an LLM's ability to analyze messy CSV data and generate actionable data cleaning rules.\n\n**Ground Truth Transformations:**\nThe messy CSV should be cleaned according to these transformations:\n1. **first_name**: Capitalize first letter, lowercase rest (jane \u2192 Jane, DOE \u2192 Doe)\n2. **last_name**: Capitalize first letter, lowercase rest\n3. **state**: Standardize to 2-letter uppercase codes (California/Calif./california \u2192 CA, Texas/Tx \u2192 TX, new york/N.Y. \u2192 NY, Florida \u2192 FL, Washington \u2192 WA, Oregon \u2192 OR, Arizona \u2192 AZ, Nevada \u2192 NV)\n4. **signup_date**: Standardize to YYYY-MM-DD format (01/20/2023 \u2192 2023-01-20, Feb 15, 2023 \u2192 2023-02-15, 20-Mar-2023 \u2192 2023-03-20, 03-15-2023 \u2192 2023-03-15, 04/05/2023 \u2192 2023-04-05)\n5. **subscription_tier**: Lowercase (Premium/PREMIUM \u2192 premium, Basic \u2192 basic, Gold \u2192 gold)\n6. **subscription_tier typo**: Fix \"Premum\" \u2192 \"premium\"\n7. **annual_spend**: Remove $ symbol, ensure decimal format with 2 places (1100 \u2192 1100.00, $750 \u2192 750.00)\n8. **phone**: Standardize to XXX-XXX-XXXX format, remove variations like (555) 234-5678, 555.345.6789, 5554567890, (555)890-1234\n9. **null variations**: Standardize NULL, N/A to empty string\n\n**Evaluation Criteria:**\n\n**1. Issue Detection (40 points)**\nVerify the LLM identified these specific issues:\n- Date format inconsistencies across 5+ different formats (CRITICAL - 5 points)\n- State name variations and abbreviations (CRITICAL - 5 points)\n- Case inconsistencies in first_name, last_name (HIGH - 4 points)\n- Case inconsistencies in subscription_tier (HIGH - 4 points)\n- Typo in subscription_tier (\"Premum\") (HIGH - 4 points)\n- Phone number format variations (MEDIUM - 3 points)\n- Currency symbol and decimal inconsistencies in annual_spend (MEDIUM - 3 points)\n- Null value variations (NULL, N/A) (MEDIUM - 3 points)\n- Email validation issues (bob.johnson@email missing domain) (LOW - 2 points)\n\nPenalty: -5 points for each CRITICAL issue missed, -3 points for each HIGH issue missed, -2 points for MEDIUM, -1 for LOW\n\n**2. Rule Correctness (40 points)**\nFor each column with issues, verify:\n- Rules would produce ground truth output (10 points)\n- Transformation logic is specific and executable (10 points)\n- Examples show correct before/after transformations (10 points)\n- Severity levels appropriately assigned (5 points)\n- Affected row counts are reasonable estimates (5 points)\n\nPenalty: -8 points for rules that would produce incorrect output, -5 points for vague/non-actionable rules, -3 points for missing examples\n\n**3. JSON Schema Compliance (20 points)**\n- Valid JSON structure (5 points)\n- All required fields present (dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review) (5 points)\n- Correct data types (numbers as numbers, not strings) (5 points)\n- Schema matches specification exactly (5 points)\n\nPenalty: -10 points for invalid JSON, -5 points for missing required sections, -2 points per field with wrong data type\n\n**Scoring Instructions:**\n1. Start with 100 points\n2. Check each issue type against ground truth - deduct points for missed issues\n3. Verify each cleaning rule would produce correct transformations - deduct for incorrect/vague rules\n4. Validate JSON structure and schema compliance - deduct for structural issues\n5. Award bonus points (up to +10) for:\n   - Identifying additional valid issues not in ground truth\n   - Excellent actionability (regex patterns, specific conditions)\n   - Appropriate use of flagged_for_review for ambiguous cases\n\n**Output Format:**\nProvide your evaluation as JSON:\n```json\n{\n  \"score\": number (0-100),\n  \"issue_detection\": {\n    \"detected\": [\"list of issues correctly identified\"],\n    \"missed\": [\"list of issues not identified\"],\n    \"false_positives\": [\"issues flagged that aren't real\"],\n    \"points\": number\n  },\n  \"rule_correctness\": {\n    \"correct_rules\": [\"rules that would work\"],\n    \"incorrect_rules\": [\"rules that would fail or produce wrong output\"],\n    \"vague_rules\": [\"rules lacking specificity\"],\n    \"points\": number\n  },\n  \"schema_compliance\": {\n    \"valid_json\": boolean,\n    \"missing_fields\": [\"list of missing required fields\"],\n    \"type_errors\": [\"fields with wrong data types\"],\n    \"points\": number\n  },\n  \"strengths\": [\"what the output did well\"],\n  \"weaknesses\": [\"what the output missed or got wrong\"],\n  \"actionability_assessment\": \"Are rules specific enough to implement?\",\n  \"overall_feedback\": \"Summary of evaluation\"\n}\n```",
+  "rubric": {
+    "critical_requirements": [
+      {
+        "name": "date_format_standardization_detected",
+        "description": "Must identify inconsistent date formats across the signup_date column (YYYY-MM-DD, MM/DD/YYYY, DD-Mon-YYYY, MM-DD-YYYY, etc.) and provide rule to standardize to YYYY-MM-DD",
+        "derived_from": "Ground truth shows all dates standardized to YYYY-MM-DD format from 5+ different input formats",
+        "penalty_per_violation": 8
+      },
+      {
+        "name": "state_normalization_detected",
+        "description": "Must identify state name variations (California, Calif., california, CA, Texas, Tx, new york, NY, N.Y., Florida, FL) and provide rule to standardize to 2-letter uppercase codes",
+        "derived_from": "Ground truth shows all state values converted to 2-letter uppercase codes (CA, TX, NY, FL, WA, OR, AZ, NV)",
+        "penalty_per_violation": 8
+      },
+      {
+        "name": "categorical_case_inconsistency_detected",
+        "description": "Must identify mixed case in subscription_tier (premium, Premium, PREMIUM, basic, Basic, gold, Gold) and provide rule to standardize to lowercase",
+        "derived_from": "Ground truth shows all subscription_tier values in lowercase",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "typo_detection",
+        "description": "Must identify typo 'Premum' in subscription_tier and provide correction rule to 'premium'",
+        "derived_from": "Ground truth shows row 1009 'Premum' corrected to 'premium'",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "phone_format_standardization_detected",
+        "description": "Must identify phone number format variations ((555) 234-5678, 555.345.6789, 5554567890, (555)890-1234, 555-123-4567) and provide rule to standardize to XXX-XXX-XXXX",
+        "derived_from": "Ground truth shows all phone numbers in XXX-XXX-XXXX format",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "currency_cleaning_detected",
+        "description": "Must identify currency format inconsistencies in annual_spend ($1250.00, 1100, $980.50, 500.00, $750) and provide rule to remove $ and standardize to decimal format",
+        "derived_from": "Ground truth shows all annual_spend values as decimals without $ symbol, with 2 decimal places",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "null_variation_handling",
+        "description": "Must identify null value variations (NULL, N/A) and provide rule to standardize to empty string",
+        "derived_from": "Ground truth shows NULL and N/A converted to empty strings",
+        "penalty_per_violation": 3
+      },
+      {
+        "name": "name_case_normalization",
+        "description": "Must identify case inconsistencies in first_name and last_name (jane, DOE) and provide rule to capitalize first letter, lowercase rest",
+        "derived_from": "Ground truth shows jane \u2192 Jane, DOE \u2192 Doe",
+        "penalty_per_violation": 3
+      }
+    ],
+    "compliance_checks": [
+      {
+        "check": "valid_json_structure",
+        "condition": "Output is not valid JSON or cannot be parsed",
+        "severity": "CRITICAL",
+        "penalty": 15
+      },
+      {
+        "check": "required_fields_present",
+        "condition": "Missing any of: dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review",
+        "severity": "CRITICAL",
+        "penalty": 10
+      },
+      {
+        "check": "summary_fields_complete",
+        "condition": "summary object missing total_rows, columns_analyzed, issues_found, or critical_issues",
+        "severity": "HIGH",
+        "penalty": 5
+      },
+      {
+        "check": "column_analysis_structure",
+        "condition": "column_analysis missing required fields: column, inferred_type, issues array",
+        "severity": "HIGH",
+        "penalty": 5
+      },
+      {
+        "check": "issues_detail_complete",
+        "condition": "Issues missing: issue_type, severity, affected_rows, examples, or suggested_rule",
+        "severity": "HIGH",
+        "penalty": 5
+      },
+      {
+        "check": "cleaning_rules_structure",
+        "condition": "cleaning_rules missing: rule_id, priority, column, description, condition, transformation, or examples",
+        "severity": "HIGH",
+        "penalty": 5
+      },
+      {
+        "check": "actionability_of_rules",
+        "condition": "Rules contain vague transformations like 'clean the data' or 'fix inconsistencies' without specific logic",
+        "severity": "HIGH",
+        "penalty": 8
+      },
+      {
+        "check": "rule_correctness",
+        "condition": "Suggested transformation would produce incorrect output or break valid data",
+        "severity": "CRITICAL",
+        "penalty": 10
+      },
+      {
+        "check": "examples_accuracy",
+        "condition": "Before/after examples don't match the actual transformations needed",
+        "severity": "MEDIUM",
+        "penalty": 3
+      },
+      {
+        "check": "severity_appropriate",
+        "condition": "Severity levels (critical/high/medium/low) don't match impact (e.g., date format marked as 'low')",
+        "severity": "MEDIUM",
+        "penalty": 2
+      },
+      {
+        "check": "false_positive_issues",
+        "condition": "Flags valid data as problematic (e.g., correctly formatted values marked as errors)",
+        "severity": "MEDIUM",
+        "penalty": 3
+      },
+      {
+        "check": "data_types_correct",
+        "condition": "Numeric fields (total_rows, affected_rows, priority) stored as strings instead of numbers",
+        "severity": "LOW",
+        "penalty": 2
+      }
+    ],
+    "weights": {
+      "accuracy": 40,
+      "format": 20,
+      "compliance": 40
+    },
+    "scoring_instructions": "Start with 100 points. Evaluate in three categories: (1) ACCURACY (40 pts): Deduct penalties for each missed critical requirement based on penalty_per_violation. Award partial credit for partial detection. (2) FORMAT (20 pts): Deduct penalties for JSON structure violations, missing fields, incorrect data types. (3) COMPLIANCE (40 pts): Deduct penalties for non-actionable rules, incorrect transformations, missing examples, inappropriate severity levels. Award bonus points (up to +10) for exceptional actionability (specific regex/SQL patterns), identifying additional valid issues, or appropriate use of flagged_for_review. Final score = max(0, min(110, calculated_score))."
+  }
+}

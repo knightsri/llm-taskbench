@@ -1,140 +1,180 @@
 # LLM TaskBench
 
-Task-first LLM evaluation with agentic orchestration, parallel execution, LLM-as-judge, and cost-aware recommendations.
+Task-first LLM evaluation with folder-based use cases, automatic prompt generation, LLM-as-judge, and cost-aware recommendations.
 
 ## What it does
-- Run multiple LLMs in parallel on the same task input.
-- Capture all artifacts: prompts, outputs, timing, token usage, inline/billed costs, generation IDs.
-- Judge outputs (automated or human-in-the-loop) for accuracy, format, compliance, coverage, and depth.
-- Compare and recommend best overall and best value models.
-- Replay or re-judge saved runs without re-calling models.
+- Define use cases in human-friendly Markdown (USE-CASE.md)
+- Automatically derive prompts from use case analysis + ground truth
+- Run multiple LLMs in parallel on the same task
+- Judge outputs against ground truth for accuracy, format, and compliance
+- Compare and recommend best overall and best value models
+- Track all costs with inline and billed cost tracking
 
 ## Quick start
-1) Install deps  
+
+1) Install deps
 ```bash
 pip install -e .
 ```
 
-2) Set your key  
+2) Set your key
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 ```
 
-Docker (optional)  
+3) List available use cases
+```bash
+taskbench list-usecases
+```
+
+4) Run evaluation on a use case
+```bash
+taskbench run sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o
+```
+
+5) Generate prompts for a use case (without running)
+```bash
+taskbench generate-prompts sample-usecases/00-lecture-concept-extraction
+```
+
+## Folder-Based Use Cases
+
+Use cases are now organized in folders with:
+- `USE-CASE.md` - Human-friendly description with goal, evaluation notes, edge cases
+- `data/` - Input data files
+- `ground-truth/` - Expected outputs for comparison
+
+```
+sample-usecases/
+├── 00-lecture-concept-extraction/
+│   ├── USE-CASE.md
+│   ├── data/
+│   │   ├── lecture-01-python-basics.txt
+│   │   ├── lecture-02-ml-fundamentals.txt
+│   │   └── lecture-03-system-design.txt
+│   └── ground-truth/
+│       ├── lecture-01-concepts.csv
+│       ├── lecture-02-concepts.csv
+│       └── lecture-03-concepts.csv
+├── 01-meeting-action-items/
+│   └── ...
+└── 02-bug-report-triage/
+    └── ...
+```
+
+The framework automatically:
+1. Parses USE-CASE.md for goal, evaluation notes, edge cases
+2. Matches data files to ground truth by naming patterns
+3. Uses LLM to analyze and generate task prompts and judge rubrics
+4. Saves generated prompts to `generated-prompts.json` for reuse
+
+## Key Commands
+
+### Run Evaluation
+```bash
+taskbench run <usecase_folder> [options]
+```
+Options:
+- `--models` / `-m` - Comma-separated model IDs
+- `--data` / `-d` - Specific data file to use (if multiple)
+- `--output` / `-o` - Output file path
+- `--regenerate-prompts` - Force regenerate prompts
+- `--skip-judge` - Skip judge evaluation
+
+### List Use Cases
+```bash
+taskbench list-usecases [folder]
+```
+
+### Generate Prompts
+```bash
+taskbench generate-prompts <usecase_folder> [--force]
+```
+
+### Legacy Commands
+- `taskbench evaluate` - Run with YAML task definition
+- `taskbench recommend` - Load saved results and recommend
+- `taskbench models` - List priced models
+- `taskbench validate` - Validate task YAML
+- `taskbench sample` - Run bundled sample task
+
+## Docker
+
 ```bash
 cp .env.example .env
 # add your OPENROUTER_API_KEY to .env
+
+# CLI mode
 docker compose -f docker-compose.cli.yml build
-docker compose -f docker-compose.cli.yml run --rm taskbench-cli --help
+docker compose -f docker-compose.cli.yml run --rm taskbench-cli list-usecases
+
+# UI mode
+docker compose -f docker-compose.ui.yml up --build
+# API at http://localhost:8000, UI at http://localhost:5173
 ```
 
-3) Run a sample evaluation (parallel, no judge)  
-```bash
-taskbench sample \
-  --models anthropic/claude-sonnet-4.5,openai/gpt-4o,qwen/qwen-2.5-72b-instruct \
-  --no-judge
+## UI
+
+The web UI provides:
+- Browse and select use cases from `sample-usecases/`
+- View use case details, data files, and ground truth
+- Generate and preview prompts
+- Select models to evaluate
+- Run evaluations and view results
+- Compare model performance with cost tracking
+
+## How Prompt Generation Works
+
+When you run a use case, the framework:
+
+1. **Parses USE-CASE.md** - Extracts goal, evaluation notes, edge cases
+2. **Analyzes Data/Ground-Truth** - Matches input files to expected outputs
+3. **Generates Prompts via LLM** - Creates:
+   - Task prompt for model execution
+   - Judge prompt for output evaluation
+   - Rubric with compliance checks and scoring weights
+4. **Saves to Folder** - Prompts saved in `generated-prompts.json`
+
+Example generated rubric:
+```json
+{
+  "critical_requirements": [
+    {"name": "duration_bounds", "description": "Segments 2-7 minutes", "penalty": 8}
+  ],
+  "compliance_checks": [
+    {"check": "timestamp_format", "severity": "HIGH", "penalty": 5}
+  ],
+  "weights": {"accuracy": 40, "format": 20, "compliance": 40}
+}
 ```
 
-4) Run your own task  
-```bash
-taskbench evaluate tasks/lecture_analysis.yaml \
- --models anthropic/claude-sonnet-4.5,openai/gpt-4o \
- --input-file tests/fixtures/sample_transcript.txt \
- --output results/my_run.json \
-  --chunked --chunk-chars 20000 --chunk-overlap 500 --dynamic-chunk \
-  --skip-judge      # or omit to judge automatically
-```
+## Environment Variables
 
-5) Judge/recommend later from saved results  
-```bash
-taskbench recommend --results results/my_run.json
-```
-
-## Key commands
-- `taskbench evaluate` – run models on a task; `--skip-judge` to defer judging; parallel by default.
-- `--usecase` to load use-case goals/notes and drive prompts; `--models auto` to pick recommended models.
-- `--chunked` (plus `--chunk-chars/--chunk-overlap` and `--dynamic-chunk/--no-dynamic-chunk`) for long inputs; dynamic chunking sizes to the smallest selected model’s context window by default.
-- `taskbench recommend` – load a saved results JSON, render comparison, and recommendations.
-- `taskbench models` – list priced models from `config/models.yaml`.
-- `taskbench validate` – validate task YAML.
-- `taskbench sample` – run the bundled lecture task on the sample transcript.
-
-## Concurrency & resilience
-- Parallelism via `TASKBENCH_MAX_CONCURRENCY` (default 5).
-- Built-in retries/backoff and optional rate limiting.
-- JSON mode enforced for judge calls.
-
-## Cost tracking
-- Inline usage requested on every call (`usage.include=true`).
-- Billed cost fetched from `/generation?id=...` when available.
-- Results store `generation_id`, `billed_cost_usd`, token counts, and per-model totals.
-
-## Human-in-the-loop judging
-- Run `evaluate --skip-judge`, inspect/edit outputs, then `recommend` to judge and compare.
-- Saved runs include all artifacts needed to re-judge without re-calling models.
-
-## Files to know
-- `tasks/lecture_analysis.yaml` – sample task.
-- `tests/fixtures/sample_transcript.txt` – sample input.
-- `config/models.yaml` – pricing catalog.
-- `docs/openrouter-cost-tracking-guide.md` – billing details.
-
-## Intelligent Model Selection
-
-TaskBench includes an AI-powered model selector that analyzes your task and recommends models across different tiers:
-
-```bash
-# Auto-select models based on use case
-taskbench evaluate tasks/my_task.yaml --models auto --usecase usecases/my_usecase.yaml
-```
-
-**Tiers:**
-- 💎 **Quality** - Premium models: Claude Opus, o1, GPT-4-turbo (>$25/1M tokens)
-- ⚖️ **Value** - Mid-tier: Claude Sonnet 4.5, GPT-4o, Gemini Pro ($3-25/1M tokens)
-- 💰 **Budget** - Low-cost and free models (<$3/1M tokens)
-- ⚡ **Speed** - Fast response: Gemini Flash, GPT-4o-mini, Claude Haiku
-
-**How it works:**
-1. Phase 1: LLM analyzes task requirements (~2s)
-2. Phase 2: Programmatic filtering from 350+ OpenRouter models (cached)
-3. Phase 3: LLM ranks candidates by tier (~6s)
-4. Cost: ~$0.007 per selection
-
-**Caching:** Model catalog cached for 24 hours (configurable via `TASKBENCH_MODELS_CACHE_TTL`).
-
-## Environment variables
 - `OPENROUTER_API_KEY` (required)
 - `TASKBENCH_MAX_CONCURRENCY` (default 5)
+- `TASKBENCH_PROMPT_GEN_MODEL` (default anthropic/claude-sonnet-4.5)
+- `TASKBENCH_MAX_TOKENS` (default 4000)
+- `TASKBENCH_TEMPERATURE` (default 0.7)
 - `TASKBENCH_USE_GENERATION_LOOKUP` (true/false, default true)
-- `TASKBENCH_MODELS_CACHE_TTL` (hours, default 24) - Model catalog cache duration
-- `MODEL_SELECTOR_LLM` (default openai/gpt-4o) - LLM used for model selection
 
-Docker notes:
-- Compose file: `docker-compose.cli.yml`
-- Volumes: mounts `tasks/`, `config/`, `results/`, `tests/fixtures/`
-- Override command, e.g.:
-  ```bash
-  docker compose -f docker-compose.cli.yml run --rm taskbench-cli \
-    evaluate tasks/lecture_analysis.yaml --models anthropic/claude-sonnet-4.5 --input-file tests/fixtures/sample_transcript.txt --skip-judge
-  ```
+## Cost Tracking
 
-## UI status
-- Available: FastAPI backend + Streamlit UI for task selection/upload, model selection, run launch, and judging/recommendations.
-- Run UI via Docker:
-  ```bash
-  cp .env.example .env
-  # add your OPENROUTER_API_KEY
-  docker compose -f docker-compose.ui.yml up --build
-  # API at http://localhost:8000, UI at http://localhost:8501
-  ```
-- The UI reuses the same executor/judge flow; runs are stored under `results/` and can be re-judged later.
-- Use-cases can be created/selected in UI; runs are grouped per use-case with cost summaries.
+- Inline usage requested on every call
+- Billed cost fetched from `/generation?id=...` when available
+- Results store token counts, generation IDs, and per-model totals
+- Judge evaluation costs tracked separately
 
-## How comparison works
-- Each model run yields `EvaluationResult` with timings, tokens, inline/billed costs.
-- Judge produces `JudgeScore` (accuracy, format, compliance, violations, reasoning).
-- `ModelComparison` merges results + scores, ranks by overall_score, shows value (score/cost).
-- `RecommendationEngine` surfaces best overall, best value, budget-friendly options.
+## Sample Use Cases
+
+| # | Use Case | Difficulty | Capability |
+|---|----------|------------|------------|
+| 00 | Lecture Concept Extraction | Moderate-Hard | Reasoning + Structured Extraction |
+| 01 | Meeting Action Items | Moderate | Extraction + Inference |
+| 02 | Bug Report Triage | Moderate-Hard | Classification + Reasoning |
+| 03 | Regex Generation | Hard | Pattern Recognition + Logic |
+| 04 | Data Cleaning Rules | Moderate-Hard | Pattern Recognition |
 
 ## Status
-Core CLI, parallel executor, judge integration, cost tracking, comparison, and recommendations are implemented. Docs reflect current behavior; additional polish (more tasks, UI) can be layered on top.
+
+Folder-based use cases, automatic prompt generation, parallel executor, judge integration, cost tracking, and UI are implemented. Legacy YAML-based tasks still supported.

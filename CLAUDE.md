@@ -12,27 +12,36 @@ This document provides essential context to help Claude (or any AI assistant) ma
 
 ### Core Purpose
 
-- Enable **task-first** evaluation with declarative YAML task definitions
+- Enable **task-first** evaluation with folder-based use case definitions
+- **Automatically derive prompts** from use case analysis and ground truth
 - Compare **multiple LLMs simultaneously** via OpenRouter API
-- Provide **LLM-as-judge** evaluation using Claude Sonnet 4.5
+- Provide **LLM-as-judge** evaluation using Claude Sonnet 4
 - Deliver **cost-aware recommendations** with transparent cost breakdowns
-- Support **use-case layer** for context-driven model selection and prompts
+- Support **human-friendly Markdown** use case definitions (USE-CASE.md)
 - Enable **chunked processing** for long inputs with dynamic sizing
 
 ### Current Architecture
 
-The project is **CLI-first** with an optional Streamlit UI:
+The project is **CLI-first** with an optional React UI:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    CLI Interface                            │
-│        taskbench evaluate | models | validate | recommend   │
+│    taskbench run | list-usecases | generate-prompts | ...   │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
-│                  Optional Streamlit UI                      │
-│              FastAPI API + Streamlit Frontend               │
-│           http://localhost:8000 + http://localhost:8501     │
+│                  Optional React UI                          │
+│              FastAPI API + React Frontend                   │
+│           http://localhost:8000 + http://localhost:5173     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────┐
+│               Folder-Based Use Case Processing              │
+├─────────────────────────────────────────────────────────────┤
+│  UseCaseParser → Parse USE-CASE.md, extract structured data │
+│  DataAnalyzer → Match data/ with ground-truth/ files        │
+│  PromptGenerator → LLM-driven prompt & rubric generation    │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
@@ -42,7 +51,6 @@ The project is **CLI-first** with an optional Streamlit UI:
 │  Judge → LLM-as-judge scoring with JSON mode               │
 │  Comparison → Ranking, value metrics, recommendations       │
 │  CostTracker → Token/cost tracking, generation ID lookup    │
-│  Orchestrator → Use-case aware model recommendations        │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
@@ -58,7 +66,7 @@ The project is **CLI-first** with an optional Streamlit UI:
 ```
 llm-taskbench/
 ├── src/taskbench/           # Main CLI application
-│   ├── cli/main.py          # CLI commands (evaluate, models, validate, recommend, sample)
+│   ├── cli/main.py          # CLI commands (run, list-usecases, generate-prompts, evaluate, ...)
 │   ├── api/
 │   │   ├── client.py        # OpenRouter API client with retry/backoff
 │   │   └── retry.py         # Retry logic and rate limiting
@@ -73,27 +81,44 @@ llm-taskbench/
 │   │   ├── cost.py          # CostTracker - token/cost tracking
 │   │   ├── model_selector.py # AI-powered tier-based model selection
 │   │   └── orchestrator.py  # LLMOrchestrator - use-case model selection
-│   ├── ui_api.py            # FastAPI endpoints for Streamlit UI
-│   ├── usecase.py           # UseCase model and loader
+│   ├── ui_api.py            # FastAPI endpoints for React UI
+│   ├── usecase.py           # Legacy UseCase model (YAML-based)
+│   ├── usecase_parser.py    # NEW: Folder-based USE-CASE.md parser
+│   ├── prompt_generator.py  # NEW: LLM-driven prompt generation
 │   └── utils/               # Logging and validation utilities
 │
-├── tasks/                   # Task definitions (YAML)
-│   ├── lecture_analysis.yaml
-│   └── template.yaml
+├── sample-usecases/         # Folder-based use cases
+│   ├── 00-lecture-concept-extraction/
+│   │   ├── USE-CASE.md      # Human-friendly description
+│   │   ├── data/            # Input data files
+│   │   ├── ground-truth/    # Expected outputs
+│   │   └── generated-prompts.json  # Auto-generated prompts
+│   ├── 01-meeting-action-items/
+│   ├── 02-bug-report-triage/
+│   ├── 03-regex-generation/
+│   └── 04-data-cleaning-rules/
 │
-├── usecases/                # Use-case specifications (YAML)
-│   └── concepts_extraction.yaml
+├── frontend/                # React UI
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── UseCaseSelector/  # Use case browser
+│   │   │   ├── Results/          # Results dashboard
+│   │   │   └── History/          # Run history
+│   │   ├── api/client.ts    # API client
+│   │   └── types/           # TypeScript types
+│   └── package.json
 │
+├── tasks/                   # Legacy task definitions (YAML)
+├── usecases/                # Legacy use-case specifications (YAML)
 ├── config/
-│   └── models.yaml          # Model pricing catalog (11 models)
+│   └── models.yaml          # Model pricing catalog
 │
 ├── results/                 # Evaluation outputs (JSON)
 ├── tests/                   # Test suite with fixtures
 ├── docs/                    # Documentation
 │
-├── ui_app.py                # Streamlit UI entry point
 ├── docker-compose.cli.yml   # CLI Docker config
-├── docker-compose.ui.yml    # UI Docker config (API + Streamlit)
+├── docker-compose.ui.yml    # UI Docker config (API + React)
 ├── pyproject.toml           # Python package config
 └── Dockerfile               # Container build
 ```
@@ -141,28 +166,54 @@ llm-taskbench/
 
 ## CLI Commands
 
-### `taskbench evaluate`
+### `taskbench run` (NEW - Primary Command)
 
-Run multi-model evaluation on a task.
+Run evaluation on a folder-based use case.
+
+```bash
+taskbench run sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o \
+  --output results/my_run.json
+```
+
+**Key Options:**
+- `--models` / `-m`: Comma-separated model IDs (required)
+- `--data` / `-d`: Specific data file to use (if multiple available)
+- `--output` / `-o`: Output file path
+- `--regenerate-prompts`: Force regenerate prompts
+- `--skip-judge`: Skip judge evaluation
+
+### `taskbench list-usecases` (NEW)
+
+List available folder-based use cases.
+
+```bash
+taskbench list-usecases
+taskbench list-usecases my-usecases/
+```
+
+### `taskbench generate-prompts` (NEW)
+
+Generate prompts for a use case without running evaluation.
+
+```bash
+taskbench generate-prompts sample-usecases/00-lecture-concept-extraction
+taskbench generate-prompts sample-usecases/00-lecture-concept-extraction --force
+```
+
+### `taskbench evaluate` (Legacy)
+
+Run multi-model evaluation on a YAML task definition.
 
 ```bash
 taskbench evaluate tasks/lecture_analysis.yaml \
   --usecase usecases/concepts_extraction.yaml \
-  --models anthropic/claude-sonnet-4.5,openai/gpt-4o \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o \
   --input-file tests/fixtures/sample_transcript.txt \
   --output results/my_run.json \
   --chunked --dynamic-chunk \
-  --skip-judge  # or omit to judge automatically
+  --skip-judge
 ```
-
-**Key Options:**
-- `--models`: Comma-separated model IDs, or `auto` for orchestrator recommendations
-- `--usecase`: Use-case YAML for goal/notes that drive prompts
-- `--chunked`: Enable chunked processing for long inputs
-- `--dynamic-chunk`: Derive chunk size from model context windows
-- `--skip-judge` / `--no-judge`: Skip judge evaluation
-- `--chunk-chars`: Max characters per chunk (default: 20000)
-- `--chunk-overlap`: Overlap between chunks (default: 500)
 
 ### `taskbench models`
 
@@ -170,7 +221,7 @@ List available models and pricing.
 
 ```bash
 taskbench models --list
-taskbench models --info anthropic/claude-sonnet-4.5
+taskbench models --info anthropic/claude-sonnet-4
 ```
 
 ### `taskbench validate`
@@ -195,7 +246,7 @@ Run bundled sample evaluation.
 
 ```bash
 taskbench sample \
-  --models anthropic/claude-sonnet-4.5,openai/gpt-4o \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o \
   --no-judge
 ```
 
@@ -207,10 +258,10 @@ taskbench sample \
 
 ```bash
 docker compose -f docker-compose.cli.yml build
-docker compose -f docker-compose.cli.yml run --rm taskbench-cli evaluate \
-  tasks/lecture_analysis.yaml \
-  --models anthropic/claude-sonnet-4.5 \
-  --input-file tests/fixtures/sample_transcript.txt \
+docker compose -f docker-compose.cli.yml run --rm taskbench-cli list-usecases
+docker compose -f docker-compose.cli.yml run --rm taskbench-cli run \
+  sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4 \
   --skip-judge
 ```
 
@@ -221,7 +272,7 @@ cp .env.example .env
 # Add your OPENROUTER_API_KEY to .env
 docker compose -f docker-compose.ui.yml up --build
 # API: http://localhost:8000
-# UI: http://localhost:8501
+# UI: http://localhost:5173
 ```
 
 ---
@@ -232,9 +283,12 @@ docker compose -f docker-compose.ui.yml up --build
 |----------|----------|---------|-------------|
 | `OPENROUTER_API_KEY` | Yes | - | OpenRouter API key |
 | `TASKBENCH_MAX_CONCURRENCY` | No | 5 | Max parallel model calls |
+| `TASKBENCH_PROMPT_GEN_MODEL` | No | anthropic/claude-sonnet-4.5 | LLM for prompt generation |
+| `TASKBENCH_MAX_TOKENS` | No | 4000 | Max tokens for model output |
+| `TASKBENCH_TEMPERATURE` | No | 0.7 | Temperature for model calls |
 | `TASKBENCH_USE_GENERATION_LOOKUP` | No | true | Fetch billed cost from generation endpoint |
-| `TASKBENCH_DEFAULT_JUDGE_MODEL` | No | anthropic/claude-sonnet-4.5 | Default judge model |
-| `GENERAL_TASK_LLM` | No | anthropic/claude-sonnet-4.5 | Default model for general tasks/fallback |
+| `TASKBENCH_DEFAULT_JUDGE_MODEL` | No | anthropic/claude-sonnet-4 | Default judge model |
+| `GENERAL_TASK_LLM` | No | anthropic/claude-sonnet-4 | Default model for general tasks/fallback |
 | `TASKBENCH_MODELS_CACHE_TTL` | No | 24 | Model catalog cache duration (hours) |
 | `MODEL_SELECTOR_LLM` | No | openai/gpt-4o | LLM used for model selection analysis |
 
@@ -242,7 +296,70 @@ docker compose -f docker-compose.ui.yml up --build
 
 ## Key Concepts
 
-### Task Definition (YAML)
+### Folder-Based Use Cases (NEW - Primary Format)
+
+Use cases are organized in folders with human-friendly Markdown:
+
+```
+sample-usecases/00-lecture-concept-extraction/
+├── USE-CASE.md           # Human-readable description
+├── data/                 # Input files
+│   ├── lecture-01-python-basics.txt
+│   └── lecture-02-ml-fundamentals.txt
+├── ground-truth/         # Expected outputs
+│   ├── lecture-01-concepts.csv
+│   └── lecture-02-concepts.csv
+└── generated-prompts.json  # Auto-generated (created by framework)
+```
+
+**USE-CASE.md Format:**
+
+```markdown
+# Use Case: Concepts Extraction from Lecture Transcript
+
+## Metadata
+- **Difficulty:** Moderate to Hard
+- **Primary Capability:** Reasoning + Structured Extraction
+
+## Goal
+Extract distinct teaching concepts from lecture transcripts...
+
+## LLM Evaluation Notes
+**What this tests:**
+- Understanding of teaching flow
+- Precise timestamp boundary identification
+
+**Edge cases to watch:**
+- Mid-lecture breaks
+- Q&A sections
+
+## Expected Output Schema
+```csv
+concept,start_time,end_time
+01_Introduction,00:00:00,00:04:32
+```
+
+## Quality Criteria
+**"Excellent" extraction:**
+- All segments 2-7 minutes
+- Descriptive concept names
+```
+
+### Automatic Prompt Generation
+
+When running a use case, the framework:
+
+1. **Parses USE-CASE.md** - Extracts goal, evaluation notes, edge cases
+2. **Analyzes data/ground-truth** - Matches files by naming patterns
+3. **Generates prompts via LLM** - Creates task prompt, judge prompt, and rubric
+4. **Saves to folder** - Prompts cached in `generated-prompts.json`
+
+Generated prompts include:
+- `task_prompt`: Instructions for model execution
+- `judge_prompt`: Evaluation criteria for judge
+- `rubric`: Structured scoring with compliance checks and weights
+
+### Task Definition (YAML) - Legacy
 
 Tasks define what to evaluate:
 
@@ -469,16 +586,19 @@ Retry logic: Exponential backoff (2^attempt seconds), max 3 retries for transien
 |---------|----------|
 | CLI entry point | `src/taskbench/cli/main.py` |
 | Core models | `src/taskbench/core/models.py` |
-| Task parser | `src/taskbench/core/task.py` |
+| Task parser (YAML) | `src/taskbench/core/task.py` |
+| Use case parser (Markdown) | `src/taskbench/usecase_parser.py` |
+| Prompt generator | `src/taskbench/prompt_generator.py` |
 | API client | `src/taskbench/api/client.py` |
 | Executor | `src/taskbench/evaluation/executor.py` |
 | Judge | `src/taskbench/evaluation/judge.py` |
 | Cost tracker | `src/taskbench/evaluation/cost.py` |
 | Orchestrator | `src/taskbench/evaluation/orchestrator.py` |
 | UI API | `src/taskbench/ui_api.py` |
-| Streamlit UI | `ui_app.py` |
-| Task definitions | `tasks/*.yaml` |
-| Use-cases | `usecases/*.yaml` |
+| React UI | `frontend/src/` |
+| Sample use cases | `sample-usecases/` |
+| Legacy task definitions | `tasks/*.yaml` |
+| Legacy use-cases | `usecases/*.yaml` |
 | Model pricing | `config/models.yaml` |
 | Test fixtures | `tests/fixtures/` |
 | Results output | `results/` |
@@ -511,8 +631,12 @@ pip install -e .
 # Set API key
 export OPENROUTER_API_KEY=sk-or-...
 
-# Run sample evaluation
-taskbench sample --models anthropic/claude-sonnet-4.5,openai/gpt-4o --no-judge
+# List available use cases
+taskbench list-usecases
+
+# Run evaluation on a use case
+taskbench run sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o
 
 # Run with UI
 docker compose -f docker-compose.ui.yml up --build
@@ -521,17 +645,22 @@ docker compose -f docker-compose.ui.yml up --build
 ### Common Workflows
 
 ```bash
-# Evaluate with judge
-taskbench evaluate tasks/lecture_analysis.yaml \
-  --models anthropic/claude-sonnet-4.5,openai/gpt-4o \
-  --input-file data/transcript.txt
+# Folder-based use case (recommended)
+taskbench run sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4,openai/gpt-4o
 
-# Evaluate without judge, re-judge later
+# Generate prompts without evaluation
+taskbench generate-prompts sample-usecases/00-lecture-concept-extraction
+
+# Skip judge for quick runs
+taskbench run sample-usecases/00-lecture-concept-extraction \
+  --models anthropic/claude-sonnet-4 \
+  --skip-judge
+
+# Legacy: YAML-based evaluation
 taskbench evaluate tasks/lecture_analysis.yaml \
-  --models auto \
-  --input-file data/transcript.txt \
-  --skip-judge \
-  --output results/run.json
+  --models anthropic/claude-sonnet-4,openai/gpt-4o \
+  --input-file data/transcript.txt
 
 # Judge saved results
 taskbench recommend --results results/run.json

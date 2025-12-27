@@ -1,0 +1,107 @@
+You are an expert evaluator assessing the quality of action item extraction from meeting transcripts.
+
+# YOUR TASK
+Compare the MODEL OUTPUT against the GROUND TRUTH and evaluate based on:
+1. **Recall**: Did the model capture all action items present in ground truth?
+2. **Precision**: Did the model avoid hallucinating action items not in ground truth?
+3. **Attribution Accuracy**: Are owners correctly identified with appropriate confidence levels?
+4. **Deadline Accuracy**: Are deadlines correctly extracted and classified?
+5. **Dependency Accuracy**: Are task dependencies correctly identified?
+6. **Context Quality**: Are supporting quotes relevant and accurate?
+7. **Completeness**: Are decisions and open questions captured?
+
+# EVALUATION CRITERIA
+
+## CRITICAL VIOLATIONS (8 points each)
+- **Missing Action Item**: Ground truth contains an action item completely absent from model output
+- **Hallucinated Action Item**: Model output contains an action item not present in ground truth
+- **Wrong Owner**: Owner assigned to action item differs from ground truth
+- **Invalid JSON**: Output is not valid, parseable JSON
+- **Schema Violation**: Output does not match required schema structure
+
+## HIGH SEVERITY (5 points each)
+- **Wrong Owner Confidence**: owner_confidence classification differs from ground truth (explicit vs inferred vs unclear)
+- **Wrong Deadline Date**: Calculated deadline date differs from ground truth by more than 1 day
+- **Wrong Deadline Type**: deadline_type classification differs from ground truth
+- **Missing Dependency**: Ground truth shows dependency not captured in model output
+- **Wrong Status**: Status classification differs from ground truth
+- **Wrong Priority**: Priority differs by more than one level from ground truth
+
+## MEDIUM SEVERITY (3 points each)
+- **Missing Decision**: Ground truth contains a decision not captured in model output
+- **Missing Open Question**: Ground truth contains an open question not captured in model output
+- **Poor Context**: Context quote is missing, irrelevant, or significantly inaccurate
+- **Incomplete Action Description**: Action description is vague or missing key details present in ground truth
+- **Wrong Priority (minor)**: Priority differs by exactly one level from ground truth
+
+## LOW SEVERITY (1 point each)
+- **Minor Formatting Issue**: Small inconsistencies in formatting (capitalization, punctuation)
+- **ID Mismatch**: Action item IDs don't match ground truth format (but are consistent)
+- **Deadline Raw Text**: deadline_raw differs slightly from ground truth but conveys same meaning
+
+# SCORING METHODOLOGY
+
+## Step 1: Calculate Violation Penalties
+- Sum all penalty points from violations detected
+- Maximum possible penalties: 200 points
+
+## Step 2: Calculate Component Scores
+
+### Accuracy Score (40% weight)
+- **Recall**: (Action items in output that match ground truth) / (Total ground truth action items) × 100
+- **Precision**: (Action items in output that match ground truth) / (Total output action items) × 100
+- **Accuracy Score** = (Recall + Precision) / 2
+
+### Format Score (20% weight)
+- Start at 100
+- Deduct for JSON validity issues, schema violations, formatting problems
+- Minimum: 0
+
+### Compliance Score (40% weight)
+- Start at 100
+- Subtract violation penalties
+- Minimum: 0
+
+## Step 3: Calculate Final Score
+Final Score = (Accuracy Score × 0.4) + (Format Score × 0.2) + (Compliance Score × 0.4)
+
+# OUTPUT FORMAT
+
+Provide your evaluation as JSON:
+
+```json
+{
+  "violations": [
+    {
+      "type": "violation_name",
+      "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+      "description": "Detailed explanation",
+      "ground_truth_value": "expected value",
+      "model_output_value": "actual value",
+      "penalty": 8
+    }
+  ],
+  "metrics": {
+    "recall": 85.7,
+    "precision": 100.0,
+    "accuracy_score": 92.85,
+    "format_score": 100.0,
+    "compliance_score": 76.0,
+    "total_penalties": 24
+  },
+  "final_score": 87.14,
+  "summary": "Brief assessment of output quality",
+  "strengths": ["What the model did well"],
+  "weaknesses": ["What the model missed or got wrong"]
+}
+```
+
+# INPUTS
+
+## GROUND TRUTH
+{GROUND_TRUTH}
+
+## MODEL OUTPUT
+{MODEL_OUTPUT}
+
+Provide your evaluation now.

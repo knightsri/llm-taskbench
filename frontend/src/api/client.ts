@@ -3,7 +3,7 @@
  */
 
 import axios from 'axios';
-import type { Task, Evaluation, EvaluationProgress } from '../types';
+import type { Task, Evaluation, EvaluationProgress, UseCase, UseCaseDetail, GeneratedPrompts } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -14,7 +14,45 @@ const api = axios.create({
   },
 });
 
-// Tasks API
+// Use Cases API (folder-based)
+export const usecasesApi = {
+  async list(): Promise<UseCase[]> {
+    const response = await api.get('/usecases/');
+    return response.data;
+  },
+
+  async get(folderPath: string): Promise<UseCaseDetail> {
+    const response = await api.get('/usecases/detail', { params: { path: folderPath } });
+    return response.data;
+  },
+
+  async generatePrompts(folderPath: string, force: boolean = false): Promise<GeneratedPrompts> {
+    const response = await api.post('/usecases/generate-prompts', { path: folderPath, force });
+    return response.data;
+  },
+
+  async getPrompts(folderPath: string): Promise<GeneratedPrompts | null> {
+    try {
+      const response = await api.get('/usecases/prompts', { params: { path: folderPath } });
+      return response.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  async runEvaluation(data: {
+    usecase_path: string;
+    data_file?: string;
+    models: string[];
+    skip_judge?: boolean;
+    regenerate_prompts?: boolean;
+  }): Promise<Evaluation> {
+    const response = await api.post('/usecases/evaluate', data);
+    return response.data;
+  },
+};
+
+// Tasks API (legacy)
 export const tasksApi = {
   async create(data: {
     name: string;

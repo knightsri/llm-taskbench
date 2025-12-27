@@ -1,0 +1,17 @@
+{
+  "transformation_type": "Temporal segmentation and concept extraction from timestamped lecture transcripts",
+  "key_fields": [
+    "concept",
+    "start_time",
+    "end_time"
+  ],
+  "quality_indicators": [
+    "All segments between 2-7 minutes duration (3-6 minutes ideal)",
+    "Sequential numbering with descriptive concept names in XX_Title_Case_Format",
+    "Gapless coverage (each end_time matches next start_time)",
+    "Natural pedagogical boundaries between concepts",
+    "Complete transcript coverage from start to finish",
+    "Descriptive concept names (3-7 words) that accurately reflect content"
+  ],
+  "comparison_strategy": "Compare segment count, duration compliance, naming convention adherence, temporal coverage gaps, and boundary alignment between output and ground truth"
+}

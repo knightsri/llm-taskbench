@@ -1,0 +1,129 @@
+{
+  "analysis": {
+    "transformation_type": "Temporal segmentation and concept extraction from timestamped lecture transcripts",
+    "key_fields": [
+      "concept",
+      "start_time",
+      "end_time"
+    ],
+    "quality_indicators": [
+      "All segments between 2-7 minutes duration (3-6 minutes ideal)",
+      "Sequential numbering with descriptive concept names in XX_Title_Case_Format",
+      "Gapless coverage (each end_time matches next start_time)",
+      "Natural pedagogical boundaries between concepts",
+      "Complete transcript coverage from start to finish",
+      "Descriptive concept names (3-7 words) that accurately reflect content"
+    ],
+    "comparison_strategy": "Compare segment count, duration compliance, naming convention adherence, temporal coverage gaps, and boundary alignment between output and ground truth"
+  },
+  "task_prompt": "You are an expert educational content curator. Your task is to extract distinct teaching concepts from a lecture transcript and segment them into bite-sized video clips.\n\n**INPUT:** A lecture transcript with timestamps in [HH:MM:SS] format.\n\n**YOUR TASK:** Identify self-contained teaching concepts and output them as a CSV with three columns: concept, start_time, end_time.\n\n**REQUIREMENTS:**\n\n1. **Duration Constraints:**\n   - Each segment must be 2-7 minutes long\n   - Ideal length is 3-6 minutes\n   - Segments under 2 minutes or over 7 minutes are violations\n\n2. **Concept Naming:**\n   - Format: `XX_Concept_Name_In_Title_Case`\n   - Number sequentially starting from 01\n   - Use underscores, no spaces\n   - Be descriptive but concise (3-7 words)\n   - Accurately reflect the teaching content\n\n3. **Coverage:**\n   - Cover the ENTIRE lecture with NO GAPS\n   - Each segment's end_time must equal the next segment's start_time\n   - Start from the lecture beginning, end at the lecture conclusion\n   - Exclude breaks but don't create gaps (merge around them)\n\n4. **Boundaries:**\n   - Cut at natural transition points between concepts\n   - Each segment should be self-contained and make sense independently\n   - Respect pedagogical flow (don't split explanations mid-thought)\n\n5. **Edge Cases:**\n   - Q&A sections: merge with preceding concept or create separate segment if substantial\n   - Tangential stories: include with the relevant concept\n   - Mid-lecture breaks: exclude duration but maintain continuous timestamps\n   - Repeated references: keep with the current concept being taught\n\n**OUTPUT FORMAT:**\n```csv\nconcept,start_time,end_time\n01_Introduction_to_Topic_Name,00:00:00,00:04:32\n02_Core_Concept_Definition,00:04:32,00:08:15\n```\n\n**Time Format:** HH:MM:SS (e.g., 00:04:32)\n\nProvide ONLY the CSV output, no additional text or explanations.",
+  "judge_prompt": "You are evaluating the quality of lecture concept extraction against a ground truth reference. Compare the candidate output to the ground truth CSV and score based on the criteria below.\n\n**INPUTS:**\n- Ground Truth CSV: The reference segmentation\n- Candidate Output CSV: The LLM's extraction to evaluate\n- Original Transcript: The source material\n\n**EVALUATION CRITERIA:**\n\n**1. DURATION COMPLIANCE (30 points)**\n- Check each segment duration (end_time - start_time)\n- CRITICAL VIOLATION: Segment under 2 minutes OR over 7 minutes (-5 points each)\n- MINOR: Segment outside ideal 3-6 minute range but within 2-7 minutes (-1 point each)\n- Calculate: Total segments compliant / Total segments \u00d7 30\n\n**2. COVERAGE COMPLETENESS (25 points)**\n- First segment must start at lecture beginning (00:00:00 or within 5 seconds)\n- Last segment must end at lecture conclusion (compare to ground truth end time \u00b110 seconds)\n- Check for GAPS: Any gap where segment[n].end_time \u2260 segment[n+1].start_time (-5 points per gap)\n- Check for OVERLAPS: segment[n].end_time > segment[n+1].start_time (-5 points per overlap)\n- Deduct points from 25 based on violations\n\n**3. CONCEPT NAMING QUALITY (20 points)**\n- Format compliance: XX_Title_Case_With_Underscores (-2 points per violation)\n- Sequential numbering: Must be 01, 02, 03... with no skips (-3 points per error)\n- Descriptiveness: Names should be 3-7 words and accurately reflect content (-2 points for vague/inaccurate names)\n- Compare semantic similarity to ground truth concept names (if highly divergent, -3 points)\n\n**4. SEGMENTATION ACCURACY (25 points)**\n- Compare segment count: Ground truth has 8 segments\n  - If candidate has 6-10 segments: Full points\n  - If candidate has 4-5 or 11-12 segments: -5 points (under/over-segmented)\n  - If candidate has <4 or >12 segments: -15 points (severely wrong granularity)\n- Boundary alignment: Compare candidate boundaries to ground truth (\u00b130 seconds tolerance is acceptable)\n  - Major misalignment (>2 minutes off): -3 points per boundary\n  - Minor misalignment (30sec-2min off): -1 point per boundary\n\n**SCORING CALCULATION:**\n1. Start with 100 points\n2. Apply all penalties from each category\n3. Ensure category scores don't go below 0\n4. Sum all category scores for final score (0-100)\n\n**OUTPUT FORMAT:**\nProvide a JSON evaluation:\n```json\n{\n  \"duration_compliance\": {\"score\": X, \"violations\": [\"list\"], \"details\": \"explanation\"},\n  \"coverage_completeness\": {\"score\": X, \"violations\": [\"list\"], \"details\": \"explanation\"},\n  \"concept_naming\": {\"score\": X, \"violations\": [\"list\"], \"details\": \"explanation\"},\n  \"segmentation_accuracy\": {\"score\": X, \"violations\": [\"list\"], \"details\": \"explanation\"},\n  \"total_score\": X,\n  \"quality_tier\": \"Excellent|Good|Acceptable|Poor\",\n  \"summary\": \"Brief overall assessment\"\n}\n```\n\n**QUALITY TIERS:**\n- Excellent (90-100): All segments 2-7 min, complete coverage, accurate names, natural boundaries\n- Good (75-89): 1-2 minor violations, mostly accurate, near-complete coverage\n- Acceptable (60-74): 3-5 violations, some issues but usable output\n- Poor (<60): 6+ violations OR major gaps OR severely wrong segmentation",
+  "rubric": {
+    "critical_requirements": [
+      {
+        "name": "duration_constraints",
+        "description": "All segments must be between 2-7 minutes in duration",
+        "derived_from": "Ground truth shows 8 segments all within acceptable range; use case explicitly states 2 min minimum, 7 min maximum",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "gapless_coverage",
+        "description": "No gaps or overlaps between consecutive segments; each end_time must equal next start_time",
+        "derived_from": "Ground truth shows perfect continuity: 00:02:42\u219200:02:42, 00:07:15\u219200:07:15, etc. Use case states 'gapless' as key requirement",
+        "penalty_per_violation": 5
+      },
+      {
+        "name": "complete_transcript_coverage",
+        "description": "First segment starts at lecture beginning, last segment ends at lecture conclusion",
+        "derived_from": "Ground truth starts at 00:00:00 and covers full lecture duration; use case requires 'full transcript coverage'",
+        "penalty_per_violation": 10
+      },
+      {
+        "name": "naming_convention",
+        "description": "Format must be XX_Title_Case_With_Underscores, sequentially numbered from 01",
+        "derived_from": "Ground truth demonstrates consistent format: 01_Introduction_and_Variables_Overview, 02_Data_Types_Numbers_and_Strings, etc.",
+        "penalty_per_violation": 2
+      }
+    ],
+    "compliance_checks": [
+      {
+        "check": "segment_too_short",
+        "condition": "Any segment duration < 2 minutes",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "segment_too_long",
+        "condition": "Any segment duration > 7 minutes",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "temporal_gap",
+        "condition": "segment[n].end_time \u2260 segment[n+1].start_time (gap exists)",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "temporal_overlap",
+        "condition": "segment[n].end_time > segment[n+1].start_time",
+        "severity": "CRITICAL",
+        "penalty": 5
+      },
+      {
+        "check": "missing_start_coverage",
+        "condition": "First segment start_time > 00:00:05",
+        "severity": "HIGH",
+        "penalty": 10
+      },
+      {
+        "check": "missing_end_coverage",
+        "condition": "Last segment end_time more than 10 seconds before lecture conclusion",
+        "severity": "HIGH",
+        "penalty": 10
+      },
+      {
+        "check": "incorrect_naming_format",
+        "condition": "Concept name doesn't follow XX_Title_Case_Format",
+        "severity": "MEDIUM",
+        "penalty": 2
+      },
+      {
+        "check": "non_sequential_numbering",
+        "condition": "Numbering skips or doesn't start at 01",
+        "severity": "MEDIUM",
+        "penalty": 3
+      },
+      {
+        "check": "vague_concept_name",
+        "condition": "Concept name is not descriptive (too short, generic, or inaccurate)",
+        "severity": "MEDIUM",
+        "penalty": 2
+      },
+      {
+        "check": "wrong_granularity",
+        "condition": "Segment count differs significantly from expected range (ground truth: 8 segments, acceptable: 6-10)",
+        "severity": "HIGH",
+        "penalty": 5
+      },
+      {
+        "check": "boundary_misalignment",
+        "condition": "Segment boundaries differ from ground truth by >2 minutes",
+        "severity": "MEDIUM",
+        "penalty": 3
+      },
+      {
+        "check": "invalid_csv_format",
+        "condition": "Output is not valid CSV or missing required columns",
+        "severity": "CRITICAL",
+        "penalty": 50
+      }
+    ],
+    "weights": {
+      "accuracy": 40,
+      "format": 20,
+      "compliance": 40
+    },
+    "scoring_instructions": "Start with 100 points. Evaluate each compliance check and apply penalties. Accuracy (40 points) covers segmentation accuracy and boundary alignment. Format (20 points) covers CSV structure and naming conventions. Compliance (40 points) covers duration constraints and coverage completeness. Sum penalties within each category, ensuring no category goes below 0. Final score = 100 - total_penalties. Quality tier: Excellent (90-100), Good (75-89), Acceptable (60-74), Poor (<60)."
+  }
+}

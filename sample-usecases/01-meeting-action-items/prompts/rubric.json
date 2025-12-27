@@ -1,0 +1,126 @@
+{
+  "critical_requirements": [
+    {
+      "name": "Complete Action Item Extraction",
+      "description": "All action items present in ground truth must be extracted without omissions",
+      "derived_from": "Ground truth contains 7 action items (AI-001 through AI-007) representing all commitments made during the meeting",
+      "penalty_per_violation": 8
+    },
+    {
+      "name": "No Hallucinated Action Items",
+      "description": "Model must not invent action items not present in the transcript or ground truth",
+      "derived_from": "Precision is a key metric; ground truth only includes items explicitly or implicitly committed to in the transcript",
+      "penalty_per_violation": 8
+    },
+    {
+      "name": "Correct Owner Attribution",
+      "description": "Each action item must be assigned to the correct person responsible",
+      "derived_from": "Ground truth shows specific owner assignments (Sarah, Mike, Priya, Tom, Lisa) based on explicit statements or clear inference",
+      "penalty_per_violation": 8
+    },
+    {
+      "name": "Valid JSON Output",
+      "description": "Output must be valid, parseable JSON",
+      "derived_from": "Expected output format is JSON; invalid JSON cannot be processed by project management tools",
+      "penalty_per_violation": 8
+    },
+    {
+      "name": "Schema Compliance",
+      "description": "Output must match the required schema structure with all mandatory fields",
+      "derived_from": "Ground truth follows specific schema with meeting_id, action_items array, decisions array, open_questions array",
+      "penalty_per_violation": 8
+    }
+  ],
+  "compliance_checks": [
+    {
+      "check": "Owner Confidence Classification",
+      "condition": "owner_confidence value differs from ground truth (explicit vs inferred vs unclear)",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "Deadline Date Accuracy",
+      "condition": "Calculated deadline date differs from ground truth by more than 1 day",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "Deadline Type Classification",
+      "condition": "deadline_type differs from ground truth (explicit vs relative vs inferred vs none)",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "Dependency Identification",
+      "condition": "Dependencies array missing items present in ground truth (e.g., AI-005 depends on AI-004)",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "Status Classification",
+      "condition": "Status differs from ground truth (new vs in-progress vs blocked vs done)",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "Priority Assessment Major",
+      "condition": "Priority differs by more than one level from ground truth",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "Decision Extraction",
+      "condition": "Decisions present in ground truth are missing from model output",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "Open Question Extraction",
+      "condition": "Open questions present in ground truth are missing from model output",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "Context Quote Quality",
+      "condition": "Context field is missing, irrelevant, or significantly inaccurate compared to ground truth",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "Action Description Completeness",
+      "condition": "Action description is vague or missing key details present in ground truth",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "Priority Assessment Minor",
+      "condition": "Priority differs by exactly one level from ground truth (e.g., high vs medium)",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "Formatting Consistency",
+      "condition": "Minor inconsistencies in capitalization, punctuation, or text formatting",
+      "severity": "LOW",
+      "penalty": 1
+    },
+    {
+      "check": "ID Format",
+      "condition": "Action item IDs don't match ground truth format but are internally consistent",
+      "severity": "LOW",
+      "penalty": 1
+    },
+    {
+      "check": "Deadline Raw Text",
+      "condition": "deadline_raw differs slightly from ground truth but conveys same meaning",
+      "severity": "LOW",
+      "penalty": 1
+    }
+  ],
+  "weights": {
+    "accuracy": 40,
+    "format": 20,
+    "compliance": 40
+  },
+  "scoring_instructions": "Calculate final score as weighted average: (1) Accuracy Score (40%): Average of recall and precision percentages where recall = matched items / ground truth items and precision = matched items / output items. (2) Format Score (20%): Start at 100, deduct for JSON and schema violations. (3) Compliance Score (40%): Start at 100, subtract total violation penalties (max 200 possible). Final Score = (Accuracy \u00d7 0.4) + (Format \u00d7 0.2) + (Compliance \u00d7 0.4). Score range: 0-100."
+}

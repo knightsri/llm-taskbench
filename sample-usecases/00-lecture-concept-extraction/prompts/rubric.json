@@ -1,0 +1,108 @@
+{
+  "critical_requirements": [
+    {
+      "name": "duration_constraints",
+      "description": "All segments must be between 2-7 minutes in duration",
+      "derived_from": "Ground truth shows 8 segments all within acceptable range; use case explicitly states 2 min minimum, 7 min maximum",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "gapless_coverage",
+      "description": "No gaps or overlaps between consecutive segments; each end_time must equal next start_time",
+      "derived_from": "Ground truth shows perfect continuity: 00:02:42\u219200:02:42, 00:07:15\u219200:07:15, etc. Use case states 'gapless' as key requirement",
+      "penalty_per_violation": 5
+    },
+    {
+      "name": "complete_transcript_coverage",
+      "description": "First segment starts at lecture beginning, last segment ends at lecture conclusion",
+      "derived_from": "Ground truth starts at 00:00:00 and covers full lecture duration; use case requires 'full transcript coverage'",
+      "penalty_per_violation": 10
+    },
+    {
+      "name": "naming_convention",
+      "description": "Format must be XX_Title_Case_With_Underscores, sequentially numbered from 01",
+      "derived_from": "Ground truth demonstrates consistent format: 01_Introduction_and_Variables_Overview, 02_Data_Types_Numbers_and_Strings, etc.",
+      "penalty_per_violation": 2
+    }
+  ],
+  "compliance_checks": [
+    {
+      "check": "segment_too_short",
+      "condition": "Any segment duration < 2 minutes",
+      "severity": "CRITICAL",
+      "penalty": 5
+    },
+    {
+      "check": "segment_too_long",
+      "condition": "Any segment duration > 7 minutes",
+      "severity": "CRITICAL",
+      "penalty": 5
+    },
+    {
+      "check": "temporal_gap",
+      "condition": "segment[n].end_time \u2260 segment[n+1].start_time (gap exists)",
+      "severity": "CRITICAL",
+      "penalty": 5
+    },
+    {
+      "check": "temporal_overlap",
+      "condition": "segment[n].end_time > segment[n+1].start_time",
+      "severity": "CRITICAL",
+      "penalty": 5
+    },
+    {
+      "check": "missing_start_coverage",
+      "condition": "First segment start_time > 00:00:05",
+      "severity": "HIGH",
+      "penalty": 10
+    },
+    {
+      "check": "missing_end_coverage",
+      "condition": "Last segment end_time more than 10 seconds before lecture conclusion",
+      "severity": "HIGH",
+      "penalty": 10
+    },
+    {
+      "check": "incorrect_naming_format",
+      "condition": "Concept name doesn't follow XX_Title_Case_Format",
+      "severity": "MEDIUM",
+      "penalty": 2
+    },
+    {
+      "check": "non_sequential_numbering",
+      "condition": "Numbering skips or doesn't start at 01",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "vague_concept_name",
+      "condition": "Concept name is not descriptive (too short, generic, or inaccurate)",
+      "severity": "MEDIUM",
+      "penalty": 2
+    },
+    {
+      "check": "wrong_granularity",
+      "condition": "Segment count differs significantly from expected range (ground truth: 8 segments, acceptable: 6-10)",
+      "severity": "HIGH",
+      "penalty": 5
+    },
+    {
+      "check": "boundary_misalignment",
+      "condition": "Segment boundaries differ from ground truth by >2 minutes",
+      "severity": "MEDIUM",
+      "penalty": 3
+    },
+    {
+      "check": "invalid_csv_format",
+      "condition": "Output is not valid CSV or missing required columns",
+      "severity": "CRITICAL",
+      "penalty": 50
+    }
+  ],
+  "weights": {
+    "accuracy": 40,
+    "format": 20,
+    "compliance": 40
+  },
+  "scoring_instructions": "Start with 100 points. Evaluate each compliance check and apply penalties. Accuracy (40 points) covers segmentation accuracy and boundary alignment. Format (20 points) covers CSV structure and naming conventions. Compliance (40 points) covers duration constraints and coverage completeness. Sum penalties within each category, ensuring no category goes below 0. Final score = 100 - total_penalties. Quality tier: Excellent (90-100), Good (75-89), Acceptable (60-74), Poor (<60)."
+}

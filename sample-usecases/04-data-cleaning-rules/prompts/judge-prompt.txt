@@ -1,0 +1,87 @@
+You are evaluating an LLM's ability to analyze messy CSV data and generate actionable data cleaning rules.
+
+**Ground Truth Transformations:**
+The messy CSV should be cleaned according to these transformations:
+1. **first_name**: Capitalize first letter, lowercase rest (jane → Jane, DOE → Doe)
+2. **last_name**: Capitalize first letter, lowercase rest
+3. **state**: Standardize to 2-letter uppercase codes (California/Calif./california → CA, Texas/Tx → TX, new york/N.Y. → NY, Florida → FL, Washington → WA, Oregon → OR, Arizona → AZ, Nevada → NV)
+4. **signup_date**: Standardize to YYYY-MM-DD format (01/20/2023 → 2023-01-20, Feb 15, 2023 → 2023-02-15, 20-Mar-2023 → 2023-03-20, 03-15-2023 → 2023-03-15, 04/05/2023 → 2023-04-05)
+5. **subscription_tier**: Lowercase (Premium/PREMIUM → premium, Basic → basic, Gold → gold)
+6. **subscription_tier typo**: Fix "Premum" → "premium"
+7. **annual_spend**: Remove $ symbol, ensure decimal format with 2 places (1100 → 1100.00, $750 → 750.00)
+8. **phone**: Standardize to XXX-XXX-XXXX format, remove variations like (555) 234-5678, 555.345.6789, 5554567890, (555)890-1234
+9. **null variations**: Standardize NULL, N/A to empty string
+
+**Evaluation Criteria:**
+
+**1. Issue Detection (40 points)**
+Verify the LLM identified these specific issues:
+- Date format inconsistencies across 5+ different formats (CRITICAL - 5 points)
+- State name variations and abbreviations (CRITICAL - 5 points)
+- Case inconsistencies in first_name, last_name (HIGH - 4 points)
+- Case inconsistencies in subscription_tier (HIGH - 4 points)
+- Typo in subscription_tier ("Premum") (HIGH - 4 points)
+- Phone number format variations (MEDIUM - 3 points)
+- Currency symbol and decimal inconsistencies in annual_spend (MEDIUM - 3 points)
+- Null value variations (NULL, N/A) (MEDIUM - 3 points)
+- Email validation issues (bob.johnson@email missing domain) (LOW - 2 points)
+
+Penalty: -5 points for each CRITICAL issue missed, -3 points for each HIGH issue missed, -2 points for MEDIUM, -1 for LOW
+
+**2. Rule Correctness (40 points)**
+For each column with issues, verify:
+- Rules would produce ground truth output (10 points)
+- Transformation logic is specific and executable (10 points)
+- Examples show correct before/after transformations (10 points)
+- Severity levels appropriately assigned (5 points)
+- Affected row counts are reasonable estimates (5 points)
+
+Penalty: -8 points for rules that would produce incorrect output, -5 points for vague/non-actionable rules, -3 points for missing examples
+
+**3. JSON Schema Compliance (20 points)**
+- Valid JSON structure (5 points)
+- All required fields present (dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review) (5 points)
+- Correct data types (numbers as numbers, not strings) (5 points)
+- Schema matches specification exactly (5 points)
+
+Penalty: -10 points for invalid JSON, -5 points for missing required sections, -2 points per field with wrong data type
+
+**Scoring Instructions:**
+1. Start with 100 points
+2. Check each issue type against ground truth - deduct points for missed issues
+3. Verify each cleaning rule would produce correct transformations - deduct for incorrect/vague rules
+4. Validate JSON structure and schema compliance - deduct for structural issues
+5. Award bonus points (up to +10) for:
+   - Identifying additional valid issues not in ground truth
+   - Excellent actionability (regex patterns, specific conditions)
+   - Appropriate use of flagged_for_review for ambiguous cases
+
+**Output Format:**
+Provide your evaluation as JSON:
+```json
+{
+  "score": number (0-100),
+  "issue_detection": {
+    "detected": ["list of issues correctly identified"],
+    "missed": ["list of issues not identified"],
+    "false_positives": ["issues flagged that aren't real"],
+    "points": number
+  },
+  "rule_correctness": {
+    "correct_rules": ["rules that would work"],
+    "incorrect_rules": ["rules that would fail or produce wrong output"],
+    "vague_rules": ["rules lacking specificity"],
+    "points": number
+  },
+  "schema_compliance": {
+    "valid_json": boolean,
+    "missing_fields": ["list of missing required fields"],
+    "type_errors": ["fields with wrong data types"],
+    "points": number
+  },
+  "strengths": ["what the output did well"],
+  "weaknesses": ["what the output missed or got wrong"],
+  "actionability_assessment": "Are rules specific enough to implement?",
+  "overall_feedback": "Summary of evaluation"
+}
+```

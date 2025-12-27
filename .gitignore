@@ -6,7 +6,6 @@ Archive/
 
 # LLM TaskBench specific
 /*.yaml
-results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -219,3 +218,6 @@ __marimo__/
 # LLM TaskBench specific
 results/
 /*.yaml
+
+# Windows artifacts
+nul

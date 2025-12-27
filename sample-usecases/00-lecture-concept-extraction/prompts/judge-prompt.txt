@@ -1,0 +1,62 @@
+You are evaluating the quality of lecture concept extraction against a ground truth reference. Compare the candidate output to the ground truth CSV and score based on the criteria below.
+
+**INPUTS:**
+- Ground Truth CSV: The reference segmentation
+- Candidate Output CSV: The LLM's extraction to evaluate
+- Original Transcript: The source material
+
+**EVALUATION CRITERIA:**
+
+**1. DURATION COMPLIANCE (30 points)**
+- Check each segment duration (end_time - start_time)
+- CRITICAL VIOLATION: Segment under 2 minutes OR over 7 minutes (-5 points each)
+- MINOR: Segment outside ideal 3-6 minute range but within 2-7 minutes (-1 point each)
+- Calculate: Total segments compliant / Total segments × 30
+
+**2. COVERAGE COMPLETENESS (25 points)**
+- First segment must start at lecture beginning (00:00:00 or within 5 seconds)
+- Last segment must end at lecture conclusion (compare to ground truth end time ±10 seconds)
+- Check for GAPS: Any gap where segment[n].end_time ≠ segment[n+1].start_time (-5 points per gap)
+- Check for OVERLAPS: segment[n].end_time > segment[n+1].start_time (-5 points per overlap)
+- Deduct points from 25 based on violations
+
+**3. CONCEPT NAMING QUALITY (20 points)**
+- Format compliance: XX_Title_Case_With_Underscores (-2 points per violation)
+- Sequential numbering: Must be 01, 02, 03... with no skips (-3 points per error)
+- Descriptiveness: Names should be 3-7 words and accurately reflect content (-2 points for vague/inaccurate names)
+- Compare semantic similarity to ground truth concept names (if highly divergent, -3 points)
+
+**4. SEGMENTATION ACCURACY (25 points)**
+- Compare segment count: Ground truth has 8 segments
+  - If candidate has 6-10 segments: Full points
+  - If candidate has 4-5 or 11-12 segments: -5 points (under/over-segmented)
+  - If candidate has <4 or >12 segments: -15 points (severely wrong granularity)
+- Boundary alignment: Compare candidate boundaries to ground truth (±30 seconds tolerance is acceptable)
+  - Major misalignment (>2 minutes off): -3 points per boundary
+  - Minor misalignment (30sec-2min off): -1 point per boundary
+
+**SCORING CALCULATION:**
+1. Start with 100 points
+2. Apply all penalties from each category
+3. Ensure category scores don't go below 0
+4. Sum all category scores for final score (0-100)
+
+**OUTPUT FORMAT:**
+Provide a JSON evaluation:
+```json
+{
+  "duration_compliance": {"score": X, "violations": ["list"], "details": "explanation"},
+  "coverage_completeness": {"score": X, "violations": ["list"], "details": "explanation"},
+  "concept_naming": {"score": X, "violations": ["list"], "details": "explanation"},
+  "segmentation_accuracy": {"score": X, "violations": ["list"], "details": "explanation"},
+  "total_score": X,
+  "quality_tier": "Excellent|Good|Acceptable|Poor",
+  "summary": "Brief overall assessment"
+}
+```
+
+**QUALITY TIERS:**
+- Excellent (90-100): All segments 2-7 min, complete coverage, accurate names, natural boundaries
+- Good (75-89): 1-2 minor violations, mostly accurate, near-complete coverage
+- Acceptable (60-74): 3-5 violations, some issues but usable output
+- Poor (<60): 6+ violations OR major gaps OR severely wrong segmentation

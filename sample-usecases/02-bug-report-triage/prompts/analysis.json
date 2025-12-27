@@ -1,0 +1,25 @@
+{
+  "transformation_type": "Multi-label classification with structured output generation - transforming unstructured bug reports into standardized, machine-readable JSON with severity, component, type, root cause, reproducibility classifications, plus duplicate detection and missing information identification",
+  "key_fields": [
+    "severity (critical/high/medium/low)",
+    "severity_rationale",
+    "component (ui/backend/database/auth/payments/api/mobile/infrastructure)",
+    "type (bug/feature_request/question/documentation)",
+    "root_cause_category (code_defect/configuration/data_issue/third_party/user_error/unknown)",
+    "reproducibility (always/sometimes/rare/cannot_reproduce)",
+    "potential_duplicates (array with bug_id, confidence, rationale)",
+    "missing_information (array)",
+    "suggested_assignee_team"
+  ],
+  "quality_indicators": [
+    "Correct severity assessment matching business impact (financial/legal=critical, unusable=high, degraded=medium, cosmetic=low)",
+    "Accurate component identification from symptom description",
+    "Proper distinction between bugs vs feature requests vs user errors",
+    "Appropriate root cause categorization when determinable",
+    "Realistic reproducibility assessment from report details",
+    "Detection of duplicate patterns across different phrasings",
+    "Identification of missing diagnostic information",
+    "Logical team assignment based on component"
+  ],
+  "comparison_strategy": "Field-by-field exact match for categorical fields (severity, component, type, root_cause_category, reproducibility, suggested_assignee_team). Semantic similarity check for rationale fields. Array overlap analysis for potential_duplicates with tolerance for confidence levels. Partial credit for missing_information if reasonable alternatives identified."
+}

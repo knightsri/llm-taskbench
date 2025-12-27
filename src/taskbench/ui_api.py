@@ -1,12 +1,14 @@
 import asyncio
 import os
 import uuid
+from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import json
 import yaml
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from taskbench.api.client import OpenRouterClient
@@ -19,6 +21,8 @@ from taskbench.evaluation.judge import LLMJudge
 from taskbench.evaluation.recommender import RecommendationEngine
 from taskbench.usecase import UseCase, list_usecases
 from taskbench.evaluation.orchestrator import LLMOrchestrator
+from taskbench.usecase_parser import load_usecase_from_folder, list_sample_usecases, ParsedUseCase
+from taskbench.prompt_generator import PromptGenerator, generate_prompts_for_usecase
 
 
 class RunRequest(BaseModel):
@@ -44,6 +48,15 @@ class RunStatus(BaseModel):
 
 
 app = FastAPI(title="TaskBench UI API", version="0.1.0")
+
+# Add CORS middleware for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:9999"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 RUNS: Dict[str, RunStatus] = {}
 RESULTS_DIR = Path("results")
@@ -290,3 +303,272 @@ def aggregate_usecase_costs(usecase_name: str):
 @app.get("/usecases/{usecase_name}/summary")
 async def usecase_summary(usecase_name: str):
     return aggregate_usecase_costs(usecase_name)
+
+
+# ============================================================
+# Folder-Based Use Case API (v1)
+# ============================================================
+
+class UseCaseEvalRequest(BaseModel):
+    usecase_path: str
+    data_file: Optional[str] = None
+    models: List[str]
+    skip_judge: bool = False
+    regenerate_prompts: bool = False
+
+
+class GeneratePromptsRequest(BaseModel):
+    path: str
+    force: bool = False
+
+
+def _parsed_usecase_to_dict(parsed: ParsedUseCase) -> Dict[str, Any]:
+    """Convert ParsedUseCase dataclass to serializable dict."""
+    return {
+        "folder_path": str(parsed.folder_path),
+        "name": parsed.name,
+        "goal": parsed.goal,
+        "difficulty": parsed.difficulty,
+        "primary_capability": parsed.primary_capability,
+        "token_range": parsed.token_range,
+        "llm_notes": parsed.llm_notes,
+        "expected_output_schema": parsed.expected_output_schema,
+        "output_format": parsed.output_format,
+        "quality_criteria": parsed.quality_criteria,
+        "edge_cases": parsed.edge_cases,
+        "data_files": [
+            {
+                "path": str(df.path),
+                "name": df.name,
+                "extension": df.extension,
+                "content_preview": df.content_preview,
+                "size_bytes": df.size_bytes,
+                "line_count": df.line_count,
+            }
+            for df in parsed.data_files
+        ],
+        "ground_truth_files": [
+            {
+                "path": str(gtf.path),
+                "name": gtf.name,
+                "extension": gtf.extension,
+                "format_type": gtf.format_type,
+            }
+            for gtf in parsed.ground_truth_files
+        ],
+        "matched_pairs": [
+            {
+                "data_file": {
+                    "path": str(mp.data_file.path),
+                    "name": mp.data_file.name,
+                    "extension": mp.data_file.extension,
+                    "content_preview": mp.data_file.content_preview,
+                    "size_bytes": mp.data_file.size_bytes,
+                    "line_count": mp.data_file.line_count,
+                },
+                "ground_truth_file": {
+                    "path": str(mp.ground_truth_file.path),
+                    "name": mp.ground_truth_file.name,
+                    "extension": mp.ground_truth_file.extension,
+                    "format_type": mp.ground_truth_file.format_type,
+                },
+                "match_pattern": mp.match_pattern,
+            }
+            for mp in parsed.matched_pairs
+        ],
+    }
+
+
+@app.get("/api/v1/usecases/")
+async def list_folder_usecases(folder: str = Query("sample-usecases")):
+    """List all folder-based use cases."""
+    try:
+        usecases = list_sample_usecases(folder)
+        return usecases
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/usecases/detail")
+async def get_usecase_detail(path: str = Query(...)):
+    """Get detailed information about a specific use case folder."""
+    try:
+        parsed = load_usecase_from_folder(path)
+        return _parsed_usecase_to_dict(parsed)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/usecases/prompts")
+async def get_usecase_prompts(path: str = Query(...)):
+    """Get previously generated prompts for a use case."""
+    try:
+        generator = PromptGenerator()
+        prompts = generator.load_saved_prompts(path)
+        if prompts is None:
+            raise HTTPException(status_code=404, detail="Prompts not found")
+        return prompts
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/usecases/generate-prompts")
+async def generate_usecase_prompts(request: GeneratePromptsRequest):
+    """Generate prompts for a use case by analyzing data and ground truth."""
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OPENROUTER_API_KEY not set")
+
+    try:
+        prompts = await generate_prompts_for_usecase(
+            request.path,
+            api_key=api_key,
+            force_regenerate=request.force
+        )
+        return prompts
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/usecases/evaluate")
+async def evaluate_folder_usecase(request: UseCaseEvalRequest):
+    """Run evaluation on a folder-based use case."""
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OPENROUTER_API_KEY not set")
+
+    try:
+        # Load use case
+        parsed = load_usecase_from_folder(request.usecase_path)
+
+        # Generate or load prompts
+        prompts = await generate_prompts_for_usecase(
+            request.usecase_path,
+            api_key=api_key,
+            force_regenerate=request.regenerate_prompts
+        )
+
+        # Find the data file to use
+        if not parsed.matched_pairs:
+            raise HTTPException(status_code=400, detail="No matched data/ground-truth pairs found")
+
+        pair = parsed.matched_pairs[0]
+        if request.data_file:
+            for p in parsed.matched_pairs:
+                if str(p.data_file.path) == request.data_file:
+                    pair = p
+                    break
+
+        # Read input data
+        input_text = pair.data_file.path.read_text(encoding="utf-8")
+
+        # Create run
+        run_id = str(uuid.uuid4())
+        run_dir = RESULTS_DIR / parsed.name.replace(" ", "_") / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        input_file = run_dir / "input.txt"
+        input_file.write_text(input_text, encoding="utf-8")
+
+        run_status = RunStatus(
+            id=run_id,
+            task_path=request.usecase_path,
+            usecase_name=parsed.name,
+            models=request.models,
+            judge=not request.skip_judge,
+            status="running",
+        )
+        RUNS[run_id] = run_status
+
+        async def run_eval():
+            try:
+                cost_tracker = CostTracker()
+                async with OpenRouterClient(api_key=api_key) as client:
+                    executor = ModelExecutor(client, cost_tracker)
+
+                    # Create a temporary task from generated prompts
+                    from taskbench.core.task import TaskDefinition
+                    task = TaskDefinition(
+                        name=parsed.name,
+                        description=parsed.goal,
+                        prompt_template=prompts["task_prompt"],
+                        output_format=parsed.output_format,
+                        output_schema={"type": "string"},
+                        quality_checks=[],
+                        evaluation_criteria=[],
+                    )
+
+                    results = await executor.evaluate_multiple(
+                        model_ids=request.models,
+                        task=task,
+                        input_data=input_text,
+                        usecase=None,
+                        max_tokens=4000,
+                        temperature=0.7,
+                    )
+
+                    scores: List[Optional[JudgeScore]] = []
+                    if not request.skip_judge:
+                        judge = LLMJudge(client, judge_model="anthropic/claude-sonnet-4")
+                        for r in results:
+                            if r.status == "success":
+                                # Create a usecase-like object for judge
+                                from taskbench.usecase import UseCase as LegacyUseCase
+                                legacy_uc = LegacyUseCase(
+                                    name=parsed.name,
+                                    goal=parsed.goal,
+                                    domain="general",
+                                    rubric=prompts.get("rubric", {}),
+                                    expected_output_format=parsed.output_format,
+                                    custom_judge_prompt=prompts.get("judge_prompt"),
+                                )
+                                s = await judge.evaluate(task, r, input_text, usecase=legacy_uc)
+                                scores.append(s)
+                            else:
+                                scores.append(None)
+
+                    # Save output
+                    output_data = {
+                        "usecase": _parsed_usecase_to_dict(parsed),
+                        "prompts": prompts,
+                        "data_file": str(pair.data_file.path),
+                        "ground_truth_file": str(pair.ground_truth_file.path),
+                        "results": [r.model_dump() for r in results],
+                        "scores": [s.model_dump() if s else None for s in scores] if not request.skip_judge else [],
+                        "statistics": cost_tracker.get_statistics(),
+                        "run_judge": not request.skip_judge,
+                    }
+                    output_path = run_dir / "results.json"
+                    output_path.write_text(
+                        json.dumps(output_data, indent=2, default=str),
+                        encoding="utf-8"
+                    )
+
+                    run_status.status = "completed"
+                    run_status.output_file = str(output_path)
+                    RUNS[run_id] = run_status
+
+            except Exception as exc:
+                run_status.status = "failed"
+                run_status.error = str(exc)
+                RUNS[run_id] = run_status
+
+        asyncio.create_task(run_eval())
+
+        return {
+            "id": run_id,
+            "status": "running",
+            "usecase": parsed.name,
+            "models": request.models,
+        }
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
