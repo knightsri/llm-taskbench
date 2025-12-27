@@ -1,17 +1,51 @@
-name: "concepts_extraction_from_lecture"
-goal: "Extract teaching concepts from a long lecture transcript into 4-8 minute segments with good coverage and depth."
+name: "Concepts-Extraction-from-Lecture-Transcript"
+goal: |
+  Extract concepts covered during the lecture that can be in bite-size chunks
+  between 4 and 8 min long to make them useful for students. Essentially not
+  too small, and not too long. Easy to search, get to the point and grab the
+  necessary knowledge. Some concepts may be shorter and some may be longer,
+  but only if that would make sense from the concept covered.
+
+llm_notes: |
+  Low-cost and high-quality are the metrics we seek.
+  Ensure mid-session breaks are honored, if any.
+  Ensure no-gaps in analyzing the full transcript.
+  Compare the results - not just number of concepts, but also the quality
+  of the concepts captured.
+
+output_format:
+  format_type: "json"
+  fields:
+    - name: "title"
+      type: "string"
+      description: "Concise, descriptive concept title (2-6 words)"
+    - name: "description"
+      type: "string"
+      description: "2-3 sentence summary of what is covered"
+    - name: "start_time"
+      type: "timestamp"
+      description: "Start time in HH:MM:SS format"
+    - name: "end_time"
+      type: "timestamp"
+      description: "End time in HH:MM:SS format"
+  example: |
+    {"title": "Introduction to Machine Learning", "description": "Overview of ML concepts, types of learning (supervised, unsupervised), and real-world applications.", "start_time": "00:22:14", "end_time": "00:28:30"}
+  notes: "All timestamps must be within the input transcript range. No overlapping segments."
+
 chunk_min_minutes: 4
 chunk_max_minutes: 8
 coverage_required: true
 allow_shorter_if_justified: true
 cost_priority: "high"
 quality_priority: "high"
+
 notes: |
   - No gaps from the provided start/end timestamps.
   - Honor any mid-session breaks; do not place segments across a break.
   - Prefer concise, descriptive concept titles and 2-3 sentence summaries.
   - Depth matters: avoid surface-level headings.
   - Output format: JSON array of {title, description, start_time, end_time} with HH:MM:SS timestamps.
+
 default_judge_model: "${TASKBENCH_DEFAULT_JUDGE_MODEL:-anthropic/claude-sonnet-4.5}"
 default_candidate_models:
   - anthropic/claude-sonnet-4.5

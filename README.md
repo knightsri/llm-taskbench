@@ -79,10 +79,35 @@ taskbench recommend --results results/my_run.json
 - `config/models.yaml` – pricing catalog.
 - `docs/openrouter-cost-tracking-guide.md` – billing details.
 
+## Intelligent Model Selection
+
+TaskBench includes an AI-powered model selector that analyzes your task and recommends models across different tiers:
+
+```bash
+# Auto-select models based on use case
+taskbench evaluate tasks/my_task.yaml --models auto --usecase usecases/my_usecase.yaml
+```
+
+**Tiers:**
+- 💎 **Quality** - Premium models: Claude Opus, o1, GPT-4-turbo (>$25/1M tokens)
+- ⚖️ **Value** - Mid-tier: Claude Sonnet 4.5, GPT-4o, Gemini Pro ($3-25/1M tokens)
+- 💰 **Budget** - Low-cost and free models (<$3/1M tokens)
+- ⚡ **Speed** - Fast response: Gemini Flash, GPT-4o-mini, Claude Haiku
+
+**How it works:**
+1. Phase 1: LLM analyzes task requirements (~2s)
+2. Phase 2: Programmatic filtering from 350+ OpenRouter models (cached)
+3. Phase 3: LLM ranks candidates by tier (~6s)
+4. Cost: ~$0.007 per selection
+
+**Caching:** Model catalog cached for 24 hours (configurable via `TASKBENCH_MODELS_CACHE_TTL`).
+
 ## Environment variables
 - `OPENROUTER_API_KEY` (required)
 - `TASKBENCH_MAX_CONCURRENCY` (default 5)
 - `TASKBENCH_USE_GENERATION_LOOKUP` (true/false, default true)
+- `TASKBENCH_MODELS_CACHE_TTL` (hours, default 24) - Model catalog cache duration
+- `MODEL_SELECTOR_LLM` (default openai/gpt-4o) - LLM used for model selection
 
 Docker notes:
 - Compose file: `docker-compose.cli.yml`

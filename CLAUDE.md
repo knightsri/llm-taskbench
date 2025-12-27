@@ -71,6 +71,7 @@ llm-taskbench/
 │   │   ├── comparison.py    # ModelComparison - results analysis
 │   │   ├── recommender.py   # RecommendationEngine - model recommendations
 │   │   ├── cost.py          # CostTracker - token/cost tracking
+│   │   ├── model_selector.py # AI-powered tier-based model selection
 │   │   └── orchestrator.py  # LLMOrchestrator - use-case model selection
 │   ├── ui_api.py            # FastAPI endpoints for Streamlit UI
 │   ├── usecase.py           # UseCase model and loader
@@ -234,6 +235,8 @@ docker compose -f docker-compose.ui.yml up --build
 | `TASKBENCH_USE_GENERATION_LOOKUP` | No | true | Fetch billed cost from generation endpoint |
 | `TASKBENCH_DEFAULT_JUDGE_MODEL` | No | anthropic/claude-sonnet-4.5 | Default judge model |
 | `GENERAL_TASK_LLM` | No | anthropic/claude-sonnet-4.5 | Default model for general tasks/fallback |
+| `TASKBENCH_MODELS_CACHE_TTL` | No | 24 | Model catalog cache duration (hours) |
+| `MODEL_SELECTOR_LLM` | No | openai/gpt-4o | LLM used for model selection analysis |
 
 ---
 
@@ -318,6 +321,39 @@ Judge model (Claude Sonnet 4.5 by default) evaluates outputs:
 | gemini-pro-1.5 | Google | $1.25 | $5.00 | 2M |
 | mistral-large | Mistral AI | $2.00 | $6.00 | 128K |
 | command-r-plus | Cohere | $2.50 | $10.00 | 128K |
+
+### Intelligent Model Selection
+
+The `model_selector.py` module provides AI-powered model recommendations:
+
+**Two-Phase Approach:**
+1. **Task Analysis**: LLM analyzes requirements (context size, quality/cost sensitivity)
+2. **Programmatic Filtering**: Filter 350+ models from OpenRouter catalog
+3. **Tier-based Ranking**: LLM ranks candidates by tier
+
+**Tiers:**
+| Tier | Cost Range | Examples |
+|------|------------|----------|
+| Quality | >$25/1M | Claude Opus, o1, GPT-4-turbo |
+| Value | $3-25/1M | Claude Sonnet 4.5, GPT-4o, Gemini Pro |
+| Budget | <$3/1M | GPT-4o-mini, Llama, free models |
+| Speed | varies | Gemini Flash, Claude Haiku, small models |
+
+**Usage:**
+```python
+from taskbench.evaluation.model_selector import select_models_for_task
+
+result = await select_models_for_task(
+    "Extract concepts from lectures",
+    tiers=["quality", "value", "budget", "speed"]
+)
+# Returns: task_analysis, models (with costs), suggested_test_order
+```
+
+**Performance:**
+- Time: ~8 seconds
+- Cost: ~$0.007 per selection
+- Cache: Model catalog cached in `.cache/openrouter_models.json` (TTL configurable)
 
 ---
 

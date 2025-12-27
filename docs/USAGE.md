@@ -9,6 +9,8 @@ Optional envs:
 - `TASKBENCH_MAX_CONCURRENCY` (default 5)
 - `TASKBENCH_USE_GENERATION_LOOKUP` (true/false, default true)
 - `GENERAL_TASK_LLM` (default judge/model fallback)
+- `TASKBENCH_MODELS_CACHE_TTL` (hours, default 24) - Model catalog cache duration
+- `MODEL_SELECTOR_LLM` (default openai/gpt-4o) - LLM used for model selection
 
 Docker (CLI):
 ```bash
@@ -27,9 +29,47 @@ docker compose -f docker-compose.ui.yml up --build
 ```
 Capabilities:
 - Create/select use-cases, upload inputs.
-- Auto-recommend models or pick manually.
+- **Tier-based model selection**: Select from Quality/Value/Budget/Speed tiers.
 - Run evaluations, judge now or later, view comparisons/recommendations.
 - Per-use-case run list and cost summaries.
+
+## Intelligent Model Selection
+
+TaskBench includes an AI-powered model selector that recommends models based on your task:
+
+**Tiers:**
+- 💎 **Quality** - Premium: Claude Opus, o1, GPT-4-turbo (>$25/1M tokens)
+- ⚖️ **Value** - Mid-tier: Claude Sonnet 4.5, GPT-4o, Gemini Pro ($3-25/1M)
+- 💰 **Budget** - Low-cost and free models (<$3/1M tokens)
+- ⚡ **Speed** - Fast: Gemini Flash, GPT-4o-mini, Claude Haiku
+
+**CLI usage:**
+```bash
+# Auto-select models based on use case
+taskbench evaluate tasks/my_task.yaml --models auto --usecase usecases/my_usecase.yaml
+```
+
+**Programmatic usage:**
+```python
+from taskbench.evaluation.model_selector import select_models_for_task
+
+# Default tiers (quality, value, budget)
+result = await select_models_for_task("Extract concepts from lectures")
+
+# Specific tiers
+result = await select_models_for_task(
+    "Extract concepts from lectures",
+    tiers=["value", "budget", "speed"]
+)
+
+print(result["models"])  # List of recommended models with costs
+print(result["suggested_test_order"])  # Top 3 to test first
+```
+
+**Performance:**
+- Time: ~8 seconds (2 LLM calls)
+- Cost: ~$0.007 per selection
+- Cache: Model catalog cached for 24 hours (configurable)
 
 ## Commands
 

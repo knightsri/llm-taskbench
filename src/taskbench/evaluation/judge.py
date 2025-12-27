@@ -17,6 +17,7 @@ from rich.table import Table
 from taskbench.api.client import OpenRouterClient
 from taskbench.core.models import EvaluationResult, JudgeScore, TaskDefinition
 from taskbench.evaluation.comparison import ModelComparison
+from taskbench.usecase import UseCase
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -100,7 +101,7 @@ class LLMJudge:
         task: TaskDefinition,
         model_output: str,
         input_data: str,
-        usecase: Any = None
+        usecase: Optional[UseCase] = None
     ) -> str:
         """
         Build evaluation prompt for the judge model.
@@ -109,6 +110,7 @@ class LLMJudge:
             task: TaskDefinition with evaluation criteria
             model_output: The output to evaluate
             input_data: Original input data for context
+            usecase: Optional UseCase with goals and format specs
 
         Returns:
             Complete judge prompt
@@ -149,7 +151,38 @@ class LLMJudge:
                 "# Use Case Goal",
                 usecase.goal,
             ])
+
+            # Include LLM notes if present
+            if usecase.llm_notes:
+                prompt_parts.extend([
+                    "",
+                    "# LLM Notes (context for evaluation)",
+                    usecase.llm_notes,
+                ])
+
+            # Include expected output format spec
+            if usecase.output_format:
+                prompt_parts.extend([
+                    "",
+                    "# Expected Output Format",
+                    f"Format Type: {usecase.output_format.format_type.upper()}",
+                    "Required Fields:",
+                ])
+                for field in usecase.output_format.fields:
+                    prompt_parts.append(
+                        f"  - **{field.get('name')}** ({field.get('type')}): {field.get('description', '')}"
+                    )
+                if usecase.output_format.example:
+                    prompt_parts.extend([
+                        "",
+                        "Example of correct output:",
+                        f"```{usecase.output_format.example.strip()}```",
+                    ])
+                if usecase.output_format.notes:
+                    prompt_parts.append(f"Format Notes: {usecase.output_format.notes}")
+
             if usecase.chunk_min_minutes or usecase.chunk_max_minutes or usecase.coverage_required:
+                prompt_parts.append("")
                 prompt_parts.append("## Coverage/Chunk Rules")
                 if usecase.chunk_min_minutes:
                     prompt_parts.append(f"- Chunk minimum: {usecase.chunk_min_minutes} minutes")
@@ -158,6 +191,7 @@ class LLMJudge:
                 if usecase.coverage_required:
                     prompt_parts.append("- No gaps across the time range.")
             if getattr(usecase, "notes", None):
+                prompt_parts.append("")
                 prompt_parts.append("## Additional Notes")
                 for note in usecase.notes:
                     prompt_parts.append(f"- {note}")
@@ -380,4 +414,113 @@ class LLMJudge:
 
         return "\n".join(summary_parts)
 
+    async def aggregate_analysis(
+        self,
+        usecase: UseCase,
+        all_runs_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Analyze results across multiple runs to provide aggregate recommendations.
 
+        Args:
+            usecase: The UseCase being evaluated
+            all_runs_data: List of run data dicts, each with 'results' and 'scores'
+
+        Returns:
+            Dict with aggregate analysis including:
+            - best_overall_model: Best performing model across all runs
+            - best_value_model: Best cost/performance ratio
+            - model_rankings: Ordered list of models by performance
+            - recommendation: Natural language recommendation
+            - excluded_runs: Runs excluded from analysis (too narrow)
+        """
+        # Filter out narrow runs (e.g., only 1-2 models or very short input)
+        valid_runs = []
+        excluded_runs = []
+
+        for i, run_data in enumerate(all_runs_data):
+            results = run_data.get("results", [])
+            scores = run_data.get("scores", [])
+            valid_scores = [s for s in scores if s is not None]
+
+            if len(valid_scores) < 2:
+                excluded_runs.append({
+                    "run_index": i,
+                    "reason": f"Too few valid results ({len(valid_scores)} models)"
+                })
+            else:
+                valid_runs.append(run_data)
+
+        if not valid_runs:
+            return {
+                "best_overall_model": None,
+                "best_value_model": None,
+                "model_rankings": [],
+                "recommendation": "No valid runs to analyze. All runs were too narrow.",
+                "excluded_runs": excluded_runs
+            }
+
+        # Aggregate scores by model
+        model_scores: Dict[str, List[int]] = {}
+        model_costs: Dict[str, List[float]] = {}
+
+        for run_data in valid_runs:
+            results = run_data.get("results", [])
+            scores = run_data.get("scores", [])
+
+            for result, score in zip(results, scores):
+                if score is None:
+                    continue
+                model_name = result.get("model_name", "unknown")
+                if model_name not in model_scores:
+                    model_scores[model_name] = []
+                    model_costs[model_name] = []
+                model_scores[model_name].append(score.get("overall_score", 0))
+                model_costs[model_name].append(result.get("cost_usd", 0.0))
+
+        # Calculate averages
+        model_rankings = []
+        for model_name in model_scores:
+            avg_score = sum(model_scores[model_name]) / len(model_scores[model_name])
+            avg_cost = sum(model_costs[model_name]) / len(model_costs[model_name])
+            value_ratio = avg_score / avg_cost if avg_cost > 0 else 0
+
+            model_rankings.append({
+                "model": model_name,
+                "avg_score": round(avg_score, 1),
+                "avg_cost": round(avg_cost, 4),
+                "value_ratio": round(value_ratio, 1),
+                "run_count": len(model_scores[model_name])
+            })
+
+        # Sort by score
+        model_rankings.sort(key=lambda x: x["avg_score"], reverse=True)
+
+        best_overall = model_rankings[0] if model_rankings else None
+        best_value = max(model_rankings, key=lambda x: x["value_ratio"]) if model_rankings else None
+
+        # Generate recommendation
+        recommendation_parts = []
+        if best_overall:
+            recommendation_parts.append(
+                f"Best overall: {best_overall['model']} with average score {best_overall['avg_score']}/100 "
+                f"across {best_overall['run_count']} run(s)."
+            )
+        if best_value and best_value != best_overall:
+            recommendation_parts.append(
+                f"Best value: {best_value['model']} with {best_value['value_ratio']} pts/$ "
+                f"(score: {best_value['avg_score']}, cost: ${best_value['avg_cost']:.4f})."
+            )
+        if excluded_runs:
+            recommendation_parts.append(
+                f"Note: {len(excluded_runs)} run(s) excluded from analysis due to insufficient data."
+            )
+
+        return {
+            "best_overall_model": best_overall["model"] if best_overall else None,
+            "best_value_model": best_value["model"] if best_value else None,
+            "model_rankings": model_rankings,
+            "recommendation": " ".join(recommendation_parts),
+            "excluded_runs": excluded_runs,
+            "total_runs_analyzed": len(valid_runs)
+        }

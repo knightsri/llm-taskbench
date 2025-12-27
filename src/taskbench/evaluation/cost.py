@@ -5,15 +5,21 @@ This module provides functionality to calculate costs based on token usage
 and track cumulative costs across multiple evaluations.
 """
 
+import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import httpx
 import yaml
 
 from taskbench.core.models import EvaluationResult, ModelConfig
 
 logger = logging.getLogger(__name__)
+
+# Global cost tracking file
+GLOBAL_COSTS_FILE = Path("results/.global_costs.json")
 
 
 class CostTracker:
@@ -245,3 +251,119 @@ class CostTracker:
             List of ModelConfig objects
         """
         return list(self.models.values())
+
+    def save_to_global(self, usecase_name: str, run_id: str, cost: float) -> None:
+        """
+        Save cost to global tracking file.
+
+        Args:
+            usecase_name: Name of the use case
+            run_id: Unique run identifier
+            cost: Cost in USD
+        """
+        GLOBAL_COSTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        data = {}
+        if GLOBAL_COSTS_FILE.exists():
+            try:
+                data = json.loads(GLOBAL_COSTS_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+
+        if "usecases" not in data:
+            data["usecases"] = {}
+
+        if usecase_name not in data["usecases"]:
+            data["usecases"][usecase_name] = {"runs": [], "total_cost": 0.0}
+
+        data["usecases"][usecase_name]["runs"].append({
+            "run_id": run_id,
+            "cost": cost
+        })
+        data["usecases"][usecase_name]["total_cost"] += cost
+
+        # Update global total
+        data["total_cost"] = sum(
+            uc["total_cost"] for uc in data["usecases"].values()
+        )
+
+        GLOBAL_COSTS_FILE.write_text(
+            json.dumps(data, indent=2), encoding="utf-8"
+        )
+
+    @staticmethod
+    def get_global_costs() -> Dict[str, Any]:
+        """
+        Get global cost summary across all use cases.
+
+        Returns:
+            Dict with total cost and per-use-case breakdown
+        """
+        if not GLOBAL_COSTS_FILE.exists():
+            return {"total_cost": 0.0, "usecases": {}}
+
+        try:
+            return json.loads(GLOBAL_COSTS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {"total_cost": 0.0, "usecases": {}}
+
+    @staticmethod
+    async def get_openrouter_balance() -> Optional[Dict[str, Any]]:
+        """
+        Query OpenRouter API for current account balance/credits.
+
+        Returns:
+            Dict with balance info or None if failed
+        """
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            logger.warning("OPENROUTER_API_KEY not set, cannot check balance")
+            return None
+
+        try:
+            async with httpx.AsyncClient() as client:
+                # OpenRouter credits endpoint
+                response = await client.get(
+                    "https://openrouter.ai/api/v1/auth/key",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=10.0
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    # OpenRouter returns 'data' with usage info
+                    return {
+                        "balance": data.get("data", {}).get("limit_remaining"),
+                        "usage": data.get("data", {}).get("usage"),
+                        "limit": data.get("data", {}).get("limit"),
+                        "label": data.get("data", {}).get("label", "API Key"),
+                        "raw": data
+                    }
+                else:
+                    logger.warning(f"OpenRouter balance check failed: {response.status_code}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"Failed to check OpenRouter balance: {e}")
+            return None
+
+    @staticmethod
+    def get_usecase_cost_summary(usecase_name: str) -> Dict[str, Any]:
+        """
+        Get cost summary for a specific use case.
+
+        Args:
+            usecase_name: Name of the use case
+
+        Returns:
+            Dict with total cost and run breakdown for this use case
+        """
+        global_costs = CostTracker.get_global_costs()
+        usecase_data = global_costs.get("usecases", {}).get(usecase_name, {})
+
+        return {
+            "usecase_name": usecase_name,
+            "total_cost": usecase_data.get("total_cost", 0.0),
+            "run_count": len(usecase_data.get("runs", [])),
+            "runs": usecase_data.get("runs", [])
+        }
