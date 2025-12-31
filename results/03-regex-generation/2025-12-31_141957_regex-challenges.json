@@ -1,0 +1,211 @@
+{
+  "usecase": {
+    "name": "Regex Pattern Generation from Examples",
+    "folder": "sample-usecases/03-regex-generation",
+    "data_file": "sample-usecases\\03-regex-generation\\data\\regex-challenges.json",
+    "ground_truth_file": "sample-usecases\\03-regex-generation\\ground-truth\\regex-solutions.json"
+  },
+  "prompts": {
+    "analysis": {
+      "transformation_type": "Pattern recognition and regex generation - the LLM must analyze positive and negative string examples to infer the underlying pattern and express it as a valid regular expression",
+      "key_fields": [
+        "challenge_id",
+        "regex",
+        "explanation",
+        "confidence",
+        "test_results"
+      ],
+      "quality_indicators": [
+        "Regex matches ALL positive examples (100% recall on training set)",
+        "Regex rejects ALL negative examples (100% precision on training set)",
+        "Regex generalizes to held-out test cases not shown to model",
+        "Regex is syntactically valid and executable",
+        "Regex is reasonably concise (not just OR-ing all examples)",
+        "Explanation accurately describes what the pattern matches"
+      ],
+      "comparison_strategy": "Execute the generated regex against all positive/negative examples (both provided and held-out). Calculate match rates. Validate syntax. Compare regex complexity. Check for overfitting patterns like excessive alternation."
+    },
+    "task_prompt": "You are a regex pattern generation expert. Your task is to analyze sets of positive and negative string examples and generate a regular expression that correctly matches the pattern.\n\n# INSTRUCTIONS\n\n1. Carefully examine the positive examples to identify what they have in common\n2. Examine the negative examples to understand what should NOT match\n3. Generate a regular expression that:\n   - Matches ALL positive examples\n   - Rejects ALL negative examples\n   - Is concise and generalizable (avoid overfitting)\n   - Uses standard regex syntax (PCRE or JavaScript compatible)\n4. Include anchors (^ and $) to match the entire string\n5. Provide a clear explanation of what your pattern matches\n6. Test your regex mentally against all examples before finalizing\n\n# INPUT FORMAT\n\nYou will receive a challenge with:\n- `challenge_id`: Unique identifier\n- `name`: Description of the pattern type\n- `difficulty`: Complexity level\n- `positive_examples`: Strings that MUST match your regex\n- `negative_examples`: Strings that must NOT match your regex\n- `hint`: Optional guidance about the pattern\n\n# OUTPUT FORMAT\n\nRespond with valid JSON matching this exact schema:\n\n```json\n{\n  \"challenge_id\": \"REGEX-XXX\",\n  \"regex\": \"^your_pattern_here$\",\n  \"explanation\": \"Clear description of what the pattern matches and key constraints\",\n  \"confidence\": \"high|medium|low\",\n  \"test_results\": {\n    \"positive_matches\": <number of positive examples your regex matches>,\n    \"positive_total\": <total positive examples>,\n    \"negative_rejected\": <number of negative examples your regex correctly rejects>,\n    \"negative_total\": <total negative examples>\n  }\n}\n```\n\n# IMPORTANT GUIDELINES\n\n- Your regex should generalize beyond the specific examples (think about the underlying rule)\n- Avoid simply OR-ing all positive examples together\n- Consider edge cases and boundary conditions\n- Use character classes, quantifiers, and grouping appropriately\n- Escape special regex characters properly\n- Test your regex against ALL provided examples\n- Set confidence based on pattern complexity and your certainty\n\n# EXAMPLE\n\nInput:\n```json\n{\n  \"challenge_id\": \"REGEX-001\",\n  \"positive_examples\": [\"555-123-4567\", \"123-456-7890\"],\n  \"negative_examples\": [\"55-123-4567\", \"555.123.4567\"]\n}\n```\n\nOutput:\n```json\n{\n  \"challenge_id\": \"REGEX-001\",\n  \"regex\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\",\n  \"explanation\": \"Three digits, dash, three digits, dash, four digits - standard US phone format\",\n  \"confidence\": \"high\",\n  \"test_results\": {\n    \"positive_matches\": 2,\n    \"positive_total\": 2,\n    \"negative_rejected\": 2,\n    \"negative_total\": 2\n  }\n}\n```\n\nNow process the challenge and generate your regex pattern.",
+    "judge_prompt": "You are evaluating a regex pattern generation task. The model was given positive and negative string examples and asked to generate a regular expression that matches all positive examples and rejects all negative examples.\n\n# EVALUATION CRITERIA\n\n## 1. CORRECTNESS ON PROVIDED EXAMPLES (40 points)\n\n**Test the regex against all provided examples:**\n- Execute the regex against each positive example\n- Execute the regex against each negative example\n- Calculate match rates\n\n**Scoring:**\n- Perfect match (100% positive matched, 100% negative rejected): 40 points\n- For each positive example that fails to match: -4 points\n- For each negative example that incorrectly matches: -4 points\n- Minimum: 0 points\n\n## 2. GENERALIZATION TO HELD-OUT EXAMPLES (30 points)\n\n**Test against held-out test cases from ground truth:**\n- Test against `held_out_positive` examples\n- Test against `held_out_negative` examples\n\n**Scoring:**\n- Perfect generalization: 30 points\n- For each held-out positive that fails: -5 points\n- For each held-out negative that incorrectly matches: -5 points\n- Minimum: 0 points\n\n## 3. REGEX VALIDITY (15 points)\n\n**Check if regex is executable:**\n- Syntactically valid regex: 15 points\n- Invalid syntax or cannot be compiled: 0 points\n- Deduct 5 points if missing anchors (^ and $) when ground truth has them\n\n## 4. FORMAT COMPLIANCE (10 points)\n\n**Required fields present and correct type:**\n- `challenge_id` matches input: 2 points\n- `regex` is a string: 2 points\n- `explanation` is a non-empty string: 2 points\n- `confidence` is one of [high, medium, low]: 2 points\n- `test_results` object with all 4 numeric fields: 2 points\n\n## 5. CONCISENESS (5 points)\n\n**Evaluate regex complexity:**\n- Compare length to ground truth regex\n- If within 50% of ground truth length: 5 points\n- If 50-100% longer: 3 points\n- If 100-200% longer: 1 point\n- If >200% longer (likely overfitting): 0 points\n- Exception: If regex is just OR-ing all positive examples, automatic 0 points\n\n# COMPARISON PROCESS\n\n1. Load the candidate regex and ground truth regex\n2. Execute both against all test cases (provided + held-out)\n3. Compare results\n4. Check for overfitting patterns (e.g., `(example1|example2|example3)`)\n5. Validate syntax by attempting to compile the regex\n6. Calculate scores per criteria above\n7. Sum total score (max 100 points)\n\n# OVERFITTING DETECTION\n\nA regex is considered overfitted if:\n- It uses alternation to list out specific examples: `^(555-123-4567|123-456-7890|...)$`\n- It's significantly longer than necessary\n- It fails held-out test cases despite passing provided examples\n\n**Penalty for detected overfitting:** -20 points from total score\n\n# OUTPUT FORMAT\n\nProvide your evaluation as JSON:\n\n```json\n{\n  \"challenge_id\": \"REGEX-XXX\",\n  \"scores\": {\n    \"correctness_provided\": 40,\n    \"generalization_held_out\": 30,\n    \"validity\": 15,\n    \"format_compliance\": 10,\n    \"conciseness\": 5,\n    \"overfitting_penalty\": 0,\n    \"total\": 100\n  },\n  \"test_results\": {\n    \"provided_positive_passed\": 5,\n    \"provided_positive_total\": 5,\n    \"provided_negative_passed\": 5,\n    \"provided_negative_total\": 5,\n    \"held_out_positive_passed\": 2,\n    \"held_out_positive_total\": 2,\n    \"held_out_negative_passed\": 2,\n    \"held_out_negative_total\": 2\n  },\n  \"violations\": [\n    {\n      \"type\": \"FAILED_POSITIVE_MATCH\",\n      \"severity\": \"CRITICAL\",\n      \"description\": \"Regex failed to match positive example: '555-123-4567'\",\n      \"penalty\": 4\n    }\n  ],\n  \"regex_comparison\": {\n    \"candidate_regex\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\",\n    \"ground_truth_regex\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\",\n    \"candidate_length\": 20,\n    \"ground_truth_length\": 20,\n    \"length_ratio\": 1.0,\n    \"is_overfitted\": false\n  },\n  \"overall_assessment\": \"Brief summary of performance\"\n}\n```\n\n# GROUND TRUTH DATA\n\nYou will be provided with:\n1. The original challenge (positive/negative examples)\n2. The ground truth solution (correct regex + held-out test cases)\n3. The candidate output to evaluate\n\nExecute the evaluation systematically and provide detailed scoring.",
+    "rubric": {
+      "critical_requirements": [
+        {
+          "name": "matches_all_positive_examples",
+          "description": "The generated regex must match 100% of provided positive examples",
+          "derived_from": "Core task requirement - regex must have perfect recall on training set",
+          "penalty_per_violation": 4
+        },
+        {
+          "name": "rejects_all_negative_examples",
+          "description": "The generated regex must reject 100% of provided negative examples",
+          "derived_from": "Core task requirement - regex must have perfect precision on training set",
+          "penalty_per_violation": 4
+        },
+        {
+          "name": "generalizes_to_held_out_positive",
+          "description": "The regex must match held-out positive examples not shown during generation",
+          "derived_from": "Ground truth includes held_out_positive field for generalization testing",
+          "penalty_per_violation": 5
+        },
+        {
+          "name": "generalizes_to_held_out_negative",
+          "description": "The regex must reject held-out negative examples not shown during generation",
+          "derived_from": "Ground truth includes held_out_negative field for generalization testing",
+          "penalty_per_violation": 5
+        },
+        {
+          "name": "syntactically_valid_regex",
+          "description": "The regex must be valid and executable in standard regex engines",
+          "derived_from": "Task requirement for working regular expression",
+          "penalty_per_violation": 15
+        }
+      ],
+      "compliance_checks": [
+        {
+          "check": "output_format_valid_json",
+          "condition": "Output is not valid JSON or missing required fields",
+          "severity": "CRITICAL",
+          "penalty": 10
+        },
+        {
+          "check": "challenge_id_matches",
+          "condition": "challenge_id in output does not match input challenge_id",
+          "severity": "HIGH",
+          "penalty": 2
+        },
+        {
+          "check": "regex_field_present",
+          "condition": "regex field is missing or not a string",
+          "severity": "CRITICAL",
+          "penalty": 15
+        },
+        {
+          "check": "explanation_present",
+          "condition": "explanation field is missing or empty",
+          "severity": "MEDIUM",
+          "penalty": 2
+        },
+        {
+          "check": "confidence_valid",
+          "condition": "confidence is not one of: high, medium, low",
+          "severity": "MEDIUM",
+          "penalty": 2
+        },
+        {
+          "check": "test_results_complete",
+          "condition": "test_results object missing or lacks required numeric fields",
+          "severity": "MEDIUM",
+          "penalty": 2
+        },
+        {
+          "check": "anchors_present",
+          "condition": "Regex missing ^ or $ anchors when ground truth includes them",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "overfitting_detected",
+          "condition": "Regex appears to be overfitted (e.g., OR-ing specific examples)",
+          "severity": "CRITICAL",
+          "penalty": 20
+        },
+        {
+          "check": "excessive_length",
+          "condition": "Regex is more than 200% longer than ground truth solution",
+          "severity": "MEDIUM",
+          "penalty": 5
+        }
+      ],
+      "weights": {
+        "accuracy": 40,
+        "format": 10,
+        "compliance": 50
+      },
+      "scoring_instructions": "Calculate total score out of 100 points:\n\n1. CORRECTNESS ON PROVIDED EXAMPLES (40 points max):\n   - Start with 40 points\n   - Subtract 4 points for each positive example that fails to match\n   - Subtract 4 points for each negative example that incorrectly matches\n   - Floor at 0 points\n\n2. GENERALIZATION TO HELD-OUT EXAMPLES (30 points max):\n   - Start with 30 points\n   - Subtract 5 points for each held-out positive that fails\n   - Subtract 5 points for each held-out negative that incorrectly matches\n   - Floor at 0 points\n\n3. REGEX VALIDITY (15 points max):\n   - 15 points if regex compiles and executes\n   - 0 points if syntax error\n   - Subtract 5 points if missing required anchors\n\n4. FORMAT COMPLIANCE (10 points max):\n   - 2 points for correct challenge_id\n   - 2 points for regex field present\n   - 2 points for explanation present\n   - 2 points for valid confidence value\n   - 2 points for complete test_results object\n\n5. CONCISENESS (5 points max):\n   - 5 points if within 50% of ground truth length\n   - 3 points if 50-100% longer\n   - 1 point if 100-200% longer\n   - 0 points if >200% longer\n   - 0 points if overfitting detected\n\n6. APPLY PENALTIES:\n   - Subtract 20 points if overfitting detected\n   - Apply any other compliance check penalties\n\n7. FINAL SCORE:\n   - Sum all component scores\n   - Subtract all penalties\n   - Floor at 0, cap at 100\n\nProvide detailed breakdown showing each component score and all penalties applied."
+    }
+  },
+  "results": [
+    {
+      "model_name": "openai/gpt-4o",
+      "task_name": "regex_pattern_generation_from_examples",
+      "output": "[\n  {\n    \"challenge_id\": \"REGEX-001\",\n    \"regex\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\",\n    \"explanation\": \"Three digits, dash, three digits, dash, four digits - standard US phone format\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 5,\n      \"positive_total\": 5,\n      \"negative_rejected\": 6,\n      \"negative_total\": 6\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-002\",\n    \"regex\": \"^[a-zA-Z0-9]+([._][a-zA-Z0-9]+)*$\",\n    \"explanation\": \"Starts with letter or digit, followed by letters, digits, dots or underscores. Cannot start or end with dot/underscore, no consecutive dots.\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-003\",\n    \"regex\": \"^(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)$\",\n    \"explanation\": \"Three numeric components separated by dots, no leading zeros except for zero itself.\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-004\",\n    \"regex\": \"^#[0-9a-fA-F]{6}$\",\n    \"explanation\": \"Hash followed by exactly 6 hexadecimal digits.\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 7,\n      \"negative_total\": 7\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-005\",\n    \"regex\": \"^((25[0-5]|2[0-4]\\\\d|1\\\\d{2}|[1-9]?\\\\d)\\\\.){3}(25[0-5]|2[0-4]\\\\d|1\\\\d{2}|[1-9]?\\\\d)$\",\n    \"explanation\": \"Four octets (0-255) separated by dots, no leading zeros except single 0.\",\n    \"confidence\": \"medium\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-006\",\n    \"regex\": \"^(?=.*[a-z])(?=.*[A-Z])(?=.*\\\\d)(?=.*[^a-zA-Z\\\\d]).{8,}$\",\n    \"explanation\": \"Minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 digit, and 1 special character.\",\n    \"confidence\": \"medium\",\n    \"test_results\": {\n      \"positive_matches\": 5,\n      \"positive_total\": 5,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-007\",\n    \"regex\": \"^(\\\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\\\d|3[01])$\",\n    \"explanation\": \"ISO date format YYYY-MM-DD, valid months (01-12) and days (01-31).\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 5,\n      \"positive_total\": 5,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-008\",\n    \"regex\": \"^[a-zA-Z_][a-zA-Z0-9_]*$\",\n    \"explanation\": \"Starts with a letter or underscore, contains only alphanumeric characters and underscores.\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 7,\n      \"positive_total\": 7,\n      \"negative_rejected\": 7,\n      \"negative_total\": 7\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-009\",\n    \"regex\": \"^\\\\*{4}-\\\\*{4}-\\\\*{4}-\\\\d{4}$\",\n    \"explanation\": \"Three groups of asterisks followed by a group of four digits, separated by dashes.\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 4,\n      \"positive_total\": 4,\n      \"negative_rejected\": 6,\n      \"negative_total\": 6\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-010\",\n    \"regex\": \"^([01]\\\\d|2[0-3]):[0-5]\\\\d$\",\n    \"explanation\": \"Valid 24-hour format time with hours 00-23 and minutes 00-59, separated by a colon.\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  }\n]",
+      "input_tokens": 2518,
+      "output_tokens": 1219,
+      "total_tokens": 3737,
+      "cost_usd": 0.0185,
+      "billed_cost_usd": 0.018485,
+      "latency_ms": 15885.176099953242,
+      "timestamp": "2025-12-31 14:19:22.236800",
+      "generation_id": "gen-1767212346-xPEM10QqaG0YEywyBPd2",
+      "provider": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "model_name": "anthropic/claude-sonnet-4",
+      "task_name": "regex_pattern_generation_from_examples",
+      "output": "[\n  {\n    \"challenge_id\": \"REGEX-001\",\n    \"regex\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\",\n    \"explanation\": \"Matches exactly three digits, dash, three digits, dash, four digits - standard US phone format\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 5,\n      \"positive_total\": 5,\n      \"negative_rejected\": 6,\n      \"negative_total\": 6\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-002\",\n    \"regex\": \"^[a-zA-Z0-9]([a-zA-Z0-9._]*[a-zA-Z0-9])?$\",\n    \"explanation\": \"Starts and ends with alphanumeric, middle can contain dots and underscores, no consecutive dots or underscores at boundaries\",\n    \"confidence\": \"medium\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-003\",\n    \"regex\": \"^(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)$\",\n    \"explanation\": \"Three dot-separated numeric components, each either 0 or a number without leading zeros\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-004\",\n    \"regex\": \"^#[0-9A-Fa-f]{6}$\",\n    \"explanation\": \"Hash symbol followed by exactly 6 hexadecimal digits (0-9, A-F, case insensitive)\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 7,\n      \"negative_total\": 7\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-005\",\n    \"regex\": \"^((0|[1-9]\\\\d?|1\\\\d{2}|2[0-4]\\\\d|25[0-5])\\\\.){3}(0|[1-9]\\\\d?|1\\\\d{2}|2[0-4]\\\\d|25[0-5])$\",\n    \"explanation\": \"Four dot-separated octets, each 0-255 with no leading zeros except single 0\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-006\",\n    \"regex\": \"^(?=.*[a-z])(?=.*[A-Z])(?=.*\\\\d)(?=.*[^a-zA-Z\\\\d]).{8,}$\",\n    \"explanation\": \"Minimum 8 characters with at least one lowercase, one uppercase, one digit, and one special character\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 5,\n      \"positive_total\": 5,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-007\",\n    \"regex\": \"^\\\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\\\d|3[01])$\",\n    \"explanation\": \"YYYY-MM-DD format with 4-digit year, valid months 01-12, and valid days 01-31\",\n    \"confidence\": \"medium\",\n    \"test_results\": {\n      \"positive_matches\": 5,\n      \"positive_total\": 5,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-008\",\n    \"regex\": \"^[a-zA-Z_][a-zA-Z0-9_]*$\",\n    \"explanation\": \"Starts with letter or underscore, followed by any number of letters, digits, or underscores\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 7,\n      \"positive_total\": 7,\n      \"negative_rejected\": 7,\n      \"negative_total\": 7\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-009\",\n    \"regex\": \"^\\\\*{4}-\\\\*{4}-\\\\*{4}-\\\\d{4}$\",\n    \"explanation\": \"Three groups of four asterisks separated by dashes, followed by dash and four digits\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 4,\n      \"positive_total\": 4,\n      \"negative_rejected\": 6,\n      \"negative_total\": 6\n    }\n  },\n  {\n    \"challenge_id\": \"REGEX-010\",\n    \"regex\": \"^([01]\\\\d|2[0-3]):[0-5]\\\\d$\",\n    \"explanation\": \"24-hour time format: hours 00-23, colon, minutes 00-59\",\n    \"confidence\": \"high\",\n    \"test_results\": {\n      \"positive_matches\": 6,\n      \"positive_total\": 6,\n      \"negative_rejected\": 8,\n      \"negative_total\": 8\n    }\n  }\n]",
+      "input_tokens": 2964,
+      "output_tokens": 1465,
+      "total_tokens": 4429,
+      "cost_usd": 0.0309,
+      "billed_cost_usd": 0.030867,
+      "latency_ms": 17925.23010005243,
+      "timestamp": "2025-12-31 14:19:24.263348",
+      "generation_id": "gen-1767212347-w5FgmquGxyjWO25KnrJe",
+      "provider": null,
+      "status": "success",
+      "error": null
+    }
+  ],
+  "scores": [
+    {
+      "model_evaluated": "openai/gpt-4o",
+      "accuracy_score": 95,
+      "format_score": 100,
+      "compliance_score": 90,
+      "overall_score": 94,
+      "violations": [
+        "MEDIUM: Candidate regex ^[a-zA-Z0-9]+([._][a-zA-Z0-9]+)*$ fails on held-out positive 'x' (single character) - requires at least 2 characters due to pattern structure",
+        "MEDIUM: Candidate uses [^a-zA-Z\\d] for special characters while ground truth uses specific set [!@#$%^&*]. May accept unintended characters."
+      ],
+      "reasoning": "Evaluated 10 regex challenges. REGEX-001: Perfect match with ground truth. REGEX-002: Pattern differs - candidate requires minimum 2 chars while ground truth allows single char with optional pattern, causing held-out test 'x' to fail. REGEX-003: Perfect match. REGEX-004: Functionally equivalent (different hex notation order). REGEX-005: Perfect match. REGEX-006: Looser special character definition may accept characters beyond intended set, but passes all provided tests. REGEX-007: Perfect match. REGEX-008: Perfect match. REGEX-009: Perfect match. REGEX-010: Perfect match. Overall: 9/10 perfect or near-perfect, 1 with generalization issue. All regexes syntactically valid with proper anchors. Format compliance perfect. Conciseness appropriate. Minor deductions for REGEX-002 generalization failure and REGEX-006 pattern looseness.",
+      "timestamp": "2025-12-31 14:19:36.044418"
+    },
+    {
+      "model_evaluated": "anthropic/claude-sonnet-4",
+      "accuracy_score": 98,
+      "format_score": 100,
+      "compliance_score": 97,
+      "overall_score": 98,
+      "violations": [
+        "MINOR: Regex uses [^a-zA-Z\\d] for special characters instead of specific set [!@#$%^&*]. This is more permissive and may accept characters not intended, but still validates the core requirement."
+      ],
+      "reasoning": "Evaluated all 10 regex challenges systematically:\n\n**CORRECTNESS ON PROVIDED EXAMPLES (40/40):** All 10 regexes correctly match 100% of their positive examples and reject 100% of their negative examples based on the test_results reported.\n\n**GENERALIZATION TO HELD-OUT EXAMPLES (28/30):** Testing each regex against held-out cases:\n- REGEX-001: Perfect (000-000-0000, 111-222-3333 match; 555-1234-567, 55-1234-5678 rejected)\n- REGEX-002: Perfect (x, ab, user.test.name match; ..test, test.., . rejected)\n- REGEX-003: Perfect (0.0.0, 999.999.999 match; 1.2.3.4, 01.2.3 rejected)\n- REGEX-004: Perfect (#abcdef, #ABCDEF, #a1B2c3 match; #abc, #abcdeff, abcdef rejected)\n- REGEX-005: Perfect (127.0.0.1, 8.8.8.8 match; 300.1.1.1, 1.1.1.01 rejected)\n- REGEX-006: ISSUE - Uses [^a-zA-Z\\d] instead of [!@#$%^&*]. While this accepts the held-out examples (Xy9!abcd, TestPass1!), it's more permissive than ground truth. Deduct 2 points for deviation.\n- REGEX-007: Perfect (2030-07-15, 1990-01-01 match; 2024-02-30, 2024-00-01 rejected)\n- REGEX-008: Perfect (_test123, CamelCase match; 123abc, -test rejected)\n- REGEX-009: Perfect (****-****-****-4321 matches; ****-****-****-, 1234-****-****-5678 rejected)\n- REGEX-010: Perfect (01:01, 13:37 match; 1:30, 12:60 rejected)\n\n**REGEX VALIDITY (15/15):** All regexes are syntactically valid, properly escaped, and include required anchors (^ and $).\n\n**FORMAT COMPLIANCE (10/10):** All responses include correct challenge_id, regex string, explanation, confidence level, and test_results with proper numeric fields.\n\n**CONCISENESS (5/5):** All regexes are appropriately sized:\n- REGEX-001: 20 chars vs 20 (100%)\n- REGEX-002: 42 chars vs 42 (100%)\n- REGEX-003: 51 chars vs 51 (100%)\n- REGEX-004: 20 chars vs 20 (100%)\n- REGEX-005: 82 chars vs 88 (93% - slightly more efficient)\n- REGEX-006: 56 chars vs 60 (93% - acceptable variation)\n- REGEX-007: 50 chars vs 50 (100%)\n- REGEX-008: 24 chars vs 24 (100%)\n- REGEX-009: 28 chars vs 28 (100%)\n- REGEX-010: 26 chars vs 26 (100%)\n\nNo overfitting detected - no alternation of specific examples.\n\n**TOTAL CALCULATION:**\n- Correctness: 40/40\n- Generalization: 28/30\n- Validity: 15/15\n- Format: 10/10\n- Conciseness: 5/5\n- Overfitting penalty: 0\n- Total: 98/100\n\nThe model performed exceptionally well with only one minor deviation in REGEX-006 where it used a more general character class for special characters rather than the specific set in ground truth.",
+      "timestamp": "2025-12-31 14:19:57.206436"
+    }
+  ],
+  "statistics": {
+    "total_cost": 0.05,
+    "total_tokens": 8166,
+    "total_input_tokens": 5482,
+    "total_output_tokens": 2684,
+    "total_evaluations": 2,
+    "avg_cost_per_eval": 0.025,
+    "avg_tokens_per_eval": 4083,
+    "cost_by_model": {
+      "openai/gpt-4o": {
+        "cost": 0.0185,
+        "input_tokens": 2518,
+        "output_tokens": 1219,
+        "evaluations": 1
+      },
+      "anthropic/claude-sonnet-4": {
+        "cost": 0.0309,
+        "input_tokens": 2964,
+        "output_tokens": 1465,
+        "evaluations": 1
+      }
+    }
+  }
+}

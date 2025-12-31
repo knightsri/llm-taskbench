@@ -1,0 +1,264 @@
+{
+  "usecase": {
+    "name": "Meeting Notes Action Item Extraction",
+    "folder": "sample-usecases/01-meeting-action-items",
+    "data_file": "sample-usecases\\01-meeting-action-items\\data\\meeting-01-standup.txt",
+    "ground_truth_file": "sample-usecases\\01-meeting-action-items\\ground-truth\\meeting-01-standup.json"
+  },
+  "prompts": {
+    "analysis": {
+      "transformation_type": "Structured information extraction from unstructured conversational text with inference and attribution",
+      "key_fields": [
+        "action_items (with owner, deadline, priority, dependencies, status)",
+        "owner_confidence (explicit|inferred|unclear)",
+        "deadline_type (explicit|relative|inferred|none)",
+        "decisions",
+        "open_questions",
+        "context (supporting quotes from transcript)"
+      ],
+      "quality_indicators": [
+        "Accurate extraction of all action items without hallucination",
+        "Correct owner attribution with appropriate confidence levels",
+        "Proper deadline extraction and classification",
+        "Inclusion of supporting context from transcript",
+        "Identification of dependencies between tasks",
+        "Correct status inference from conversation",
+        "Capture of decisions and open questions",
+        "Proper handling of implicit commitments"
+      ],
+      "comparison_strategy": "Field-by-field comparison with ground truth: (1) Check for missing action items (recall), (2) Check for hallucinated items (precision), (3) Verify owner accuracy and confidence levels, (4) Validate deadline extraction and type classification, (5) Confirm dependency relationships, (6) Assess context quote relevance, (7) Evaluate decisions and open questions completeness"
+    },
+    "task_prompt": "You are an AI assistant that extracts structured action items, decisions, and open questions from meeting transcripts.\n\n# TASK\nAnalyze the provided meeting transcript and extract:\n1. **Action Items**: Tasks assigned or committed to during the meeting\n2. **Decisions Made**: Key decisions reached\n3. **Open Questions**: Unresolved items needing follow-up\n\n# INSTRUCTIONS\n\n## Action Items\nFor each action item, identify:\n- **action**: Clear description of what needs to be done\n- **owner**: Person responsible (extract from explicit assignments or infer from context)\n- **owner_confidence**: \n  - \"explicit\" if directly assigned (\"Sarah, can you...\", \"I will...\")\n  - \"inferred\" if implied by context (\"someone from engineering\", role-based)\n  - \"unclear\" if ambiguous\n- **deadline**: Date in YYYY-MM-DD format (calculate from meeting date if relative)\n- **deadline_type**:\n  - \"explicit\" if specific date/time mentioned\n  - \"relative\" if time-based (\"this morning\", \"by end of day\")\n  - \"inferred\" if implied by context (\"today\" from standup context)\n  - \"none\" if no deadline mentioned\n- **deadline_raw**: Original text from transcript\n- **priority**: Assess as critical/high/medium/low based on urgency and context\n- **dependencies**: IDs of other action items this depends on\n- **context**: Direct quote or paraphrase from transcript supporting this action item\n- **status**: \n  - \"new\" for newly assigned tasks\n  - \"in-progress\" if actively being worked on\n  - \"blocked\" if waiting on something\n  - \"done\" if completed\n\n## Decisions\nExtract key decisions with:\n- **decision**: What was decided\n- **context**: Brief background or reasoning\n- **stakeholders**: People involved in the decision\n\n## Open Questions\nCapture unresolved items with:\n- **question**: The unresolved item\n- **raised_by**: Person who raised it\n- **assigned_to**: Person assigned to follow up (or null)\n\n# IMPORTANT GUIDELINES\n- Do NOT hallucinate action items not present in the transcript\n- Capture implicit commitments (\"I'll...\", \"I should...\", \"I need to...\")\n- Pay attention to conditional tasks and note them appropriately\n- If a task is mentioned then cancelled/changed, only include the final version\n- For delegated tasks (\"Sarah, ask Mike to...\"), the owner is the person being asked (Sarah)\n- Calculate relative deadlines from the meeting date provided in the transcript\n- Include supporting context quotes to justify each extraction\n\n# OUTPUT FORMAT\nProvide your response as valid JSON matching this schema:\n\n```json\n{\n  \"meeting_id\": \"string\",\n  \"meeting_date\": \"YYYY-MM-DD\",\n  \"action_items\": [\n    {\n      \"id\": \"AI-001\",\n      \"action\": \"Description of what needs to be done\",\n      \"owner\": \"Person Name\",\n      \"owner_confidence\": \"explicit|inferred|unclear\",\n      \"deadline\": \"YYYY-MM-DD\",\n      \"deadline_type\": \"explicit|relative|inferred|none\",\n      \"deadline_raw\": \"original text from transcript\",\n      \"priority\": \"critical|high|medium|low\",\n      \"dependencies\": [\"AI-002\"],\n      \"context\": \"Quote from transcript\",\n      \"status\": \"new|in-progress|blocked|done\"\n    }\n  ],\n  \"decisions\": [\n    {\n      \"decision\": \"What was decided\",\n      \"context\": \"Brief background\",\n      \"stakeholders\": [\"Person1\", \"Person2\"]\n    }\n  ],\n  \"open_questions\": [\n    {\n      \"question\": \"Unresolved item\",\n      \"raised_by\": \"Person Name\",\n      \"assigned_to\": \"Person Name or null\"\n    }\n  ]\n}\n```\n\nNow analyze this meeting transcript:\n\n{INPUT_TRANSCRIPT}",
+    "judge_prompt": "You are an expert evaluator assessing the quality of action item extraction from meeting transcripts.\n\n# YOUR TASK\nCompare the MODEL OUTPUT against the GROUND TRUTH and evaluate based on:\n1. **Recall**: Did the model capture all action items present in ground truth?\n2. **Precision**: Did the model avoid hallucinating action items not in ground truth?\n3. **Attribution Accuracy**: Are owners correctly identified with appropriate confidence levels?\n4. **Deadline Accuracy**: Are deadlines correctly extracted and classified?\n5. **Dependency Accuracy**: Are task dependencies correctly identified?\n6. **Context Quality**: Are supporting quotes relevant and accurate?\n7. **Completeness**: Are decisions and open questions captured?\n\n# EVALUATION CRITERIA\n\n## CRITICAL VIOLATIONS (8 points each)\n- **Missing Action Item**: Ground truth contains an action item completely absent from model output\n- **Hallucinated Action Item**: Model output contains an action item not present in ground truth\n- **Wrong Owner**: Owner assigned to action item differs from ground truth\n- **Invalid JSON**: Output is not valid, parseable JSON\n- **Schema Violation**: Output does not match required schema structure\n\n## HIGH SEVERITY (5 points each)\n- **Wrong Owner Confidence**: owner_confidence classification differs from ground truth (explicit vs inferred vs unclear)\n- **Wrong Deadline Date**: Calculated deadline date differs from ground truth by more than 1 day\n- **Wrong Deadline Type**: deadline_type classification differs from ground truth\n- **Missing Dependency**: Ground truth shows dependency not captured in model output\n- **Wrong Status**: Status classification differs from ground truth\n- **Wrong Priority**: Priority differs by more than one level from ground truth\n\n## MEDIUM SEVERITY (3 points each)\n- **Missing Decision**: Ground truth contains a decision not captured in model output\n- **Missing Open Question**: Ground truth contains an open question not captured in model output\n- **Poor Context**: Context quote is missing, irrelevant, or significantly inaccurate\n- **Incomplete Action Description**: Action description is vague or missing key details present in ground truth\n- **Wrong Priority (minor)**: Priority differs by exactly one level from ground truth\n\n## LOW SEVERITY (1 point each)\n- **Minor Formatting Issue**: Small inconsistencies in formatting (capitalization, punctuation)\n- **ID Mismatch**: Action item IDs don't match ground truth format (but are consistent)\n- **Deadline Raw Text**: deadline_raw differs slightly from ground truth but conveys same meaning\n\n# SCORING METHODOLOGY\n\n## Step 1: Calculate Violation Penalties\n- Sum all penalty points from violations detected\n- Maximum possible penalties: 200 points\n\n## Step 2: Calculate Component Scores\n\n### Accuracy Score (40% weight)\n- **Recall**: (Action items in output that match ground truth) / (Total ground truth action items) \u00d7 100\n- **Precision**: (Action items in output that match ground truth) / (Total output action items) \u00d7 100\n- **Accuracy Score** = (Recall + Precision) / 2\n\n### Format Score (20% weight)\n- Start at 100\n- Deduct for JSON validity issues, schema violations, formatting problems\n- Minimum: 0\n\n### Compliance Score (40% weight)\n- Start at 100\n- Subtract violation penalties\n- Minimum: 0\n\n## Step 3: Calculate Final Score\nFinal Score = (Accuracy Score \u00d7 0.4) + (Format Score \u00d7 0.2) + (Compliance Score \u00d7 0.4)\n\n# OUTPUT FORMAT\n\nProvide your evaluation as JSON:\n\n```json\n{\n  \"violations\": [\n    {\n      \"type\": \"violation_name\",\n      \"severity\": \"CRITICAL|HIGH|MEDIUM|LOW\",\n      \"description\": \"Detailed explanation\",\n      \"ground_truth_value\": \"expected value\",\n      \"model_output_value\": \"actual value\",\n      \"penalty\": 8\n    }\n  ],\n  \"metrics\": {\n    \"recall\": 85.7,\n    \"precision\": 100.0,\n    \"accuracy_score\": 92.85,\n    \"format_score\": 100.0,\n    \"compliance_score\": 76.0,\n    \"total_penalties\": 24\n  },\n  \"final_score\": 87.14,\n  \"summary\": \"Brief assessment of output quality\",\n  \"strengths\": [\"What the model did well\"],\n  \"weaknesses\": [\"What the model missed or got wrong\"]\n}\n```\n\n# INPUTS\n\n## GROUND TRUTH\n{GROUND_TRUTH}\n\n## MODEL OUTPUT\n{MODEL_OUTPUT}\n\nProvide your evaluation now.",
+    "rubric": {
+      "critical_requirements": [
+        {
+          "name": "Complete Action Item Extraction",
+          "description": "All action items present in ground truth must be extracted without omissions",
+          "derived_from": "Ground truth contains 7 action items (AI-001 through AI-007) representing all commitments made during the meeting",
+          "penalty_per_violation": 8
+        },
+        {
+          "name": "No Hallucinated Action Items",
+          "description": "Model must not invent action items not present in the transcript or ground truth",
+          "derived_from": "Precision is a key metric; ground truth only includes items explicitly or implicitly committed to in the transcript",
+          "penalty_per_violation": 8
+        },
+        {
+          "name": "Correct Owner Attribution",
+          "description": "Each action item must be assigned to the correct person responsible",
+          "derived_from": "Ground truth shows specific owner assignments (Sarah, Mike, Priya, Tom, Lisa) based on explicit statements or clear inference",
+          "penalty_per_violation": 8
+        },
+        {
+          "name": "Valid JSON Output",
+          "description": "Output must be valid, parseable JSON",
+          "derived_from": "Expected output format is JSON; invalid JSON cannot be processed by project management tools",
+          "penalty_per_violation": 8
+        },
+        {
+          "name": "Schema Compliance",
+          "description": "Output must match the required schema structure with all mandatory fields",
+          "derived_from": "Ground truth follows specific schema with meeting_id, action_items array, decisions array, open_questions array",
+          "penalty_per_violation": 8
+        }
+      ],
+      "compliance_checks": [
+        {
+          "check": "Owner Confidence Classification",
+          "condition": "owner_confidence value differs from ground truth (explicit vs inferred vs unclear)",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "Deadline Date Accuracy",
+          "condition": "Calculated deadline date differs from ground truth by more than 1 day",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "Deadline Type Classification",
+          "condition": "deadline_type differs from ground truth (explicit vs relative vs inferred vs none)",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "Dependency Identification",
+          "condition": "Dependencies array missing items present in ground truth (e.g., AI-005 depends on AI-004)",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "Status Classification",
+          "condition": "Status differs from ground truth (new vs in-progress vs blocked vs done)",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "Priority Assessment Major",
+          "condition": "Priority differs by more than one level from ground truth",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "Decision Extraction",
+          "condition": "Decisions present in ground truth are missing from model output",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "Open Question Extraction",
+          "condition": "Open questions present in ground truth are missing from model output",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "Context Quote Quality",
+          "condition": "Context field is missing, irrelevant, or significantly inaccurate compared to ground truth",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "Action Description Completeness",
+          "condition": "Action description is vague or missing key details present in ground truth",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "Priority Assessment Minor",
+          "condition": "Priority differs by exactly one level from ground truth (e.g., high vs medium)",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "Formatting Consistency",
+          "condition": "Minor inconsistencies in capitalization, punctuation, or text formatting",
+          "severity": "LOW",
+          "penalty": 1
+        },
+        {
+          "check": "ID Format",
+          "condition": "Action item IDs don't match ground truth format but are internally consistent",
+          "severity": "LOW",
+          "penalty": 1
+        },
+        {
+          "check": "Deadline Raw Text",
+          "condition": "deadline_raw differs slightly from ground truth but conveys same meaning",
+          "severity": "LOW",
+          "penalty": 1
+        }
+      ],
+      "weights": {
+        "accuracy": 40,
+        "format": 20,
+        "compliance": 40
+      },
+      "scoring_instructions": "Calculate final score as weighted average: (1) Accuracy Score (40%): Average of recall and precision percentages where recall = matched items / ground truth items and precision = matched items / output items. (2) Format Score (20%): Start at 100, deduct for JSON and schema violations. (3) Compliance Score (40%): Start at 100, subtract total violation penalties (max 200 possible). Final Score = (Accuracy \u00d7 0.4) + (Format \u00d7 0.2) + (Compliance \u00d7 0.4). Score range: 0-100."
+    }
+  },
+  "results": [
+    {
+      "model_name": "openai/gpt-4o",
+      "task_name": "meeting_notes_action_item_extraction",
+      "output": "/* chunk 1 */\n```json\n{\n  \"meeting_id\": \"standup-2025-01-06\",\n  \"meeting_date\": \"2025-01-06\",\n  \"action_items\": [\n    {\n      \"id\": \"AI-001\",\n      \"action\": \"Review the PR for the cart service\",\n      \"owner\": \"Sarah\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-06\",\n      \"deadline_type\": \"inferred\",\n      \"deadline_raw\": \"this morning\",\n      \"priority\": \"high\",\n      \"dependencies\": [],\n      \"context\": \"Sarah: I can review that this morning, Mike.\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-002\",\n      \"action\": \"Follow up with the design team for mobile responsive version specs\",\n      \"owner\": \"Lisa\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-07\",\n      \"deadline_type\": \"explicit\",\n      \"deadline_raw\": \"by tomorrow end of day\",\n      \"priority\": \"critical\",\n      \"dependencies\": [],\n      \"context\": \"Lisa: I'll follow up with the design team today.\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-003\",\n      \"action\": \"Look at the potential security issue with session handling\",\n      \"owner\": \"Sarah\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-06\",\n      \"deadline_type\": \"inferred\",\n      \"deadline_raw\": \"right after standup\",\n      \"priority\": \"critical\",\n      \"dependencies\": [],\n      \"context\": \"Sarah: Can you send me the ticket number? I'll look at it right after standup.\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-004\",\n      \"action\": \"Add Tom to the Stripe test environment\",\n      \"owner\": \"Mike\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-06\",\n      \"deadline_type\": \"inferred\",\n      \"deadline_raw\": \"right after this call\",\n      \"priority\": \"high\",\n      \"dependencies\": [],\n      \"context\": \"Mike: I'll send you the invite right after this call.\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-005\",\n      \"action\": \"Schedule a sync with DevOps about the deployment pipeline\",\n      \"owner\": \"Lisa\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-09\",\n      \"deadline_type\": \"explicit\",\n      \"deadline_raw\": \"Thursday afternoon\",\n      \"priority\": \"medium\",\n      \"dependencies\": [],\n      \"context\": \"Lisa: I'll set that up. Let's aim for Thursday afternoon.\",\n      \"status\": \"new\"\n    }\n  ],\n  \"decisions\": [],\n  \"open_questions\": []\n}\n```",
+      "input_tokens": 1677,
+      "output_tokens": 615,
+      "total_tokens": 2292,
+      "cost_usd": 0.0103,
+      "billed_cost_usd": 0.0103425,
+      "latency_ms": 4727.025400032289,
+      "timestamp": "2025-12-31 14:15:58.229476",
+      "generation_id": "gen-1767212153-Rsjq9tkRvckOnpXk7iuh",
+      "provider": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "model_name": "anthropic/claude-sonnet-4",
+      "task_name": "meeting_notes_action_item_extraction",
+      "output": "/* chunk 1 */\n```json\n{\n  \"meeting_id\": \"daily-standup-2025-01-06\",\n  \"meeting_date\": \"2025-01-06\",\n  \"action_items\": [\n    {\n      \"id\": \"AI-001\",\n      \"action\": \"Start on the database migration script for the user table changes\",\n      \"owner\": \"Sarah\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": null,\n      \"deadline_type\": \"none\",\n      \"deadline_raw\": \"Today I'm going to start on\",\n      \"priority\": \"medium\",\n      \"dependencies\": [],\n      \"context\": \"Today I'm going to start on the database migration script for the user table changes\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-002\",\n      \"action\": \"Figure out Stripe webhook validation for payment integration\",\n      \"owner\": \"Mike\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-06\",\n      \"deadline_type\": \"relative\",\n      \"deadline_raw\": \"by end of day\",\n      \"priority\": \"high\",\n      \"dependencies\": [],\n      \"context\": \"I should have it figured out by end of day\",\n      \"status\": \"in-progress\"\n    },\n    {\n      \"id\": \"AI-003\",\n      \"action\": \"Review Mike's PR for the cart service\",\n      \"owner\": \"Sarah\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-06\",\n      \"deadline_type\": \"relative\",\n      \"deadline_raw\": \"this morning\",\n      \"priority\": \"medium\",\n      \"dependencies\": [],\n      \"context\": \"I can review that this morning, Mike\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-004\",\n      \"action\": \"Integrate dashboard components with API endpoints\",\n      \"owner\": \"Priya\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": null,\n      \"deadline_type\": \"none\",\n      \"deadline_raw\": \"Today I'm integrating\",\n      \"priority\": \"medium\",\n      \"dependencies\": [],\n      \"context\": \"Today I'm integrating them with the API endpoints Mike finished last week\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-005\",\n      \"action\": \"Follow up with design team for mobile responsive specs\",\n      \"owner\": \"Lisa\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-07\",\n      \"deadline_type\": \"relative\",\n      \"deadline_raw\": \"by tomorrow end of day\",\n      \"priority\": \"high\",\n      \"dependencies\": [],\n      \"context\": \"I'll follow up with the design team today. I'll make sure you have them by tomorrow end of day\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-006\",\n      \"action\": \"Send ticket number for security issue to Sarah\",\n      \"owner\": \"Tom\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": null,\n      \"deadline_type\": \"relative\",\n      \"deadline_raw\": \"right after standup\",\n      \"priority\": \"critical\",\n      \"dependencies\": [],\n      \"context\": \"Can you send me the ticket number? I'll look at it right after standup\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-007\",\n      \"action\": \"Review security issue with session handling\",\n      \"owner\": \"Sarah\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": null,\n      \"deadline_type\": \"relative\",\n      \"deadline_raw\": \"right after standup\",\n      \"priority\": \"critical\",\n      \"dependencies\": [\"AI-006\"],\n      \"context\": \"Sarah, that second one might need your eyes on it urgently. I'll look at it right after standup\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-008\",\n      \"action\": \"Start regression tests for the payment module\",\n      \"owner\": \"Tom\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": null,\n      \"deadline_type\": \"none\",\n      \"deadline_raw\": \"Today I'm starting on\",\n      \"priority\": \"medium\",\n      \"dependencies\": [\"AI-009\"],\n      \"context\": \"Today I'm starting on regression tests for the payment module\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-009\",\n      \"action\": \"Send Stripe test environment invite to Tom\",\n      \"owner\": \"Mike\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": null,\n      \"deadline_type\": \"relative\",\n      \"deadline_raw\": \"right after this call\",\n      \"priority\": \"medium\",\n      \"dependencies\": [],\n      \"context\": \"I'll send you the invite right after this call\",\n      \"status\": \"new\"\n    },\n    {\n      \"id\": \"AI-010\",\n      \"action\": \"Set up sync meeting with DevOps about deployment pipeline\",\n      \"owner\": \"Lisa\",\n      \"owner_confidence\": \"explicit\",\n      \"deadline\": \"2025-01-09\",\n      \"deadline_type\": \"explicit\",\n      \"deadline_raw\": \"Thursday afternoon\",\n      \"priority\": \"medium\",\n      \"dependencies\": [],\n      \"context\": \"I'll set that up. Let's aim for Thursday afternoon. I'll send a calendar invite\",\n      \"status\": \"new\"\n    }\n  ],\n  \"decisions\": [\n    {\n      \"decision\": \"Priya will work on desktop integration first while waiting for mobile responsive specs\",\n      \"context\": \"Priya was blocked on mobile design specs, so Lisa suggested working around it by starting with desktop version\",\n      \"stakeholders\": [\"Priya\", \"Lisa\"]\n    }\n  ],\n  \"open_questions\": [\n    {\n      \"question\": \"Mobile responsive design specs need final sign-off from design team\",\n      \"raised_by\": \"Priya\",\n      \"assigned_to\": \"Lisa\"\n    }\n  ]\n}\n```",
+      "input_tokens": 1868,
+      "output_tokens": 1466,
+      "total_tokens": 3334,
+      "cost_usd": 0.0276,
+      "billed_cost_usd": 0.027594,
+      "latency_ms": 17276.270600035787,
+      "timestamp": "2025-12-31 14:16:10.766968",
+      "generation_id": "gen-1767212153-QTZx38rVR72U0Eroa2IU",
+      "provider": null,
+      "status": "success",
+      "error": null
+    }
+  ],
+  "scores": [
+    {
+      "model_evaluated": "openai/gpt-4o",
+      "accuracy_score": 56,
+      "format_score": 100,
+      "compliance_score": 56,
+      "overall_score": 63,
+      "violations": [
+        "CRITICAL: Missing Action Item - AI-001 from ground truth (Start working on database migration script for user table changes by Sarah) is completely absent from model output",
+        "CRITICAL: Missing Action Item - AI-003 from ground truth (Figure out Stripe webhook validation for test mode by Mike) is completely absent from model output",
+        "CRITICAL: Missing Action Item - AI-005 from ground truth (Integrate dashboard components with API endpoints by Priya) is completely absent from model output",
+        "CRITICAL: Missing Action Item - AI-006 from ground truth (Send security issue ticket number to Sarah by Tom) is completely absent from model output",
+        "HIGH: Wrong Priority - Model output AI-001 (Review PR) has priority 'high' but ground truth AI-002 has priority 'medium'",
+        "HIGH: Wrong Priority - Model output AI-002 (Follow up with design team) has priority 'critical' but ground truth AI-004 has priority 'high'",
+        "HIGH: Wrong Status - Ground truth AI-003 (Stripe webhook validation) has status 'in-progress' but model output does not capture this action item at all",
+        "MEDIUM: Missing Decision - Ground truth decision about Priya working on desktop integration first is not captured in model output",
+        "MEDIUM: Missing Decision - Ground truth decision about DevOps sync scheduled for Thursday afternoon is not captured in model output",
+        "MEDIUM: Missing Open Question - Ground truth open question about deployment pipeline handling new microservices architecture is not captured in model output",
+        "MEDIUM: Poor Context - Model output AI-001 context is abbreviated compared to ground truth AI-002 full context"
+      ],
+      "reasoning": "The model output has significant gaps in extraction completeness. Out of 9 ground truth action items, only 5 were captured (55.56% recall). The model correctly identified 5 action items without hallucination (100% precision). However, critical action items were missed: Sarah's database migration script (AI-001), Mike's Stripe webhook validation work (AI-003), Priya's dashboard integration (AI-005), and Tom's task to send the security ticket (AI-006). The model also failed to capture any decisions (0 of 2) or open questions (0 of 1). Priority classifications were incorrect for 2 items, with one being elevated from medium to high and another from high to critical. The JSON format is valid and schema-compliant (100% format score). Total penalties: 4 CRITICAL violations (32 points) + 3 HIGH violations (15 points) + 4 MEDIUM violations (12 points) = 59 points out of 100, resulting in 41% compliance. However, adjusting for the actual extraction rate, compliance score is 56.0. Overall score calculation: (55.56 * 0.3) + (100.0 * 0.2) + (56.0 * 0.5) = 62.67.",
+      "timestamp": "2025-12-31 14:16:27.760257"
+    },
+    {
+      "model_evaluated": "anthropic/claude-sonnet-4",
+      "accuracy_score": 95,
+      "format_score": 100,
+      "compliance_score": 46,
+      "overall_score": 74,
+      "violations": [
+        "CRITICAL: Ground truth action item AI-001 has deadline '2025-01-06' with deadline_type 'inferred', but model output shows deadline as null with deadline_type 'none'",
+        "HIGH: Action item AI-001 (database migration script) has wrong deadline_type classification",
+        "CRITICAL: Ground truth action item AI-005 (Integrate dashboard components) has deadline '2025-01-10' with deadline_type 'inferred' and dependency on AI-004, but model output AI-004 shows no deadline and no dependencies",
+        "HIGH: Action item for dashboard integration (Priya) has wrong deadline_type",
+        "HIGH: Action item AI-005 (dashboard integration) should depend on AI-004 (mobile specs) but model output shows no dependencies",
+        "HIGH: Action item AI-006 (Send ticket number) should have deadline 2025-01-06 but model shows null",
+        "HIGH: Action item AI-007 (Review security issue) should have deadline 2025-01-06 but model shows null",
+        "HIGH: Action item AI-008 (Add Tom to Stripe) should have deadline 2025-01-06 but model shows null",
+        "MEDIUM: Ground truth includes decision about DevOps sync scheduled for Thursday afternoon, but model output does not capture this decision",
+        "MEDIUM: Ground truth includes open question about deployment pipeline handling microservices architecture, but model output has different open question",
+        "MEDIUM: Action item AI-004 (dashboard integration) should be high priority due to Friday deadline dependency, but model shows medium",
+        "HIGH: Action item AI-005 (Follow up with design team) has wrong deadline_type - should be explicit not relative"
+      ],
+      "reasoning": "The model successfully captured all 9 ground truth action items plus 1 additional item (regression tests), showing good recall. However, there are significant issues with deadline extraction and classification, particularly missing inferred deadlines and incorrect deadline_type values. Several action items are missing explicit deadline dates that should have been calculated from relative references. The model also missed one decision and provided an incorrect open question.",
+      "timestamp": "2025-12-31 14:16:52.345542"
+    }
+  ],
+  "statistics": {
+    "total_cost": 0.04,
+    "total_tokens": 5626,
+    "total_input_tokens": 3545,
+    "total_output_tokens": 2081,
+    "total_evaluations": 2,
+    "avg_cost_per_eval": 0.02,
+    "avg_tokens_per_eval": 2813,
+    "cost_by_model": {
+      "openai/gpt-4o": {
+        "cost": 0.0103,
+        "input_tokens": 1677,
+        "output_tokens": 615,
+        "evaluations": 1
+      },
+      "anthropic/claude-sonnet-4": {
+        "cost": 0.0276,
+        "input_tokens": 1868,
+        "output_tokens": 1466,
+        "evaluations": 1
+      }
+    }
+  }
+}
