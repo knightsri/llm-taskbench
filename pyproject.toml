@@ -29,6 +29,7 @@ dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
+    "colorama>=0.4.6;sys_platform=='win32'",
 ]
 
 [project.optional-dependencies]

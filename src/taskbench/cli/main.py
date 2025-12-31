@@ -8,6 +8,7 @@ and getting recommendations.
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -15,6 +16,20 @@ import typer
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
+
+# Fix Windows terminal ANSI color support
+if sys.platform == "win32":
+    try:
+        import colorama
+        colorama.just_fix_windows_console()
+    except ImportError:
+        # colorama not available, try to enable VT processing manually
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+        except Exception:
+            pass
 
 from taskbench.api.client import OpenRouterClient
 from taskbench.core.task import TaskParser
@@ -441,13 +456,25 @@ def recommend(
 
         comp = ModelComparison()
         comparison = comp.compare_results(results, scores)
-        table = comp.generate_comparison_table(comparison)
-        console.print(table)
 
-        engine = RecommendationEngine()
-        recs = engine.generate_recommendations(comparison)
-        console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
-        console.print(engine.format_recommendations(recs))
+        try:
+            table = comp.generate_comparison_table(comparison)
+            console.print(table)
+
+            engine = RecommendationEngine()
+            recs = engine.generate_recommendations(comparison)
+            console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
+            console.print(engine.format_recommendations(recs))
+        except UnicodeEncodeError:
+            # Windows console encoding issue - print simplified results
+            console.print("[yellow]Note: Rich table display failed. Showing simplified results:[/yellow]\n")
+            console.print("[bold]Model Comparison:[/bold]")
+            for model_data in comparison.get("models", []):
+                name = model_data.get("name", "Unknown")
+                score = model_data.get("overall_score", "N/A")
+                cost = model_data.get("cost", 0)
+                violations = model_data.get("violations", 0)
+                console.print(f"  {name}: Score {score}/100, Cost ${cost:.4f}, Violations: {violations}")
 
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
