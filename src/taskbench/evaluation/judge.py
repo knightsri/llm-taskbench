@@ -84,7 +84,7 @@ class ProgrammaticValidator:
     Validates model outputs programmatically before/alongside LLM judge scoring.
 
     Performs structural checks that don't require LLM interpretation:
-    - JSON parsing validation
+    - JSON/CSV parsing validation (based on expected output format)
     - Timestamp range validation
     - Duration constraint checking
     - Required field presence
@@ -93,16 +93,23 @@ class ProgrammaticValidator:
     might otherwise receive inconsistent scores from the LLM judge.
     """
 
-    def __init__(self, input_data: str, constraints: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        input_data: str,
+        constraints: Optional[Dict[str, Any]] = None,
+        output_format: str = "json"
+    ):
         """
         Initialize the validator.
 
         Args:
             input_data: The input data (used to extract valid timestamp range)
             constraints: Task constraints (e.g., min/max duration)
+            output_format: Expected output format ("json", "csv", or "markdown")
         """
         self.input_data = input_data
         self.constraints = constraints or {}
+        self.output_format = output_format.lower()
         self.ts_range = extract_timestamp_range(input_data)
         self.violations: List[str] = []
 
@@ -115,21 +122,135 @@ class ProgrammaticValidator:
         """
         violations = []
         try:
-            # Strip markdown code blocks
             content = output.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            elif content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
+
+            # Handle chunked output format: /* chunk N */\n...
+            # This happens when executor couldn't merge JSON arrays
+            if content.startswith("/* chunk"):
+                # Try to extract and merge JSON from all chunks
+                chunk_pattern = r'/\* chunk \d+ \*/\n'
+                chunks = re.split(chunk_pattern, content)
+                # Filter out empty strings from the split
+                chunks = [c.strip() for c in chunks if c.strip()]
+
+                if len(chunks) == 1:
+                    # Single chunk - just use that content
+                    content = chunks[0]
+                else:
+                    # Multiple chunks - try to merge as arrays
+                    merged_items = []
+                    for chunk in chunks:
+                        chunk_content = self._strip_markdown_blocks(chunk)
+                        try:
+                            chunk_data = json.loads(chunk_content)
+                            if isinstance(chunk_data, list):
+                                merged_items.extend(chunk_data)
+                            else:
+                                # Single object chunk - add to list
+                                merged_items.append(chunk_data)
+                        except json.JSONDecodeError:
+                            pass  # Skip unparseable chunks
+
+                    if merged_items:
+                        return True, merged_items, violations
+                    # If no items parsed, fall through to try the whole content
+
+            # Strip markdown code blocks
+            content = self._strip_markdown_blocks(content)
 
             parsed = json.loads(content)
             return True, parsed, violations
         except json.JSONDecodeError as e:
             violations.append(f"Invalid JSON output: {str(e)[:100]}")
             return False, None, violations
+
+    def _strip_markdown_blocks(self, content: str) -> str:
+        """Strip markdown code block markers from content."""
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return content.strip()
+
+    def validate_csv(self, output: str) -> Tuple[bool, Optional[List[Dict[str, str]]], List[str]]:
+        """
+        Validate that output is valid CSV.
+
+        Returns:
+            Tuple of (is_valid, parsed_rows_as_dicts, violations)
+        """
+        import csv
+        import io
+
+        violations = []
+        try:
+            content = output.strip()
+
+            # Handle chunked output format: /* chunk N */\n...
+            if content.startswith("/* chunk"):
+                # Extract and merge CSV from all chunks
+                chunk_pattern = r'/\* chunk \d+ \*/\n'
+                chunks = re.split(chunk_pattern, content)
+                chunks = [c.strip() for c in chunks if c.strip()]
+
+                all_rows = []
+                header = None
+                for chunk in chunks:
+                    chunk_content = self._strip_csv_markdown_blocks(chunk)
+                    try:
+                        reader = csv.DictReader(io.StringIO(chunk_content))
+                        chunk_rows = list(reader)
+                        if chunk_rows:
+                            if header is None:
+                                header = reader.fieldnames
+                            all_rows.extend(chunk_rows)
+                    except csv.Error:
+                        pass  # Skip unparseable chunks
+
+                if all_rows:
+                    return True, all_rows, violations
+                # Fall through if no rows parsed
+
+            # Strip markdown code blocks
+            content = self._strip_csv_markdown_blocks(content)
+
+            # Try to parse as CSV
+            reader = csv.DictReader(io.StringIO(content))
+            rows = list(reader)
+
+            if not rows:
+                violations.append("CSV output is empty (no data rows)")
+                return False, None, violations
+
+            # Check that we have expected columns for timestamp-based tasks
+            if rows:
+                fieldnames = reader.fieldnames or []
+                # For lecture/concept extraction, expect start_time and end_time
+                has_timestamps = any(
+                    f in fieldnames for f in ['start_time', 'end_time', 'start', 'end']
+                )
+
+            return True, rows, violations
+        except csv.Error as e:
+            violations.append(f"Invalid CSV output: {str(e)[:100]}")
+            return False, None, violations
+        except Exception as e:
+            violations.append(f"Failed to parse CSV: {str(e)[:100]}")
+            return False, None, violations
+
+    def _strip_csv_markdown_blocks(self, content: str) -> str:
+        """Strip markdown code block markers from CSV content."""
+        content = content.strip()
+        if content.startswith("```csv"):
+            content = content[6:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return content.strip()
 
     def validate_timestamp_range(
         self,
@@ -255,18 +376,35 @@ class ProgrammaticValidator:
 
         Returns:
             Dict with:
-                - is_valid_json: bool
-                - parsed_data: parsed JSON or None
+                - is_valid_format: bool (valid JSON or CSV depending on output_format)
+                - is_valid_json: bool (kept for backwards compatibility)
+                - parsed_data: parsed data (list of dicts) or None
                 - violations: list of all violations
                 - validation_score: 0-100 score based on violation count
         """
         all_violations = []
+        is_valid_format = False
+        parsed_data = None
 
-        # JSON validation
-        is_valid_json, parsed_data, json_violations = self.validate_json(output)
-        all_violations.extend(json_violations)
+        # Validate based on expected output format
+        if self.output_format == "json":
+            # JSON validation
+            is_valid_format, parsed_data, format_violations = self.validate_json(output)
+            all_violations.extend(format_violations)
 
-        if is_valid_json and parsed_data:
+        elif self.output_format == "csv":
+            # CSV validation
+            is_valid_format, parsed_data, format_violations = self.validate_csv(output)
+            all_violations.extend(format_violations)
+
+        else:
+            # For markdown or other formats, skip format validation
+            # Just consider it valid and let the LLM judge do semantic evaluation
+            is_valid_format = True
+            parsed_data = None
+
+        # Run timestamp and duration validation if we have parsed data
+        if is_valid_format and parsed_data:
             # Timestamp range validation
             ts_violations = self.validate_timestamp_range(parsed_data, start_field, end_field)
             all_violations.extend(ts_violations)
@@ -276,15 +414,16 @@ class ProgrammaticValidator:
             all_violations.extend(duration_violations)
 
         # Calculate a programmatic score (100 - penalty for violations)
-        if not is_valid_json:
-            validation_score = 0  # Invalid JSON = 0
+        if not is_valid_format:
+            validation_score = 0  # Invalid format = 0
         else:
             item_count = len(parsed_data) if isinstance(parsed_data, list) else 1
             violation_penalty = min(len(all_violations) * 10, 100)
             validation_score = max(0, 100 - violation_penalty)
 
         return {
-            "is_valid_json": is_valid_json,
+            "is_valid_format": is_valid_format,
+            "is_valid_json": is_valid_format if self.output_format == "json" else True,
             "parsed_data": parsed_data,
             "violations": all_violations,
             "validation_score": validation_score,
@@ -559,12 +698,17 @@ class LLMJudge:
             if hasattr(usecase, 'chunk_max_minutes') and usecase.chunk_max_minutes:
                 constraints['chunk_max_minutes'] = usecase.chunk_max_minutes
 
-        validator = ProgrammaticValidator(input_data, constraints)
+        validator = ProgrammaticValidator(
+            input_data,
+            constraints,
+            output_format=task.output_format
+        )
         prog_validation = validator.validate(result.output)
 
         logger.info(
             f"Programmatic validation for {result.model_name}: "
-            f"valid_json={prog_validation['is_valid_json']}, "
+            f"valid_format={prog_validation['is_valid_format']}, "
+            f"output_format={task.output_format}, "
             f"violations={len(prog_validation['violations'])}"
         )
 
@@ -655,12 +799,12 @@ class LLMJudge:
             final_compliance_score = compliance
             final_overall = overall
 
-            if not prog_validation["is_valid_json"]:
-                # Invalid JSON should heavily penalize format score
+            if not prog_validation["is_valid_format"]:
+                # Invalid format (JSON/CSV depending on expected) should heavily penalize format score
                 final_format_score = min(format_sc, 20)
                 final_compliance_score = min(compliance, 30)
                 final_overall = min(overall, 25)
-                logger.warning(f"{result.model_name}: Invalid JSON output - scores adjusted")
+                logger.warning(f"{result.model_name}: Invalid {task.output_format.upper()} output - scores adjusted")
 
             elif prog_violations:
                 # If programmatic validation found violations, ensure scores reflect this
