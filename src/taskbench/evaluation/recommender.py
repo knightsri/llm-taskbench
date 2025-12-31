@@ -432,7 +432,7 @@ class RecommendationEngine:
                 "production": "🚀 Production",
                 "cost_sensitive": "💰 Cost-Sensitive",
                 "budget": "💵 Budget-Constrained",
-                "development": "🔧 Development/Testing"
+                "development": ">> Development/Testing"
             }
 
             for key, name in use_case_names.items():

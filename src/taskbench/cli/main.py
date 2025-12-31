@@ -17,20 +17,6 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 
-# Fix Windows terminal ANSI color support
-if sys.platform == "win32":
-    try:
-        import colorama
-        colorama.just_fix_windows_console()
-    except ImportError:
-        # colorama not available, try to enable VT processing manually
-        try:
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
-            kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-        except Exception:
-            pass
-
 from taskbench.api.client import OpenRouterClient
 from taskbench.core.task import TaskParser
 from taskbench.core.models import EvaluationResult, JudgeScore
@@ -39,7 +25,7 @@ from taskbench.evaluation.executor import ModelExecutor
 from taskbench.evaluation.judge import LLMJudge
 from taskbench.evaluation.comparison import ModelComparison
 from taskbench.evaluation.recommender import RecommendationEngine
-from taskbench.usecase import UseCase, get_usecase_status, list_usecases, UseCaseRun
+from taskbench.usecase import UseCase, list_usecases, UseCaseRun
 from taskbench.usecase_parser import load_usecase_from_folder, list_sample_usecases
 
 # Load environment variables
@@ -50,7 +36,13 @@ app = typer.Typer(
     help="LLM TaskBench - Task-specific LLM evaluation framework",
     add_completion=False
 )
-console = Console()
+
+# Configure console for Windows compatibility
+# Use legacy_windows=True to avoid ANSI escape code issues in PowerShell
+if sys.platform == "win32":
+    console = Console(legacy_windows=True, force_terminal=True)
+else:
+    console = Console()
 
 
 @app.command()
@@ -588,12 +580,61 @@ def status(
                     )
 
         else:
-            # Show all use cases
-            statuses = get_usecase_status()
+            # Show all use cases - check both legacy YAML and new folder-based results
+            statuses = []
+
+            # Check new folder-based results in results/ directory
+            results_dir = Path("results")
+            if results_dir.exists():
+                for usecase_dir in sorted(results_dir.iterdir()):
+                    if not usecase_dir.is_dir() or usecase_dir.name.startswith("_"):
+                        continue
+
+                    result_files = list(usecase_dir.glob("*.json"))
+                    if not result_files:
+                        continue
+
+                    # Aggregate stats from all runs
+                    total_runs = len(result_files)
+                    judged_runs = 0
+                    total_cost = 0.0
+                    best_model = None
+                    best_score = 0
+
+                    for result_file in result_files:
+                        try:
+                            with open(result_file, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+
+                            scores = data.get("scores", [])
+                            if scores and any(s for s in scores if s is not None):
+                                judged_runs += 1
+
+                                # Find best model in this run
+                                for i, score in enumerate(scores):
+                                    if score and score.get("overall_score", 0) > best_score:
+                                        best_score = score["overall_score"]
+                                        results = data.get("results", [])
+                                        if i < len(results):
+                                            best_model = results[i].get("model_name", "Unknown")
+
+                            stats = data.get("statistics", {})
+                            total_cost += stats.get("total_cost_usd", 0)
+                        except Exception:
+                            continue
+
+                    statuses.append({
+                        "name": usecase_dir.name,
+                        "total_runs": total_runs,
+                        "judged_runs": judged_runs,
+                        "total_cost": total_cost,
+                        "best_model": best_model,
+                        "best_score": best_score
+                    })
 
             if not statuses:
-                console.print("[yellow]No use cases found in usecases/ directory[/yellow]")
-                console.print("Create a use case with: taskbench wizard")
+                console.print("[yellow]No use cases found[/yellow]")
+                console.print("Run evaluations with: taskbench run <usecase-folder>")
                 raise typer.Exit(0)
 
             table = Table(title="Use Cases", show_header=True, header_style="bold magenta")
@@ -606,7 +647,7 @@ def status(
 
             for s in statuses:
                 if "error" in s:
-                    table.add_row(s["path"], "[red]Error[/red]", "-", "-", "-", "-")
+                    table.add_row(s.get("path", s.get("name", "?")), "[red]Error[/red]", "-", "-", "-", "-")
                 else:
                     table.add_row(
                         s["name"],
