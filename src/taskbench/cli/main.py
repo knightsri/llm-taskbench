@@ -619,7 +619,7 @@ def status(
                                             best_model = results[i].get("model_name", "Unknown")
 
                             stats = data.get("statistics", {})
-                            total_cost += stats.get("total_cost_usd", 0)
+                            total_cost += stats.get("total_cost", 0)
                         except Exception:
                             continue
 
