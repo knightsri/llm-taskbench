@@ -216,7 +216,7 @@ marimo/_lsp/
 __marimo__/
 
 # LLM TaskBench specific
-results/
+results/_legacy/
 /*.yaml
 
 # Windows artifacts

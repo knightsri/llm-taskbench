@@ -1286,16 +1286,26 @@ Input length: {input_len:,} characters
                 valid_scores = [s for s in scores if s is not None]
 
                 if valid_scores:
-                    console.print("\n")
-                    comp = ModelComparison()
-                    comparison = comp.compare_results(valid_results, valid_scores)
-                    table = comp.generate_comparison_table(comparison)
-                    console.print(table)
+                    try:
+                        console.print("\n")
+                        comp = ModelComparison()
+                        comparison = comp.compare_results(valid_results, valid_scores)
+                        table = comp.generate_comparison_table(comparison)
+                        console.print(table)
 
-                    console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
-                    engine = RecommendationEngine()
-                    recs = engine.generate_recommendations(comparison)
-                    console.print(engine.format_recommendations(recs))
+                        console.print("\n[bold cyan]Recommendations[/bold cyan]\n")
+                        engine = RecommendationEngine()
+                        recs = engine.generate_recommendations(comparison)
+                        console.print(engine.format_recommendations(recs))
+                    except UnicodeEncodeError:
+                        # Windows console encoding issue - print simplified results
+                        console.print("[yellow]Note: Table display failed due to encoding. Showing simplified results:[/yellow]\n")
+                        for model_data in comparison.get("models", []):
+                            name = model_data.get("name", "Unknown")
+                            score = model_data.get("overall_score", "N/A")
+                            cost = model_data.get("cost", 0)
+                            console.print(f"  {name}: Score {score}/100, Cost ${cost:.4f}")
+
 
             # Save results - organize by use case folder
             if output:
