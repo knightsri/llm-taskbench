@@ -1,0 +1,270 @@
+{
+  "usecase": {
+    "name": "Data Cleaning Rule Generation",
+    "folder": "sample-usecases/04-data-cleaning-rules",
+    "data_file": "sample-usecases\\04-data-cleaning-rules\\data\\customers-messy.csv",
+    "ground_truth_file": "sample-usecases\\04-data-cleaning-rules\\ground-truth\\customers-clean.csv"
+  },
+  "prompts": {
+    "analysis": {
+      "transformation_type": "Data quality analysis and cleaning rule generation - The LLM must analyze messy CSV data, identify data quality issues across multiple dimensions (format inconsistencies, null variations, typos, case inconsistencies), and generate structured, actionable cleaning rules in JSON format",
+      "key_fields": [
+        "dataset_id",
+        "summary (total_rows, columns_analyzed, issues_found, critical_issues)",
+        "column_analysis (column, inferred_type, issues array with issue_type, severity, affected_rows, examples, suggested_rule)",
+        "cleaning_rules (rule_id, priority, column, description, condition, transformation, examples with before/after)",
+        "flagged_for_review (column, reason, sample_values)"
+      ],
+      "quality_indicators": [
+        "Detection rate: Identifies all major issue types (date format inconsistencies, state abbreviation variations, case inconsistencies in categorical fields, null value variations, currency format issues, phone number format variations, typos like 'Premum')",
+        "Rule correctness: Generated rules would transform messy data to match ground truth (e.g., standardize dates to YYYY-MM-DD, states to 2-letter codes, subscription_tier to lowercase, phone to XXX-XXX-XXXX format, annual_spend to decimal without $ or currency symbols)",
+        "Actionability: Rules include specific transformations (regex patterns, standardization logic, normalization steps)",
+        "Completeness: Covers all 9 columns with issues identified",
+        "Non-destructive: Flags ambiguous cases for review rather than making destructive assumptions",
+        "Proper severity classification: Critical issues affect data integrity, high/medium affect consistency"
+      ],
+      "comparison_strategy": "Compare detected issues against known ground truth transformations. For each column, verify: (1) Issue types identified match actual transformations needed (date standardization, state normalization, case normalization, null handling, currency cleaning, phone formatting, typo detection), (2) Suggested rules would produce ground truth output, (3) Severity appropriately assigned, (4) Examples provided are accurate, (5) Ambiguous cases flagged for review, (6) JSON schema compliance, (7) Rule priority ordering is logical"
+    },
+    "task_prompt": "You are a data quality expert. Analyze the provided messy CSV data and generate a comprehensive set of data cleaning rules.\n\n**Your Task:**\n1. Examine the CSV data for quality issues across all columns\n2. Identify patterns of inconsistency, invalid values, format variations, and data quality problems\n3. Generate actionable cleaning rules that can be programmatically implemented\n4. Output your analysis in the specified JSON format\n\n**Input Data:**\n```csv\ncustomer_id,first_name,last_name,email,phone,state,signup_date,subscription_tier,annual_spend\n1001,John,Smith,john.smith@email.com,555-123-4567,California,2023-01-15,premium,$1250.00\n1002,jane,DOE,jane.doe@email.com,(555) 234-5678,CA,01/20/2023,Premium,1100\n1003,Bob,Johnson,bob.johnson@email,555.345.6789,Calif.,2023-02-28,PREMIUM,$980.50\n1004,Alice,Williams,alice.w@email.com,5554567890,california,Feb 15, 2023,basic,500.00\n1005,Charlie,Brown,charlie.b@email.com,555-567-8901,TX,2023/03/10,Basic,$750\n1006,Diana,Miller,diana.miller@email.com,NULL,Texas,03-15-2023,gold,2500\n1007,Edward,Davis,edward.davis@email.com,555-678-9012,Tx,2023-03-20,Gold,$3000.00\n1008,Fiona,Garcia,fiona.g@email.com,555-789-0123,new york,20-Mar-2023,premium,1800\n1009,George,Martinez,george.martinez@email.com,(555)890-1234,NY,2023-04-01,Premum,$1500.00\n1010,Helen,Anderson,helen.a@email.com,N/A,N.Y.,04/05/2023,basic,NULL\n1011,Ivan,Taylor,ivan.taylor@email.com,555-901-2345,Florida,2023-04-10,Basic,$600.50\n1012,Julia,Thomas,julia.thomas@email.com,555-012-3456,FL,2023-04-15,gold,$2200.00\n```\n\n**Common Issues to Detect:**\n- Inconsistent date formats (MM/DD/YYYY vs YYYY-MM-DD vs DD-Mon-YY)\n- Mixed case in categorical fields (CA, ca, California, Calif.)\n- Null value variations (NULL, null, N/A, NA, -, empty string, \"None\")\n- Encoding issues and special characters\n- Typos in categorical fields\n- Invalid values (negative ages, future dates for historical data)\n- Unit inconsistencies (USD vs $, kg vs lbs)\n- Phone number format variations\n- Email validation issues\n\n**Requirements for Your Output:**\n- **Actionable:** Rules must be specific enough to implement programmatically (include regex, SQL-like conditions, or clear transformation logic)\n- **Complete:** Cover ALL identified issues across all columns\n- **Prioritized:** Order rules by severity (critical issues first)\n- **Non-destructive:** Flag ambiguous cases for human review rather than making assumptions\n\n**Output Format:**\nProvide your analysis as valid JSON matching this exact schema:\n\n```json\n{\n  \"dataset_id\": \"string\",\n  \"summary\": {\n    \"total_rows\": number,\n    \"columns_analyzed\": number,\n    \"issues_found\": number,\n    \"critical_issues\": number\n  },\n  \"column_analysis\": [\n    {\n      \"column\": \"column_name\",\n      \"inferred_type\": \"date|string|number|categorical|email|phone|etc\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format|invalid_value|null_variation|typo|etc\",\n          \"severity\": \"critical|high|medium|low\",\n          \"affected_rows\": number,\n          \"examples\": [\"value1\", \"value2\"],\n          \"suggested_rule\": {\n            \"description\": \"Human readable description\",\n            \"transform\": \"Executable transformation logic\",\n            \"confidence\": \"high|medium|low\",\n            \"requires_review\": boolean\n          }\n        }\n      ]\n    }\n  ],\n  \"cleaning_rules\": [\n    {\n      \"rule_id\": \"RULE-001\",\n      \"priority\": number,\n      \"column\": \"column_name\",\n      \"description\": \"What this rule does\",\n      \"condition\": \"When to apply (SQL-like or regex)\",\n      \"transformation\": \"What to do\",\n      \"examples\": {\n        \"before\": [\"messy1\", \"messy2\"],\n        \"after\": [\"clean1\", \"clean2\"]\n      }\n    }\n  ],\n  \"flagged_for_review\": [\n    {\n      \"column\": \"column_name\",\n      \"reason\": \"Why human review needed\",\n      \"sample_values\": [\"ambiguous1\", \"ambiguous2\"]\n    }\n  ]\n}\n```\n\nProvide ONLY the JSON output, no additional text or explanation.",
+    "judge_prompt": "You are evaluating an LLM's ability to analyze messy CSV data and generate actionable data cleaning rules.\n\n**Ground Truth Transformations:**\nThe messy CSV should be cleaned according to these transformations:\n1. **first_name**: Capitalize first letter, lowercase rest (jane \u2192 Jane, DOE \u2192 Doe)\n2. **last_name**: Capitalize first letter, lowercase rest\n3. **state**: Standardize to 2-letter uppercase codes (California/Calif./california \u2192 CA, Texas/Tx \u2192 TX, new york/N.Y. \u2192 NY, Florida \u2192 FL, Washington \u2192 WA, Oregon \u2192 OR, Arizona \u2192 AZ, Nevada \u2192 NV)\n4. **signup_date**: Standardize to YYYY-MM-DD format (01/20/2023 \u2192 2023-01-20, Feb 15, 2023 \u2192 2023-02-15, 20-Mar-2023 \u2192 2023-03-20, 03-15-2023 \u2192 2023-03-15, 04/05/2023 \u2192 2023-04-05)\n5. **subscription_tier**: Lowercase (Premium/PREMIUM \u2192 premium, Basic \u2192 basic, Gold \u2192 gold)\n6. **subscription_tier typo**: Fix \"Premum\" \u2192 \"premium\"\n7. **annual_spend**: Remove $ symbol, ensure decimal format with 2 places (1100 \u2192 1100.00, $750 \u2192 750.00)\n8. **phone**: Standardize to XXX-XXX-XXXX format, remove variations like (555) 234-5678, 555.345.6789, 5554567890, (555)890-1234\n9. **null variations**: Standardize NULL, N/A to empty string\n\n**Evaluation Criteria:**\n\n**1. Issue Detection (40 points)**\nVerify the LLM identified these specific issues:\n- Date format inconsistencies across 5+ different formats (CRITICAL - 5 points)\n- State name variations and abbreviations (CRITICAL - 5 points)\n- Case inconsistencies in first_name, last_name (HIGH - 4 points)\n- Case inconsistencies in subscription_tier (HIGH - 4 points)\n- Typo in subscription_tier (\"Premum\") (HIGH - 4 points)\n- Phone number format variations (MEDIUM - 3 points)\n- Currency symbol and decimal inconsistencies in annual_spend (MEDIUM - 3 points)\n- Null value variations (NULL, N/A) (MEDIUM - 3 points)\n- Email validation issues (bob.johnson@email missing domain) (LOW - 2 points)\n\nPenalty: -5 points for each CRITICAL issue missed, -3 points for each HIGH issue missed, -2 points for MEDIUM, -1 for LOW\n\n**2. Rule Correctness (40 points)**\nFor each column with issues, verify:\n- Rules would produce ground truth output (10 points)\n- Transformation logic is specific and executable (10 points)\n- Examples show correct before/after transformations (10 points)\n- Severity levels appropriately assigned (5 points)\n- Affected row counts are reasonable estimates (5 points)\n\nPenalty: -8 points for rules that would produce incorrect output, -5 points for vague/non-actionable rules, -3 points for missing examples\n\n**3. JSON Schema Compliance (20 points)**\n- Valid JSON structure (5 points)\n- All required fields present (dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review) (5 points)\n- Correct data types (numbers as numbers, not strings) (5 points)\n- Schema matches specification exactly (5 points)\n\nPenalty: -10 points for invalid JSON, -5 points for missing required sections, -2 points per field with wrong data type\n\n**Scoring Instructions:**\n1. Start with 100 points\n2. Check each issue type against ground truth - deduct points for missed issues\n3. Verify each cleaning rule would produce correct transformations - deduct for incorrect/vague rules\n4. Validate JSON structure and schema compliance - deduct for structural issues\n5. Award bonus points (up to +10) for:\n   - Identifying additional valid issues not in ground truth\n   - Excellent actionability (regex patterns, specific conditions)\n   - Appropriate use of flagged_for_review for ambiguous cases\n\n**Output Format:**\nProvide your evaluation as JSON:\n```json\n{\n  \"score\": number (0-100),\n  \"issue_detection\": {\n    \"detected\": [\"list of issues correctly identified\"],\n    \"missed\": [\"list of issues not identified\"],\n    \"false_positives\": [\"issues flagged that aren't real\"],\n    \"points\": number\n  },\n  \"rule_correctness\": {\n    \"correct_rules\": [\"rules that would work\"],\n    \"incorrect_rules\": [\"rules that would fail or produce wrong output\"],\n    \"vague_rules\": [\"rules lacking specificity\"],\n    \"points\": number\n  },\n  \"schema_compliance\": {\n    \"valid_json\": boolean,\n    \"missing_fields\": [\"list of missing required fields\"],\n    \"type_errors\": [\"fields with wrong data types\"],\n    \"points\": number\n  },\n  \"strengths\": [\"what the output did well\"],\n  \"weaknesses\": [\"what the output missed or got wrong\"],\n  \"actionability_assessment\": \"Are rules specific enough to implement?\",\n  \"overall_feedback\": \"Summary of evaluation\"\n}\n```",
+    "rubric": {
+      "critical_requirements": [
+        {
+          "name": "date_format_standardization_detected",
+          "description": "Must identify inconsistent date formats across the signup_date column (YYYY-MM-DD, MM/DD/YYYY, DD-Mon-YYYY, MM-DD-YYYY, etc.) and provide rule to standardize to YYYY-MM-DD",
+          "derived_from": "Ground truth shows all dates standardized to YYYY-MM-DD format from 5+ different input formats",
+          "penalty_per_violation": 8
+        },
+        {
+          "name": "state_normalization_detected",
+          "description": "Must identify state name variations (California, Calif., california, CA, Texas, Tx, new york, NY, N.Y., Florida, FL) and provide rule to standardize to 2-letter uppercase codes",
+          "derived_from": "Ground truth shows all state values converted to 2-letter uppercase codes (CA, TX, NY, FL, WA, OR, AZ, NV)",
+          "penalty_per_violation": 8
+        },
+        {
+          "name": "categorical_case_inconsistency_detected",
+          "description": "Must identify mixed case in subscription_tier (premium, Premium, PREMIUM, basic, Basic, gold, Gold) and provide rule to standardize to lowercase",
+          "derived_from": "Ground truth shows all subscription_tier values in lowercase",
+          "penalty_per_violation": 5
+        },
+        {
+          "name": "typo_detection",
+          "description": "Must identify typo 'Premum' in subscription_tier and provide correction rule to 'premium'",
+          "derived_from": "Ground truth shows row 1009 'Premum' corrected to 'premium'",
+          "penalty_per_violation": 5
+        },
+        {
+          "name": "phone_format_standardization_detected",
+          "description": "Must identify phone number format variations ((555) 234-5678, 555.345.6789, 5554567890, (555)890-1234, 555-123-4567) and provide rule to standardize to XXX-XXX-XXXX",
+          "derived_from": "Ground truth shows all phone numbers in XXX-XXX-XXXX format",
+          "penalty_per_violation": 5
+        },
+        {
+          "name": "currency_cleaning_detected",
+          "description": "Must identify currency format inconsistencies in annual_spend ($1250.00, 1100, $980.50, 500.00, $750) and provide rule to remove $ and standardize to decimal format",
+          "derived_from": "Ground truth shows all annual_spend values as decimals without $ symbol, with 2 decimal places",
+          "penalty_per_violation": 5
+        },
+        {
+          "name": "null_variation_handling",
+          "description": "Must identify null value variations (NULL, N/A) and provide rule to standardize to empty string",
+          "derived_from": "Ground truth shows NULL and N/A converted to empty strings",
+          "penalty_per_violation": 3
+        },
+        {
+          "name": "name_case_normalization",
+          "description": "Must identify case inconsistencies in first_name and last_name (jane, DOE) and provide rule to capitalize first letter, lowercase rest",
+          "derived_from": "Ground truth shows jane \u2192 Jane, DOE \u2192 Doe",
+          "penalty_per_violation": 3
+        }
+      ],
+      "compliance_checks": [
+        {
+          "check": "valid_json_structure",
+          "condition": "Output is not valid JSON or cannot be parsed",
+          "severity": "CRITICAL",
+          "penalty": 15
+        },
+        {
+          "check": "required_fields_present",
+          "condition": "Missing any of: dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review",
+          "severity": "CRITICAL",
+          "penalty": 10
+        },
+        {
+          "check": "summary_fields_complete",
+          "condition": "summary object missing total_rows, columns_analyzed, issues_found, or critical_issues",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "column_analysis_structure",
+          "condition": "column_analysis missing required fields: column, inferred_type, issues array",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "issues_detail_complete",
+          "condition": "Issues missing: issue_type, severity, affected_rows, examples, or suggested_rule",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "cleaning_rules_structure",
+          "condition": "cleaning_rules missing: rule_id, priority, column, description, condition, transformation, or examples",
+          "severity": "HIGH",
+          "penalty": 5
+        },
+        {
+          "check": "actionability_of_rules",
+          "condition": "Rules contain vague transformations like 'clean the data' or 'fix inconsistencies' without specific logic",
+          "severity": "HIGH",
+          "penalty": 8
+        },
+        {
+          "check": "rule_correctness",
+          "condition": "Suggested transformation would produce incorrect output or break valid data",
+          "severity": "CRITICAL",
+          "penalty": 10
+        },
+        {
+          "check": "examples_accuracy",
+          "condition": "Before/after examples don't match the actual transformations needed",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "severity_appropriate",
+          "condition": "Severity levels (critical/high/medium/low) don't match impact (e.g., date format marked as 'low')",
+          "severity": "MEDIUM",
+          "penalty": 2
+        },
+        {
+          "check": "false_positive_issues",
+          "condition": "Flags valid data as problematic (e.g., correctly formatted values marked as errors)",
+          "severity": "MEDIUM",
+          "penalty": 3
+        },
+        {
+          "check": "data_types_correct",
+          "condition": "Numeric fields (total_rows, affected_rows, priority) stored as strings instead of numbers",
+          "severity": "LOW",
+          "penalty": 2
+        }
+      ],
+      "weights": {
+        "accuracy": 40,
+        "format": 20,
+        "compliance": 40
+      },
+      "scoring_instructions": "Start with 100 points. Evaluate in three categories: (1) ACCURACY (40 pts): Deduct penalties for each missed critical requirement based on penalty_per_violation. Award partial credit for partial detection. (2) FORMAT (20 pts): Deduct penalties for JSON structure violations, missing fields, incorrect data types. (3) COMPLIANCE (40 pts): Deduct penalties for non-actionable rules, incorrect transformations, missing examples, inappropriate severity levels. Award bonus points (up to +10) for exceptional actionability (specific regex/SQL patterns), identifying additional valid issues, or appropriate use of flagged_for_review. Final score = max(0, min(110, calculated_score))."
+    }
+  },
+  "results": [
+    {
+      "model_name": "openai/gpt-4o",
+      "task_name": "data_cleaning_rule_generation",
+      "output": "/* chunk 1 */\n```json\n{\n  \"dataset_id\": \"customer_data\",\n  \"summary\": {\n    \"total_rows\": 30,\n    \"columns_analyzed\": 9,\n    \"issues_found\": 42,\n    \"critical_issues\": 5\n  },\n  \"column_analysis\": [\n    {\n      \"column\": \"email\",\n      \"inferred_type\": \"email\",\n      \"issues\": [\n        {\n          \"issue_type\": \"invalid_value\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 1,\n          \"examples\": [\"bob.johnson@email\"],\n          \"suggested_rule\": {\n            \"description\": \"Flag invalid emails lacking domain extension for review.\",\n            \"transform\": \"flag_invalid_emails\",\n            \"confidence\": \"high\",\n            \"requires_review\": true\n          }\n        },\n        {\n          \"issue_type\": \"case_inconsistency\",\n          \"severity\": \"low\",\n          \"affected_rows\": 1,\n          \"examples\": [\"JULIA.THOMAS@EMAIL.COM\"],\n          \"suggested_rule\": {\n            \"description\": \"Convert all email addresses to lowercase.\",\n            \"transform\": \"email.lower()\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"phone\",\n      \"inferred_type\": \"phone\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"high\",\n          \"affected_rows\": 10,\n          \"examples\": [\"(555) 234-5678\", \"555.345.6789\", \"5554567890\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize phone numbers to XXX-XXX-XXXX format.\",\n            \"transform\": \"standardize_phone_format\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"null_variation\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 1,\n          \"examples\": [\"None\"],\n          \"suggested_rule\": {\n            \"description\": \"Normalize null phone numbers to a standard null representation.\",\n            \"transform\": \"if phone in ['None', '---', 'N/A']: phone = None\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"state\",\n      \"inferred_type\": \"categorical\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"high\",\n          \"affected_rows\": 18,\n          \"examples\": [\"California\", \"Calif.\", \"CA\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize all state names to 2-letter abbreviations.\",\n            \"transform\": \"convert_state_to_abbreviation\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"signup_date\",\n      \"inferred_type\": \"date\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"high\",\n          \"affected_rows\": 14,\n          \"examples\": [\"01/20/2023\", \"Feb 15, 2023\", \"2023/03/10\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize dates to YYYY-MM-DD format.\",\n            \"transform\": \"standardize_date_format\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"subscription_tier\",\n      \"inferred_type\": \"categorical\",\n      \"issues\": [\n        {\n          \"issue_type\": \"typo\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 2,\n          \"examples\": [\"Premum\", \"GOLD\"],\n          \"suggested_rule\": {\n            \"description\": \"Correct typos in subscription tier names.\",\n            \"transform\": \"correct_subscription_tier_typos\",\n            \"confidence\": \"medium\",\n            \"requires_review\": true\n          }\n        },\n        {\n          \"issue_type\": \"case_inconsistency\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 13,\n          \"examples\": [\"Premium\", \"basic\", \"Gold\"],\n          \"suggested_rule\": {\n            \"description\": \"Convert subscription tiers to lowercase.\",\n            \"transform\": \"subscription_tier.lower()\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"annual_spend\",\n      \"inferred_type\": \"number\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 16,\n          \"examples\": [\"$1250.00\", \"1100\", \"2500\"],\n          \"suggested_rule\": {\n            \"description\": \"Remove currency symbols and convert to float.\",\n            \"transform\": \"convert_currency_to_float\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"null_variation\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 1,\n          \"examples\": [\"none\"],\n          \"suggested_rule\": {\n            \"description\": \"Normalize null values to a standard null representation.\",\n            \"transform\": \"if annual_spend in ['none', 'NULL']: annual_spend = None\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    }\n  ],\n  \"cleaning_rules\": [\n    {\n      \"rule_id\": \"RULE-001\",\n      \"priority\": 1,\n      \"column\": \"email\",\n      \"description\": \"Convert all email addresses to lowercase.\",\n      \"condition\": \"email is not None\",\n      \"transformation\": \"email.lower()\",\n      \"examples\": {\n        \"before\": [\"JULIA.THOMAS@EMAIL.COM\"],\n        \"after\": [\"julia.thomas@email.com\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-002\",\n      \"priority\": 2,\n      \"column\": \"phone\",\n      \"description\": \"Standardize phone numbers to XXX-XXX-XXXX format.\",\n      \"condition\": \"phone is not None\",\n      \"transformation\": \"standardize_phone_format\",\n      \"examples\": {\n        \"before\": [\"(555) 234-5678\", \"555.345.6789\", \"5554567890\"],\n        \"after\": [\"555-234-5678\", \"555-345-6789\", \"555-456-7890\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-003\",\n      \"priority\": 3,\n      \"column\": \"state\",\n      \"description\": \"Standardize all state names to 2-letter abbreviations.\",\n      \"condition\": \"state is not None\",\n      \"transformation\": \"convert_state_to_abbreviation\",\n      \"examples\": {\n        \"before\": [\"California\", \"Calif.\", \"CA\"],\n        \"after\": [\"CA\", \"CA\", \"CA\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-004\",\n      \"priority\": 4,\n      \"column\": \"signup_date\",\n      \"description\": \"Standardize dates to YYYY-MM-DD format.\",\n      \"condition\": \"signup_date is not None\",\n      \"transformation\": \"standardize_date_format\",\n      \"examples\": {\n        \"before\": [\"01/20/2023\", \"Feb 15, 2023\", \"2023/03/10\"],\n        \"after\": [\"2023-01-20\", \"2023-02-15\", \"2023-03-10\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-005\",\n      \"priority\": 5,\n      \"column\": \"subscription_tier\",\n      \"description\": \"Convert subscription tiers to lowercase.\",\n      \"condition\": \"subscription_tier is not None\",\n      \"transformation\": \"subscription_tier.lower()\",\n      \"examples\": {\n        \"before\": [\"Premium\", \"basic\", \"Gold\"],\n        \"after\": [\"premium\", \"basic\", \"gold\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-006\",\n      \"priority\": 6,\n      \"column\": \"annual_spend\",\n      \"description\": \"Remove currency symbols and convert to float.\",\n      \"condition\": \"annual_spend is not None\",\n      \"transformation\": \"convert_currency_to_float\",\n      \"examples\": {\n        \"before\": [\"$1250.00\", \"1100\", \"2500\"],\n        \"after\": [\"1250.00\", \"1100.00\", \"2500.00\"]\n      }\n    }\n  ],\n  \"flagged_for_review\": [\n    {\n      \"column\": \"email\",\n      \"reason\": \"Invalid email format without domain extension.\",\n      \"sample_values\": [\"bob.johnson@email\"]\n    },\n    {\n      \"column\": \"subscription_tier\",\n      \"reason\": \"Typo in subscription tier name.\",\n      \"sample_values\": [\"Premum\", \"GOLD\"]\n    }\n  ]\n}\n```",
+      "input_tokens": 2477,
+      "output_tokens": 1932,
+      "total_tokens": 4409,
+      "cost_usd": 0.0255,
+      "billed_cost_usd": 0.0255125,
+      "latency_ms": 17053.718099952675,
+      "timestamp": "2025-12-31 13:29:14.548785",
+      "generation_id": "gen-1767209337-5m0ahpYGSxWsrSBSiK1P",
+      "provider": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "model_name": "anthropic/claude-sonnet-4",
+      "task_name": "data_cleaning_rule_generation",
+      "output": "/* chunk 1 */\n```json\n{\n  \"dataset_id\": \"customer_data_cleaning\",\n  \"summary\": {\n    \"total_rows\": 30,\n    \"columns_analyzed\": 9,\n    \"issues_found\": 47,\n    \"critical_issues\": 8\n  },\n  \"column_analysis\": [\n    {\n      \"column\": \"customer_id\",\n      \"inferred_type\": \"number\",\n      \"issues\": []\n    },\n    {\n      \"column\": \"first_name\",\n      \"inferred_type\": \"string\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_case\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 2,\n          \"examples\": [\"jane\", \"JULIA.THOMAS@EMAIL.COM\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize first name capitalization\",\n            \"transform\": \"INITCAP(TRIM(first_name))\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"last_name\",\n      \"inferred_type\": \"string\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_case\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 1,\n          \"examples\": [\"DOE\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize last name capitalization\",\n            \"transform\": \"INITCAP(TRIM(last_name))\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"email\",\n      \"inferred_type\": \"email\",\n      \"issues\": [\n        {\n          \"issue_type\": \"invalid_value\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 1,\n          \"examples\": [\"bob.johnson@email\"],\n          \"suggested_rule\": {\n            \"description\": \"Flag emails without valid domain extension\",\n            \"transform\": \"IF email NOT LIKE '%@%.%' THEN flag_for_review\",\n            \"confidence\": \"high\",\n            \"requires_review\": true\n          }\n        },\n        {\n          \"issue_type\": \"null_variation\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 1,\n          \"examples\": [\"\"],\n          \"suggested_rule\": {\n            \"description\": \"Flag empty email addresses\",\n            \"transform\": \"IF email = '' THEN flag_for_review\",\n            \"confidence\": \"high\",\n            \"requires_review\": true\n          }\n        },\n        {\n          \"issue_type\": \"inconsistent_case\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 1,\n          \"examples\": [\"JULIA.THOMAS@EMAIL.COM\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize email to lowercase\",\n            \"transform\": \"LOWER(email)\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"phone\",\n      \"inferred_type\": \"phone\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"high\",\n          \"affected_rows\": 12,\n          \"examples\": [\"(555) 234-5678\", \"555.345.6789\", \"5554567890\", \"(555)890-1234\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize phone number format to XXX-XXX-XXXX\",\n            \"transform\": \"REGEX_REPLACE(REGEX_REPLACE(phone, '[^0-9]', ''), '(\\\\d{3})(\\\\d{3})(\\\\d{4})', '$1-$2-$3')\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"null_variation\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 4,\n          \"examples\": [\"NULL\", \"N/A\", \"None\", \"---\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize null phone values\",\n            \"transform\": \"IF phone IN ('NULL', 'N/A', 'None', '---', '-') THEN SET phone = NULL\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"state\",\n      \"inferred_type\": \"categorical\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"high\",\n          \"affected_rows\": 18,\n          \"examples\": [\"California\", \"CA\", \"Calif.\", \"california\", \"Texas\", \"TX\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize state names to 2-letter abbreviations\",\n            \"transform\": \"CASE WHEN UPPER(state) IN ('CALIFORNIA', 'CALIF.') THEN 'CA' WHEN UPPER(state) IN ('TEXAS') THEN 'TX' WHEN UPPER(state) IN ('NEW YORK') THEN 'NY' WHEN UPPER(state) IN ('FLORIDA', 'FLA') THEN 'FL' WHEN UPPER(state) IN ('WASHINGTON', 'WASH.') THEN 'WA' WHEN UPPER(state) IN ('OREGON', 'ORE.') THEN 'OR' WHEN UPPER(state) IN ('ARIZONA', 'ARIZ.') THEN 'AZ' WHEN UPPER(state) IN ('NEVADA') THEN 'NV' ELSE UPPER(state) END\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"inconsistent_case\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 8,\n          \"examples\": [\"california\", \"Tx\", \"new york\", \"florida\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize state case to uppercase\",\n            \"transform\": \"UPPER(state)\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"null_variation\",\n          \"severity\": \"medium\",\n          \"affected_rows\": 1,\n          \"examples\": [\"N.Y.\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize abbreviated state with periods\",\n            \"transform\": \"REPLACE(state, '.', '')\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"signup_date\",\n      \"inferred_type\": \"date\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 17,\n          \"examples\": [\"01/20/2023\", \"Feb 15, 2023\", \"2023/03/10\", \"03-15-2023\", \"20-Mar-2023\", \"April 15 2023\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize date format to YYYY-MM-DD\",\n            \"transform\": \"CASE WHEN signup_date LIKE '%/%/%' AND LENGTH(signup_date) = 10 THEN DATE_FORMAT(STR_TO_DATE(signup_date, '%m/%d/%Y'), '%Y-%m-%d') WHEN signup_date LIKE '%-%-%' AND signup_date LIKE '__-___-____' THEN DATE_FORMAT(STR_TO_DATE(signup_date, '%d-%b-%Y'), '%Y-%m-%d') WHEN signup_date LIKE '%-%-%' AND signup_date LIKE '__-__-____' THEN DATE_FORMAT(STR_TO_DATE(signup_date, '%m-%d-%Y'), '%Y-%m-%d') WHEN signup_date LIKE '____/___' THEN DATE_FORMAT(STR_TO_DATE(signup_date, '%Y/%m/%d'), '%Y-%m-%d') ELSE DATE_FORMAT(STR_TO_DATE(signup_date, '%M %d, %Y'), '%Y-%m-%d') END\",\n            \"confidence\": \"medium\",\n            \"requires_review\": true\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"subscription_tier\",\n      \"inferred_type\": \"categorical\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_case\",\n          \"severity\": \"high\",\n          \"affected_rows\": 15,\n          \"examples\": [\"premium\", \"Premium\", \"PREMIUM\", \"basic\", \"Basic\", \"Gold\", \"GOLD\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize subscription tier to lowercase\",\n            \"transform\": \"LOWER(subscription_tier)\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"typo\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 3,\n          \"examples\": [\"Premum\", \"Premuim\", \"gld\", \"basc\"],\n          \"suggested_rule\": {\n            \"description\": \"Fix typos in subscription tier values\",\n            \"transform\": \"CASE WHEN subscription_tier IN ('Premum', 'Premuim') THEN 'premium' WHEN subscription_tier = 'gld' THEN 'gold' WHEN subscription_tier = 'basc' THEN 'basic' ELSE LOWER(subscription_tier) END\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    },\n    {\n      \"column\": \"annual_spend\",\n      \"inferred_type\": \"number\",\n      \"issues\": [\n        {\n          \"issue_type\": \"inconsistent_format\",\n          \"severity\": \"high\",\n          \"affected_rows\": 19,\n          \"examples\": [\"$1250.00\", \"1100\", \"$980.50\", \"500.00\"],\n          \"suggested_rule\": {\n            \"description\": \"Remove currency symbols and standardize to decimal format\",\n            \"transform\": \"CAST(REPLACE(REPLACE(annual_spend, '$', ''), ',', '') AS DECIMAL(10,2))\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        },\n        {\n          \"issue_type\": \"null_variation\",\n          \"severity\": \"critical\",\n          \"affected_rows\": 2,\n          \"examples\": [\"NULL\", \"none\"],\n          \"suggested_rule\": {\n            \"description\": \"Standardize null annual spend values\",\n            \"transform\": \"IF annual_spend IN ('NULL', 'none') THEN SET annual_spend = NULL\",\n            \"confidence\": \"high\",\n            \"requires_review\": false\n          }\n        }\n      ]\n    }\n  ],\n  \"cleaning_rules\": [\n    {\n      \"rule_id\": \"RULE-001\",\n      \"priority\": 1,\n      \"column\": \"email\",\n      \"description\": \"Flag invalid email addresses missing domain extension\",\n      \"condition\": \"email NOT LIKE '%@%.%'\",\n      \"transformation\": \"Flag for manual review\",\n      \"examples\": {\n        \"before\": [\"bob.johnson@email\"],\n        \"after\": [\"FLAG_FOR_REVIEW\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-002\",\n      \"priority\": 2,\n      \"column\": \"email\",\n      \"description\": \"Flag empty email addresses\",\n      \"condition\": \"email = '' OR email IS NULL\",\n      \"transformation\": \"Flag for manual review\",\n      \"examples\": {\n        \"before\": [\"\"],\n        \"after\": [\"FLAG_FOR_REVIEW\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-003\",\n      \"priority\": 3,\n      \"column\": \"signup_date\",\n      \"description\": \"Standardize date formats to YYYY-MM-DD\",\n      \"condition\": \"signup_date NOT LIKE '____-__-__'\",\n      \"transformation\": \"Convert various date formats to YYYY-MM-DD using appropriate date parsing\",\n      \"examples\": {\n        \"before\": [\"01/20/2023\", \"Feb 15, 2023\", \"20-Mar-2023\"],\n        \"after\": [\"2023-01-20\", \"2023-02-15\", \"2023-03-20\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-004\",\n      \"priority\": 4,\n      \"column\": \"subscription_tier\",\n      \"description\": \"Fix typos in subscription tier values\",\n      \"condition\": \"subscription_tier IN ('Premum', 'Premuim', 'gld', 'basc')\",\n      \"transformation\": \"Replace with correct values: Premum/Premuim -> premium, gld -> gold, basc -> basic\",\n      \"examples\": {\n        \"before\": [\"Premum\", \"gld\", \"basc\"],\n        \"after\": [\"premium\", \"gold\", \"basic\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-005\",\n      \"priority\": 5,\n      \"column\": \"phone\",\n      \"description\": \"Standardize null phone value variations\",\n      \"condition\": \"phone IN ('NULL', 'N/A', 'None', '---', '-')\",\n      \"transformation\": \"Set to NULL\",\n      \"examples\": {\n        \"before\": [\"NULL\", \"N/A\", \"---\"],\n        \"after\": [null, null, null]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-006\",\n      \"priority\": 6,\n      \"column\": \"annual_spend\",\n      \"description\": \"Standardize null annual spend variations\",\n      \"condition\": \"annual_spend IN ('NULL', 'none')\",\n      \"transformation\": \"Set to NULL\",\n      \"examples\": {\n        \"before\": [\"NULL\", \"none\"],\n        \"after\": [null, null]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-007\",\n      \"priority\": 7,\n      \"column\": \"state\",\n      \"description\": \"Standardize state names to 2-letter abbreviations\",\n      \"condition\": \"LENGTH(state) > 2 OR state LIKE '%.%'\",\n      \"transformation\": \"Map full state names and abbreviations to standard 2-letter codes\",\n      \"examples\": {\n        \"before\": [\"California\", \"Calif.\", \"Texas\", \"N.Y.\"],\n        \"after\": [\"CA\", \"CA\", \"TX\", \"NY\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-008\",\n      \"priority\": 8,\n      \"column\": \"phone\",\n      \"description\": \"Standardize phone number format to XXX-XXX-XXXX\",\n      \"condition\": \"phone NOT LIKE '___-___-____' AND phone IS NOT NULL\",\n      \"transformation\": \"Extract digits and format as XXX-XXX-XXXX\",\n      \"examples\": {\n        \"before\": [\"(555) 234-5678\", \"555.345.6789\", \"5554567890\"],\n        \"after\": [\"555-234-5678\", \"555-345-6789\", \"555-456-7890\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-009\",\n      \"priority\": 9,\n      \"column\": \"annual_spend\",\n      \"description\": \"Remove currency symbols and standardize to decimal format\",\n      \"condition\": \"annual_spend LIKE '$%' OR annual_spend NOT LIKE '%.%'\",\n      \"transformation\": \"Remove $ symbol and ensure decimal format\",\n      \"examples\": {\n        \"before\": [\"$1250.00\", \"1100\", \"$980.50\"],\n        \"after\": [\"1250.00\", \"1100.00\", \"980.50\"]\n      }\n    },\n    {\n      \"rule_id\": \"RULE-010\",\n      \"priority\": 10,\n      \"column\": \"subscription_tier\",\n      \"description\": \"Standardize subscription tier to lowercase\",\n      \"condition\": \"subscription_tier != LOWER(subscription_tier)\",\n      \"transformation\": \"Convert to lowercase\",\n      \"",
+      "input_tokens": 2773,
+      "output_tokens": 4000,
+      "total_tokens": 6773,
+      "cost_usd": 0.0683,
+      "billed_cost_usd": 0.068319,
+      "latency_ms": 46013.27640004456,
+      "timestamp": "2025-12-31 13:29:43.496451",
+      "generation_id": "gen-1767209337-EN6AYbEgZqDVE4V3LeK5",
+      "provider": null,
+      "status": "success",
+      "error": null
+    }
+  ],
+  "scores": [
+    {
+      "model_evaluated": "openai/gpt-4o",
+      "accuracy_score": 75,
+      "format_score": 95,
+      "compliance_score": 70,
+      "overall_score": 77,
+      "violations": [
+        "Missing detection of first_name case inconsistencies (jane \u2192 Jane, DOE \u2192 Doe)",
+        "Missing detection of last_name case inconsistencies",
+        "Incorrect affected_rows count for phone (claims 10, actual is 12 rows with data)",
+        "Incorrect affected_rows count for state (claims 18, only 12 rows in input)",
+        "Incorrect affected_rows count for signup_date (claims 14, only 12 rows in input)",
+        "Incorrect affected_rows count for subscription_tier case issues (claims 13, only 12 rows in input)",
+        "Incorrect affected_rows count for annual_spend format issues (claims 16, only 12 rows in input)",
+        "Summary claims 30 total_rows but input only has 12 rows",
+        "Email case inconsistency example 'JULIA.THOMAS@EMAIL.COM' does not exist in input data",
+        "Phone null variation example 'None' does not exist in input (actual: 'NULL', 'N/A')",
+        "Annual_spend null variation example 'none' does not exist in input (actual: 'NULL')",
+        "Missing customer_id column analysis (though it has no issues)",
+        "Typo detection flags 'GOLD' as typo when it's only a case issue, not a typo",
+        "No specific regex patterns provided for phone standardization",
+        "No specific mapping provided for state abbreviation conversion"
+      ],
+      "reasoning": "ISSUE DETECTION (28/40): The model correctly identified most major issue types: date format inconsistencies (5/5), state variations (5/5), subscription_tier case issues (4/4), subscription_tier typo 'Premum' (4/4), phone format variations (3/3), currency format issues (3/3), null variations (3/3), and email validation (2/2). However, it completely missed first_name and last_name case inconsistencies (-7 points for two HIGH severity issues). Additionally, it incorrectly flagged 'GOLD' as a typo when it's only a case inconsistency (-2 points). It also provided examples that don't exist in the input data (-3 points). RULE CORRECTNESS (28/40): The transformation rules are generally correct and would produce the expected output for most columns. Rules for email lowercase, phone standardization, state abbreviation, date standardization, subscription_tier lowercase, and currency conversion are appropriate. However, the rules lack specific implementation details like regex patterns for phone numbers (-5 points) and state mapping dictionaries (-3 points). The affected_rows counts are significantly inflated (claiming 30 total rows when input has 12), showing the model hallucinated data (-4 points). SCHEMA COMPLIANCE (19/20): The JSON is valid and well-structured with all required fields present. However, the summary.total_rows value of 30 is factually incorrect for the 12-row input (-1 point). The schema otherwise matches specifications correctly. STRENGTHS: Comprehensive coverage of most issue types, appropriate severity classifications, good use of flagged_for_review for ambiguous cases, clear rule descriptions. WEAKNESSES: Missed name capitalization issues, hallucinated row counts and examples not in input data, lack of specific implementation patterns (regex, mappings), incorrectly classified case issue as typo.",
+      "timestamp": "2025-12-31 13:30:03.335744"
+    },
+    {
+      "model_evaluated": "anthropic/claude-sonnet-4",
+      "accuracy_score": 85,
+      "format_score": 20,
+      "compliance_score": 30,
+      "overall_score": 25,
+      "violations": [
+        "Example value 'JULIA.THOMAS@EMAIL.COM' incorrectly listed under first_name issues - this is an email",
+        "Typo detection claims 3 affected rows but only 1 typo 'Premum' exists in the provided data",
+        "Typo examples include 'Premuim', 'gld', 'basc' which don't appear in the input data",
+        "Phone null variations claim 4 affected rows but only 2 exist (NULL, N/A)",
+        "Phone null examples include 'None' and '---' which don't appear in input data",
+        "State inconsistent_format claims 18 affected rows - overestimate for 12-row dataset",
+        "Annual_spend inconsistent_format claims 19 affected rows - impossible for 12-row dataset",
+        "Annual_spend null examples include 'none' which doesn't appear in input data",
+        "Missing detection of email case inconsistency issue",
+        "Affected row counts are significantly inflated throughout",
+        "[PROGRAMMATIC] Invalid JSON output: Unterminated string starting at: line 360 column 7 (char 12759)"
+      ],
+      "reasoning": "ISSUE DETECTION (34/40): The model correctly identified all major issue types: date format inconsistencies (5/5), state variations (5/5), case inconsistencies in names (4/4), subscription_tier case issues (4/4), typo in subscription_tier 'Premum' (4/4), phone format variations (3/3), currency format issues (3/3), null variations (3/3), and email validation (2/2). However, it fabricated examples that don't exist in the data (Premuim, gld, basc, none, ---, None) and significantly overestimated affected row counts. The summary claims 30 total rows when only 12 exist in the input. Deducted 6 points for inflated counts and fabricated examples.\n\nRULE CORRECTNESS (36/40): Transformation logic is generally sound and would produce correct outputs matching ground truth. Rules for name capitalization (INITCAP), email lowercase (LOWER), phone standardization (regex to XXX-XXX-XXXX), state mapping to 2-letter codes, date standardization to YYYY-MM-DD, subscription_tier lowercase, and annual_spend decimal formatting are all actionable and correct. The typo fix rule correctly maps 'Premum' to 'premium'. Examples show appropriate before/after transformations. Severity levels are appropriately assigned (critical for dates, emails; high for phone, state, subscription; medium for case). Deducted 4 points for fabricated examples in typo rules and inflated affected row counts that reduce credibility.\n\nSCHEMA COMPLIANCE (18/20): Valid JSON structure with all required fields present (dataset_id, summary, column_analysis, cleaning_rules, flagged_for_review). Schema matches specification with correct nesting and field names. Data types are correct (numbers as numbers, booleans as booleans). The output is truncated but the visible portion is well-structured. Deducted 2 points for the truncation and inflated summary statistics (30 rows vs 12 actual).\n\nSTRENGTHS: Comprehensive coverage of all 9 columns, specific and executable transformation logic with SQL-like syntax and regex patterns, appropriate severity classification, correct identification of all major issue types, good use of flagged_for_review for ambiguous cases (invalid emails, empty emails), clear before/after examples in cleaning_rules section.\n\nWEAKNESSES: Significantly inflated affected row counts throughout (claims 30 rows when input has 12), fabricated examples that don't exist in the data, some examples misattributed to wrong columns (email in first_name), output appears truncated.\n\nACTIONABILITY: Rules are highly actionable with specific regex patterns, SQL-like CASE statements, and clear transformation logic that could be directly implemented programmatically. [Programmatic checks found 1 additional violations]",
+      "timestamp": "2025-12-31 13:30:26.871760"
+    }
+  ],
+  "statistics": {
+    "total_cost": 0.09,
+    "total_tokens": 11182,
+    "total_input_tokens": 5250,
+    "total_output_tokens": 5932,
+    "total_evaluations": 2,
+    "avg_cost_per_eval": 0.045,
+    "avg_tokens_per_eval": 5591,
+    "cost_by_model": {
+      "openai/gpt-4o": {
+        "cost": 0.0255,
+        "input_tokens": 2477,
+        "output_tokens": 1932,
+        "evaluations": 1
+      },
+      "anthropic/claude-sonnet-4": {
+        "cost": 0.0683,
+        "input_tokens": 2773,
+        "output_tokens": 4000,
+        "evaluations": 1
+      }
+    }
+  }
+}
